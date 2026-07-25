@@ -697,7 +697,7 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 	// StatementAssign.cpp:515–537 — expr.Output always for ops that need RHS
 	// sticky no soft invent "0" or "lhs = " empty RHS for incomplete IR
 	if st.AssignOp.NeedNoRHS() {
-		return st.AssignOp.AssignOpC(lhs, "")
+		return st.AssignOp.AssignOpCSess(s, lhs, "")
 	}
 	if st.Expr == nil {
 		sessNoteError(s, ErrGeneric)
@@ -710,7 +710,7 @@ func OutputAssignSimpleSess(s *Session, st *Stmt, wrapVol bool) string {
 		}
 		return ""
 	}
-	return st.AssignOp.AssignOpC(lhs, rhs)
+	return st.AssignOp.AssignOpCSess(s, lhs, rhs)
 }
 
 // assignLhsText resolves LHS text for assign emit.
@@ -810,7 +810,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 					if sessHasError(s) {
 						return ""
 					}
-					return lhs + " = " + lhs + " " + bop.BinaryOpC() + " " + rhs
+					return lhs + " = " + lhs + " " + bop.BinaryOpCSess(s) + " " + rhs
 				}
 				// residual ERROR sticky — no invent non-vol soft path past IsVolatile residual false
 				if sessHasError(s) {
@@ -833,7 +833,7 @@ func OutputAssignAsExprOptsSess(s *Session, st *Stmt, wrapVol bool, opts Options
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
-			fname := st.SafeFlags.BinaryFuncNameSess(s, bop.BinaryOpC())
+			fname := st.SafeFlags.BinaryFuncNameSess(s, bop.BinaryOpCSess(s))
 			if fname == "" {
 				// SafeOpFlags.cpp assert empty name sticky; no invent bare +=
 				if !sessHasError(s) {

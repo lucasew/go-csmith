@@ -658,11 +658,11 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 		t.Fatal("missing CFG edge from inserted goto")
 	}
 	// PreOutput labels dest, not mid
-	preDest, okDest := PreOutput(&Stmt{Kind: StmtAssign, StmID: destID}, fm, false, false, nil, "")
+	preDest, okDest := PreOutputSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: destID}, fm, false, false, nil, "")
 	if !okDest || !strings.Contains(preDest, got.Label) {
 		t.Fatalf("dest PreOutput want label %q, got %q ok=%v", got.Label, preDest, okDest)
 	}
-	preMid, okMid := PreOutput(&Stmt{Kind: StmtAssign, StmID: midID}, fm, false, false, nil, "")
+	preMid, okMid := PreOutputSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: midID}, fm, false, false, nil, "")
 	if okMid && strings.Contains(preMid, got.Label) {
 		t.Fatalf("mid must not carry dest label; pre=%q", preMid)
 	}
@@ -845,7 +845,7 @@ func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
 	st := &Stmt{Kind: StmtAssign, SourceLabel: "lbl_1", StmID: 1}
 	// emitLabelAttrs true with rng — generator complete path may emit attrs; no residual unless hole.
 	// residual hole: verify complete path hygiene + empty LabelAttr path ok
-	out, isGoto := PreOutput(st, nil, false, false, nil, "")
+	out, isGoto := PreOutputSess(testAmbientSession, st, nil, false, false, nil, "")
 	if !isGoto || !strings.Contains(out, "lbl_1:") {
 		t.Fatal("complete SourceLabel PreOutput", out, isGoto)
 	}
@@ -854,7 +854,7 @@ func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Statement residual
-	if s, _ := PreOutput(nil, nil, false, false, nil, ""); s != "" {
+	if s, _ := PreOutputSess(testAmbientSession, nil, nil, false, false, nil, ""); s != "" {
 		t.Fatal("nil PreOutput must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

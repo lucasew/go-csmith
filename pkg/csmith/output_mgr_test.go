@@ -30,24 +30,24 @@ func TestMonitoredFuncs(t *testing.T) {
 	// OutputMgr.cpp:81–86
 	ClearMonitoredFuncsSess(testAmbientSession)
 	defer ClearMonitoredFuncsSess(testAmbientSession)
-	if !IsMonitoredFunc() {
+	if !IsMonitoredFuncSess(testAmbientSession, ) {
 		t.Fatal("empty list → all monitored")
 	}
-	SetMonitoredFuncs("func_1,func_2")
-	SetCurrFunc("func_1")
-	if !IsMonitoredFunc() {
+	SetMonitoredFuncsSess(testAmbientSession, "func_1,func_2")
+	SetCurrFuncSess(testAmbientSession, "func_1")
+	if !IsMonitoredFuncSess(testAmbientSession, ) {
 		t.Fatal("func_1 in list")
 	}
-	SetCurrFunc("func_3")
-	if IsMonitoredFunc() {
+	SetCurrFuncSess(testAmbientSession, "func_3")
+	if IsMonitoredFuncSess(testAmbientSession, ) {
 		t.Fatal("func_3 not in list")
 	}
 	// Options.ApplyMonitoredFuncs
 	o := Defaults()
 	o.MonitorFuncs = "main"
 	o.ApplyMonitoredFuncs()
-	SetCurrFunc("main")
-	if !IsMonitoredFunc() {
+	SetCurrFuncSess(testAmbientSession, "main")
+	if !IsMonitoredFuncSess(testAmbientSession, ) {
 		t.Fatal("main")
 	}
 }
@@ -110,18 +110,18 @@ func TestOutputMgrHashHelpers(t *testing.T) {
 	}
 	ClearMonitoredFuncsSess(testAmbientSession)
 	defer ClearMonitoredFuncsSess(testAmbientSession)
-	if got := OutputStepHashFuncInvocation(1, 7); got != "    step_hash(7);\n" {
+	if got := OutputStepHashFuncInvocationSess(testAmbientSession, 1, 7); got != "    step_hash(7);\n" {
 		t.Fatal(got)
 	}
 	// not monitored → soft empty
-	SetMonitoredFuncs("only_this")
-	SetCurrFunc("other")
-	if OutputStepHashFuncInvocation(1, 7) != "" {
+	SetMonitoredFuncsSess(testAmbientSession, "only_this")
+	SetCurrFuncSess(testAmbientSession, "other")
+	if OutputStepHashFuncInvocationSess(testAmbientSession, 1, 7) != "" {
 		t.Fatal("unmonitored soft empty")
 	}
 	// incomplete id sticky
-	SetCurrFunc("only_this")
-	if OutputStepHashFuncInvocation(1, 0) != "" || !HasErrorSess(testAmbientSession) {
+	SetCurrFuncSess(testAmbientSession, "only_this")
+	if OutputStepHashFuncInvocationSess(testAmbientSession, 1, 0) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("stmt_id 0 sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -142,20 +142,20 @@ func TestDefaultOutputMgrSplitPaths(t *testing.T) {
 		t.Fatal("split")
 	}
 	// empty dir sticky
-	if SplitOutputFilePath(o, 0) != "" || !HasErrorSess(testAmbientSession) {
+	if SplitOutputFilePathSess(testAmbientSession, o, 0) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty SplitFilesDir sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	o.SplitFilesDir = "/tmp/csmith-split-test"
-	p := SplitOutputFilePath(o, 2)
+	p := SplitOutputFilePathSess(testAmbientSession, o, 2)
 	if !strings.HasSuffix(p, "rnd_output2.c") {
 		t.Fatal(p)
 	}
-	if !strings.HasSuffix(SplitGlobalsHeaderPath(o), "rnd_globals.h") {
-		t.Fatal(SplitGlobalsHeaderPath(o))
+	if !strings.HasSuffix(SplitGlobalsHeaderPathSess(testAmbientSession, o), "rnd_globals.h") {
+		t.Fatal(SplitGlobalsHeaderPathSess(testAmbientSession, o))
 	}
 	// negative index sticky
-	if SplitOutputFilePath(o, -1) != "" || !HasErrorSess(testAmbientSession) {
+	if SplitOutputFilePathSess(testAmbientSession, o, -1) != "" || !HasErrorSess(testAmbientSession) {
 		t.Fatal("neg index")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -171,7 +171,7 @@ func TestDefaultOutputMgrSplitPaths(t *testing.T) {
 		t.Fatal(SplitPrimaryHeaderInclude())
 	}
 	// CreateOutputDir empty sticky
-	if CreateOutputDir("") || !HasErrorSess(testAmbientSession) {
+	if CreateOutputDirSess(testAmbientSession, "") || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty dir sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -183,7 +183,7 @@ func TestDFSCompactEmitGates(t *testing.T) {
 	if CompactOutputLn(true) != "" || CompactOutputLn(false) != "\n" {
 		t.Fatal("compact ln")
 	}
-	if CompactOutputCommentLine("x", true, false, false) != "" {
+	if CompactOutputCommentLineSess(testAmbientSession, "x", true, false, false) != "" {
 		t.Fatal("compact comment")
 	}
 	if CompactOutputTab(2, true) != "" {

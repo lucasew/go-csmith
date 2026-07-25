@@ -11,7 +11,7 @@ func TestCreateDefaultOutputMgrSplit(t *testing.T) {
 	o := Defaults()
 	o.MaxSplitFiles = 3
 	o.SplitFilesDir = "/tmp/csmith-split-unit"
-	if !CreateDefaultOutputMgr(o) || HasErrorSess(testAmbientSession) {
+	if !CreateDefaultOutputMgrSess(testAmbientSession, o) || HasErrorSess(testAmbientSession) {
 		t.Fatal("create", HasErrorSess(testAmbientSession))
 	}
 	paths := ProcessSplitPathsSess(testAmbientSession)
@@ -21,8 +21,8 @@ func TestCreateDefaultOutputMgrSplit(t *testing.T) {
 	if !strings.HasSuffix(paths[1], "rnd_output1.c") {
 		t.Fatal(paths[1])
 	}
-	if GetMainOutPath(o) != paths[0] {
-		t.Fatal(GetMainOutPath(o))
+	if GetMainOutPathSess(testAmbientSession, o) != paths[0] {
+		t.Fatal(GetMainOutPathSess(testAmbientSession, o))
 	}
 	ClearOutputMgrSess(testAmbientSession)
 }
@@ -33,7 +33,7 @@ func TestCreateDefaultOutputMgrSplitDirSticky(t *testing.T) {
 	o := Defaults()
 	o.MaxSplitFiles = 2
 	o.SplitFilesDir = ""
-	if CreateDefaultOutputMgr(o) || !HasErrorSess(testAmbientSession) {
+	if CreateDefaultOutputMgrSess(testAmbientSession, o) || !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty dir sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -53,7 +53,7 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, o)
 	v1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	v2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
-	out := RandomOutputVarDefs([]*Variable{v1, v2}, 2, true)
+	out := RandomOutputVarDefsSess(testAmbientSession, []*Variable{v1, v2}, 2, true)
 	if out == nil || HasErrorSess(testAmbientSession) {
 		t.Fatal("var defs", HasErrorSess(testAmbientSession))
 	}
@@ -69,7 +69,7 @@ func TestRandomOutputVarDefsAssign(t *testing.T) {
 
 func TestRandomOutputDefsEmptyFilesSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if RandomOutputVarDefs(nil, 0, true) != nil || !HasErrorSess(testAmbientSession) {
+	if RandomOutputVarDefsSess(testAmbientSession, nil, 0, true) != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("nFiles 0 sticky")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -77,7 +77,7 @@ func TestRandomOutputDefsEmptyFilesSticky(t *testing.T) {
 
 func TestSplitAllHeadersContent(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	h := SplitAllHeadersContent(3, true, "void foo(void);\n")
+	h := SplitAllHeadersContentSess(testAmbientSession, 3, true, "void foo(void);\n")
 	if len(h) != 3 {
 		t.Fatal(len(h))
 	}
@@ -98,7 +98,7 @@ func TestCreateDFSOutputMgr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	ClearOutputMgrSess(testAmbientSession)
 	o := Defaults()
-	CreateDFSOutputMgr(o)
+	CreateDFSOutputMgrSess(testAmbientSession, o)
 	if ProcessOutputMgrKindSess(testAmbientSession) != OutputMgrKindDFS {
 		t.Fatal(ProcessOutputMgrKindSess(testAmbientSession))
 	}
@@ -106,7 +106,7 @@ func TestCreateDFSOutputMgr(t *testing.T) {
 		t.Fatal(ProcessStructOutputSess(testAmbientSession))
 	}
 	o.StructOutput = "my_structs.h"
-	CreateDFSOutputMgr(o)
+	CreateDFSOutputMgrSess(testAmbientSession, o)
 	if ProcessStructOutputSess(testAmbientSession) != "my_structs.h" {
 		t.Fatal(ProcessStructOutputSess(testAmbientSession))
 	}

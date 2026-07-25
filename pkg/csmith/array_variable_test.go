@@ -1180,7 +1180,7 @@ func TestOutputExpressionVariableAddrOfItemized(t *testing.T) {
 	item.AsArray = item
 	// want type is pointer to element so indirect_level = 0 - 1 = -1 for &
 	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EULong))
-	got := outputExpressionVariable(&item.Variable, want)
+	got := outputExpressionVariableSess(testAmbientSession, &item.Variable, want)
 	if got != "&g_83[1]" {
 		t.Fatalf("got %q want &g_83[1]", got)
 	}

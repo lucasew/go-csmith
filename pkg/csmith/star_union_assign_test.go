@@ -36,7 +36,7 @@ func TestStarAssignUnionPtrRenewsLastWrite(t *testing.T) {
 	if indir != 1 {
 		t.Fatalf("indir want 1 got %d err=%v", indir, GetErrorSess(testAmbientSession))
 	}
-	if !fm.UpdateFactForAssignWant(l90, indir, lhs.GetType(), rhs) {
+	if !fm.UpdateFactForAssignWant(l90, indir, lhs.GetTypeSess(testAmbientSession), rhs) {
 		t.Fatalf("UpdateFactForAssignWant: %v", GetErrorSess(testAmbientSession))
 	}
 	got := FindRelatedUnionSess(testAmbientSession, fm.UnionFacts, g88)

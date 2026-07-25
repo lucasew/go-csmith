@@ -7,10 +7,6 @@ package csmith
 // Incomplete IR fails closed sticky: *ptrs → IncompleteVariables (not bare nil —
 // VariablesComplete(nil)/len==0 invents empty-complete ptr list / soft re-pick past hole).
 // ptrs always live; sticky (no invent soft-skip collect past hole).
-func CollectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) {
-	CollectReferencedPtrsExpressionSess(testAmbientSession, e, ptrs)
-}
-
 // CollectReferencedPtrsExpressionSess is CollectReferencedPtrsExpression with explicit session residual sticky.
 func CollectReferencedPtrsExpressionSess(s *Session, e *Expression, ptrs *[]*Variable) {
 	if ptrs == nil {
@@ -25,10 +21,6 @@ func CollectReferencedPtrsExpressionSess(s *Session, e *Expression, ptrs *[]*Var
 
 // collectReferencedPtrsExpression returns false on incomplete IR.
 // On failure *ptrs is IncompleteVariables (caller may also overwrite).
-func collectReferencedPtrsExpression(e *Expression, ptrs *[]*Variable) bool {
-	return collectReferencedPtrsExpressionSess(testAmbientSession, e, ptrs)
-}
-
 func collectReferencedPtrsExpressionSess(s *Session, e *Expression, ptrs *[]*Variable) bool {
 	if e == nil || ptrs == nil {
 		if ptrs != nil {
@@ -131,10 +123,6 @@ func collectReferencedPtrsExpressionSess(s *Session, e *Expression, ptrs *[]*Var
 // Incomplete IR → sticky IncompleteVariables (not bare nil invent empty-complete).
 // ptrs always live; sticky (no invent soft-skip collect past hole).}
 
-func CollectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) {
-	CollectReferencedPtrsStmtSess(testAmbientSession, st, ptrs)
-}
-
 // CollectReferencedPtrsStmtSess is CollectReferencedPtrsStmt with explicit session residual sticky.
 func CollectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) {
 	if ptrs == nil {
@@ -145,10 +133,6 @@ func CollectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) {
 		*ptrs = IncompleteVariables()
 		sessNoteError(s, ErrGeneric)
 	}
-}
-
-func collectReferencedPtrsStmt(st *Stmt, ptrs *[]*Variable) bool {
-	return collectReferencedPtrsStmtSess(testAmbientSession, st, ptrs)
 }
 
 func collectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) bool {
@@ -269,10 +253,6 @@ func collectReferencedPtrsStmtSess(s *Session, st *Stmt, ptrs *[]*Variable) bool
 // CollectReferencedPtrsBlock walks all statements in a block for referenced pointers.
 // ptrs always live; sticky (no invent soft-skip collect past hole).}
 
-func CollectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) {
-	CollectReferencedPtrsBlockSess(testAmbientSession, b, ptrs)
-}
-
 // CollectReferencedPtrsBlockSess is CollectReferencedPtrsBlock with explicit session residual sticky.
 func CollectReferencedPtrsBlockSess(s *Session, b *Block, ptrs *[]*Variable) {
 	if ptrs == nil {
@@ -283,10 +263,6 @@ func CollectReferencedPtrsBlockSess(s *Session, b *Block, ptrs *[]*Variable) {
 		*ptrs = IncompleteVariables()
 		sessNoteError(s, ErrGeneric)
 	}
-}
-
-func collectReferencedPtrsBlock(b *Block, ptrs *[]*Variable) bool {
-	return collectReferencedPtrsBlockSess(testAmbientSession, b, ptrs)
 }
 
 func collectReferencedPtrsBlockSess(s *Session, b *Block, ptrs *[]*Variable) bool {
@@ -309,10 +285,6 @@ func collectReferencedPtrsBlockSess(s *Session, b *Block, ptrs *[]*Variable) boo
 // appendUniqueVar appends v if not already present.
 // Variable always live in collect walks; sticky leave list unchanged
 // (no invent soft-skip nil hole as absent — callers fail closed IncompleteVariables).
-func appendUniqueVar(list []*Variable, v *Variable) []*Variable {
-	return appendUniqueVarSess(testAmbientSession, list, v)
-}
-
 func appendUniqueVarSess(s *Session, list []*Variable, v *Variable) []*Variable {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -329,10 +301,6 @@ func appendUniqueVarSess(s *Session, list []*Variable, v *Variable) []*Variable 
 // ReadUnionFieldExpr reports whether expression reads a union field.
 // Statement.cpp:665+ subset via IsInsideUnionField.
 // Incomplete IR sticky true (no invent "no union field read" / soft re-pick).
-func ReadUnionFieldExpr(e *Expression) bool {
-	return ReadUnionFieldExprSess(testAmbientSession, e)
-}
-
 func ReadUnionFieldExprSess(s *Session, e *Expression) bool {
 	// Expression always live; sticky incomplete as reads-union (restrictive)
 	if e == nil {
@@ -406,10 +374,6 @@ func ReadUnionFieldExprSess(s *Session, e *Expression) bool {
 // union_field_read. Go subset: IR walk of get_exprs/get_blocks + callee flags.
 // Incomplete for-test / call-collect / block holes sticky true
 // (no invent "no union field read" / soft re-pick past holes).}
-
-func ReadUnionFieldStmt(st *Stmt) bool {
-	return ReadUnionFieldStmtSess(testAmbientSession, st)
-}
 
 func ReadUnionFieldStmtSess(s *Session, st *Stmt) bool {
 	// Statement always live; sticky incomplete as reads-union (restrictive)
@@ -512,10 +476,6 @@ func ReadUnionFieldStmtSess(s *Session, st *Stmt) bool {
 // ReadUnionFieldBlock walks statements for union field access.
 // Incomplete Block sticky false for nil shell is complete empty walk; live block only.}
 
-func ReadUnionFieldBlock(b *Block) bool {
-	return ReadUnionFieldBlockSess(testAmbientSession, b)
-}
-
 // ReadUnionFieldBlockSess is ReadUnionFieldBlock with explicit session residual sticky.
 func ReadUnionFieldBlockSess(s *Session, b *Block) bool {
 	// nil block is complete empty (no stmts) — not incomplete IR
@@ -536,10 +496,6 @@ func ReadUnionFieldBlockSess(s *Session, b *Block) bool {
 // Incomplete body IR fails closed sticky UnionFieldRead + IncompleteVariables
 // ReferencedPtrs (no invent clean empty summary / soft re-pick past hole walk).
 // Function always live; sticky (no invent soft-skip summary past hole).
-func (f *Function) ComputeSummary(bodyEffect Effect) {
-	f.ComputeSummarySess(testAmbientSession, bodyEffect)
-}
-
 // ComputeSummarySess is ComputeSummary with explicit session residual sticky.
 func (f *Function) ComputeSummarySess(s *Session, bodyEffect Effect) {
 	if f == nil {

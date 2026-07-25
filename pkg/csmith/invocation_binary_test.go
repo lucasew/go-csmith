@@ -7,8 +7,8 @@ func TestBinaryOpFromString(t *testing.T) {
 	if !ok || op != BinAnd {
 		t.Fatal(op, ok)
 	}
-	if GetBinopString(BinAdd) != "+" {
-		t.Fatal(GetBinopString(BinAdd))
+	if GetBinopStringSess(testAmbientSession, BinAdd) != "+" {
+		t.Fatal(GetBinopStringSess(testAmbientSession, BinAdd))
 	}
 }
 

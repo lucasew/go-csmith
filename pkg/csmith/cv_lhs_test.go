@@ -190,18 +190,18 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 	if lhs1.IndirectLevelSess(testAmbientSession) != 1 {
 		t.Fatal(lhs1.IndirectLevelSess(testAmbientSession))
 	}
-	lvars := lhs1.GetLvars(facts)
+	lvars := lhs1.GetLvarsSess(testAmbientSession, facts)
 	if len(lvars) != 1 || lvars[0] != tgt {
 		t.Fatal(lvars)
 	}
-	ptrs := lhs1.GetReferencedPtrs()
+	ptrs := lhs1.GetReferencedPtrsSess(testAmbientSession)
 	if len(ptrs) != 1 || ptrs[0] != p {
 		t.Fatal(ptrs)
 	}
 	// qfer with 2 levels for pointer
 	p.Qfer = NewCVQualifiers([]bool{false, true}, []bool{false, false})
 	// indirect 1 → pop one → remaining [false]
-	q := lhs1.GetQualifiers()
+	q := lhs1.GetQualifiersSess(testAmbientSession)
 	if len(q.IsConsts) != 1 {
 		t.Fatal(q)
 	}
@@ -212,7 +212,7 @@ func TestLhsGetQualifiersConstSetsError(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntTypeSess(testAmbientSession), true, false)
 	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
-	q := lhs.GetQualifiers()
+	q := lhs.GetQualifiersSess(testAmbientSession)
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
 		t.Fatal("const LHS residual must fail closed empty quals, not invent shell", q)
 	}

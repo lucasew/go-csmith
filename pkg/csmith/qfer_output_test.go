@@ -430,7 +430,7 @@ func TestOutputExpressionVariableNoInventEmptyBase(t *testing.T) {
 	}
 	v.UseVolRVal = true
 	v.Type = nil // force VOL_RVAL fail closed empty
-	if s := outputExpressionVariable(v, GetIntTypeSess(testAmbientSession)); s != "" {
+	if s := outputExpressionVariableSess(testAmbientSession, v, GetIntTypeSess(testAmbientSession)); s != "" {
 		t.Fatal("empty base must fail closed", s)
 	}
 }
@@ -772,7 +772,7 @@ func TestOutputConditionBoundResidualSticky(t *testing.T) {
 	// array without AsArray → OutputLowerBound residual sticky
 	arr := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}}
 	f := &FactPointTo{Var: CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), PointTo: []*Variable{arr}}
-	if s := f.OutputCondition(); s != "" {
+	if s := f.OutputConditionSess(testAmbientSession); s != "" {
 		t.Fatal("bound residual must fail closed OutputCondition", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

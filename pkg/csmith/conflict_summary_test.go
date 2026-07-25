@@ -160,7 +160,7 @@ func TestComputeSummaryReferencedPtrs(t *testing.T) {
 			Expr: &Expression{Term: TermConstant, Con: &Constant{Type: p.Type, Value: "0"}}, AssignOp: AssignSimple},
 	}}
 	bodyEff := EmptyEffect().WriteVarSess(testAmbientSession, p)
-	f.ComputeSummary(bodyEff)
+	f.ComputeSummarySess(testAmbientSession, bodyEff)
 	if len(f.ReferencedPtrs) != 1 || f.ReferencedPtrs[0] != p {
 		t.Fatal(f.ReferencedPtrs)
 	}
@@ -182,11 +182,11 @@ func TestReadUnionFieldForTestExpr(t *testing.T) {
 	uv.FieldVars = []*Variable{f0}
 	test := &Expression{Term: TermVariable, Var: f0, ExprType: GetIntTypeSess(testAmbientSession)}
 	st := &Stmt{Kind: StmtFor, Loop: &LoopControl{TestExpr: test}, Then: &Block{}}
-	if !ReadUnionFieldStmt(st) {
+	if !ReadUnionFieldStmtSess(testAmbientSession, st) {
 		t.Fatal("for-test union field must count")
 	}
 	// incomplete for without TestExpr fails closed true
-	if !ReadUnionFieldStmt(&Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
+	if !ReadUnionFieldStmtSess(testAmbientSession, &Stmt{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}}) {
 		t.Fatal("incomplete for must fail closed true")
 	}
 }
@@ -196,14 +196,14 @@ func TestReadUnionFieldCalleeFlag(t *testing.T) {
 	callee := &Function{Name: "g", UnionFieldRead: true, ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true}
 	call := &Expression{Term: TermFunction, Invoke: &Invocation{User: callee}}
 	st := &Stmt{Kind: StmtInvoke, Expr: call}
-	if !ReadUnionFieldStmt(st) {
+	if !ReadUnionFieldStmtSess(testAmbientSession, st) {
 		t.Fatal("callee UnionFieldRead must count")
 	}
 	// assign/invoke without Expr — no invent "no union field read"
-	if !ReadUnionFieldStmt(&Stmt{Kind: StmtAssign, StmID: 1}) {
+	if !ReadUnionFieldStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: 1}) {
 		t.Fatal("nil Expr assign must fail closed true")
 	}
-	if !ReadUnionFieldExpr(nil) {
+	if !ReadUnionFieldExprSess(testAmbientSession, nil) {
 		t.Fatal("nil expr must fail closed true")
 	}
 }
@@ -213,7 +213,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	var ptrs []*Variable
 	ptrs = []*Variable{CreateVariableScalarsSess(testAmbientSession, "stale", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)}
-	CollectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &ptrs)
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: 1}, &ptrs)
 	// IncompleteVariables sticky — not bare nil invent empty-complete
 	if VariablesComplete(ptrs) {
 		t.Fatal("incomplete collect must IncompleteVariables, not empty-complete", ptrs)
@@ -223,7 +223,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	ptrs = []*Variable{}
-	CollectReferencedPtrsStmt(&Stmt{Kind: StmtInvoke, StmID: 2}, &ptrs)
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{Kind: StmtInvoke, StmID: 2}, &ptrs)
 	if VariablesComplete(ptrs) {
 		t.Fatal("incomplete invoke must IncompleteVariables")
 	}
@@ -232,23 +232,23 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// ptrs always live; sticky (no invent soft-skip collect past hole)
-	CollectReferencedPtrsExpression(&Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, nil)
+	CollectReferencedPtrsExpressionSess(testAmbientSession, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptrs CollectReferencedPtrsExpression must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	CollectReferencedPtrsStmt(&Stmt{Kind: StmtBreak, StmID: 3}, nil)
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{Kind: StmtBreak, StmID: 3}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptrs CollectReferencedPtrsStmt must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	CollectReferencedPtrsBlock(&Block{}, nil)
+	CollectReferencedPtrsBlockSess(testAmbientSession, &Block{}, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil ptrs CollectReferencedPtrsBlock must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// Variable always live in collect walks; sticky
-	got := appendUniqueVar(nil, nil)
+	got := appendUniqueVarSess(testAmbientSession, nil, nil)
 	if got != nil {
 		t.Fatal("nil var appendUniqueVar must leave list", got)
 	}
@@ -258,7 +258,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// TermFunction without Invoke sticky incomplete collect
 	var ptrs2 []*Variable
-	CollectReferencedPtrsExpression(&Expression{Term: TermFunction}, &ptrs2)
+	CollectReferencedPtrsExpressionSess(testAmbientSession, &Expression{Term: TermFunction}, &ptrs2)
 	if VariablesComplete(ptrs2) {
 		t.Fatal("nil Invoke collect must IncompleteVariables")
 	}
@@ -268,7 +268,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil Expr assign sticky
 	var ptrs3 []*Variable
-	CollectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 9}, &ptrs3)
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{Kind: StmtAssign, StmID: 9}, &ptrs3)
 	if VariablesComplete(ptrs3) {
 		t.Fatal("nil Expr assign collect must IncompleteVariables")
 	}
@@ -278,7 +278,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil Variable sticky (no invent complete no-ptrs via IsPointer false)
 	var ptrs4 []*Variable
-	CollectReferencedPtrsExpression(&Expression{
+	CollectReferencedPtrsExpressionSess(testAmbientSession, &Expression{
 		Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil},
 	}, &ptrs4)
 	if VariablesComplete(ptrs4) {
@@ -290,7 +290,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil LhsVar sticky
 	var ptrs5 []*Variable
-	CollectReferencedPtrsStmt(&Stmt{
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{
 		Kind: StmtAssign, StmID: 10,
 		Expr:   &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		LhsVar: &Variable{Name: "g_hole", Type: nil},
@@ -313,7 +313,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	}}}
 	var ptrsArr []*Variable
 	// with init_value on Expr (C++ path) — must NOT walk Then Lhs as extra ptr
-	CollectReferencedPtrsStmt(&Stmt{
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{
 		Kind: StmtArrayOp, StmID: 1,
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 4, IncrN: 1},
 		Then: body, Expr: rhs,
@@ -332,7 +332,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Expr-only (no Then) still completes
 	var ptrsInit []*Variable
-	CollectReferencedPtrsStmt(&Stmt{
+	CollectReferencedPtrsStmtSess(testAmbientSession, &Stmt{
 		Kind: StmtArrayOp, StmID: 3,
 		Loop: &LoopControl{IV: iv, InitN: 0, LimitN: 2, IncrN: 1},
 		Expr: rhs,
@@ -354,7 +354,7 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	f.Body = &Block{Stmts: []Stmt{
 		{Kind: StmtFor, Loop: &LoopControl{}, Then: &Block{}},
 	}}
-	f.ComputeSummary(EmptyEffect())
+	f.ComputeSummarySess(testAmbientSession, EmptyEffect())
 	if !f.UnionFieldRead {
 		t.Fatal("incomplete for must fail closed UnionFieldRead")
 	}
@@ -372,7 +372,7 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Function always live; sticky no invent soft-skip summary past hole
-	(*Function)(nil).ComputeSummary(EmptyEffect())
+	(*Function)(nil).ComputeSummarySess(testAmbientSession, EmptyEffect())
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Function ComputeSummary must SetError sticky")
 	}
@@ -437,14 +437,14 @@ func TestDoFinalization(t *testing.T) {
 
 func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if !ReadUnionFieldExpr(nil) {
+	if !ReadUnionFieldExprSess(testAmbientSession, nil) {
 		t.Fatal("nil Expr ReadUnionField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Expr ReadUnionField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !ReadUnionFieldStmt(nil) {
+	if !ReadUnionFieldStmtSess(testAmbientSession, nil) {
 		t.Fatal("nil Stmt ReadUnionField must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -453,7 +453,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete constant assign does not read union field
 	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), AssignOp: AssignSimple}
-	if ReadUnionFieldStmt(st) {
+	if ReadUnionFieldStmtSess(testAmbientSession, st) {
 		t.Fatal("scalar assign must not read union field")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -465,7 +465,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	parentHole := &Variable{Name: "g_u"} // Type nil
 	fieldHole := &Variable{Name: "g_u.f0", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: parentHole}
 	stHole := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}, LhsVar: fieldHole, AssignOp: AssignSimple}
-	if !ReadUnionFieldStmt(stHole) {
+	if !ReadUnionFieldStmtSess(testAmbientSession, stHole) {
 		t.Fatal("IsInsideUnionField residual ReadUnionFieldStmt must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -476,7 +476,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	lhsHole := &Expression{Term: TermVariable, Var: fieldHole}
 	rhsOK := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x2", GetIntTypeSess(testAmbientSession), false, false)}
 	comma := &Expression{Term: TermCommaExpr, CommaLHS: lhsHole, CommaRHS: rhsOK}
-	if !ReadUnionFieldExpr(comma) {
+	if !ReadUnionFieldExprSess(testAmbientSession, comma) {
 		t.Fatal("nested IsInside residual ReadUnionFieldExpr must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {

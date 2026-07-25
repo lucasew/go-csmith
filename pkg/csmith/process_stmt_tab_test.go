@@ -155,7 +155,7 @@ func TestBinaryOpsFilterNoInventProbs(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	// reject-all when process unset (no invent NewProbabilities(opts))
-	f := BinaryOpsFilter(Defaults())
+	f := BinaryOpsFilterSess(testAmbientSession, Defaults())
 	if !f.Filter(0) {
 		t.Fatal("nil process must reject-all")
 	}

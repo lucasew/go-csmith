@@ -80,7 +80,7 @@ func TestLhsGetTypeResidualNoInventExprType(t *testing.T) {
 	// Probe Lhs.GetType residual itself (wrap path guards HasError after same residual).
 	ClearErrorSess(testAmbientSession)
 	hole := &Lhs{Var: &Variable{Name: "g_hole"}}
-	if hole.GetType() != nil {
+	if hole.GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("Type-nil Lhs GetType must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {

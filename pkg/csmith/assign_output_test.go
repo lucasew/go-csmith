@@ -47,22 +47,22 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	}
 	// AssignOpC — sticky no invent empty-name or empty-rhs shells
 	ClearErrorSess(testAmbientSession)
-	if AssignSimple.AssignOpC("", "1") != "" || AssignSimple.AssignOpC("g", "") != "" {
+	if AssignSimple.AssignOpCSess(testAmbientSession, "", "1") != "" || AssignSimple.AssignOpCSess(testAmbientSession, "g", "") != "" {
 		t.Fatal("AssignOpC empty sides must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AssignOpC empty sides must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if AssignPreIncr.AssignOpC("", "") != "" {
+	if AssignPreIncr.AssignOpCSess(testAmbientSession, "", "") != "" {
 		t.Fatal("empty name preincr must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("empty name preincr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if AssignPreIncr.AssignOpC("g", "") != "++g" {
-		t.Fatal(AssignPreIncr.AssignOpC("g", ""))
+	if AssignPreIncr.AssignOpCSess(testAmbientSession, "g", "") != "++g" {
+		t.Fatal(AssignPreIncr.AssignOpCSess(testAmbientSession, "g", ""))
 	}
 	ClearErrorSess(testAmbientSession)
 }

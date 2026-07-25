@@ -656,22 +656,22 @@ func TestFactPointToLatticeTopBottom(t *testing.T) {
 	// FactPointTo.h:93–98 is_top/is_bottom/set_top/set_bottom
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := MakeFactPointToSess(testAmbientSession, p, NullPtr)
-	if f.IsBottom() {
+	if f.IsBottomSess(testAmbientSession) {
 		t.Fatal("is_bottom always false")
 	}
-	if f.IsTop() {
+	if f.IsTopSess(testAmbientSession) {
 		t.Fatal("non-empty not top")
 	}
-	f.SetTop()
-	if !f.IsTop() || len(f.PointTo) != 0 {
+	f.SetTopSess(testAmbientSession)
+	if !f.IsTopSess(testAmbientSession) || len(f.PointTo) != 0 {
 		t.Fatal("set_top clears")
 	}
-	f.SetBottom() // no-op
-	if f.GetVar() != p {
+	f.SetBottomSess(testAmbientSession) // no-op
+	if f.GetVarSess(testAmbientSession) != p {
 		t.Fatal("get_var")
 	}
 	f2 := MakeFactPointToSess(testAmbientSession, p, NullPtr)
-	if out := f2.Output(); out == "" || out != "g_p => {null}" {
+	if out := f2.OutputSess(testAmbientSession); out == "" || out != "g_p => {null}" {
 		// name may vary; just require format
 		if out == "" {
 			t.Fatal("Output empty")
@@ -746,7 +746,7 @@ func TestFactPointToPointToAndStr(t *testing.T) {
 		t.Fatal("related same var")
 	}
 	f.ClearSess(testAmbientSession)
-	if !f.EmptySess(testAmbientSession) || !f.IsTop() {
+	if !f.EmptySess(testAmbientSession) || !f.IsTopSess(testAmbientSession) {
 		t.Fatal("clear → top")
 	}
 	ClearErrorSess(testAmbientSession)

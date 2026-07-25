@@ -57,20 +57,12 @@ func ParseStringOptions(vname string) []string {
 
 // SetMonitoredFuncs mirrors CGOptions::monitored_funcs.
 // CGOptions.cpp:558–560 — parse into OutputMgr::monitored_funcs_.
-func SetMonitoredFuncs(fnames string) {
-	SetMonitoredFuncsSess(testAmbientSession, fnames)
-}
-
 // SetMonitoredFuncsSess installs monitored func names on an explicit session bag.
 func SetMonitoredFuncsSess(s *Session, fnames string) {
 	sessOrAmbient(s).MonitoredFuncs = ParseStringOptions(fnames)
 }
 
 // MonitoredFuncs returns a copy of OutputMgr::monitored_funcs_.
-func MonitoredFuncs() []string {
-	return MonitoredFuncsSess(testAmbientSession)
-}
-
 // MonitoredFuncsSess returns monitored funcs on an explicit session bag.
 func MonitoredFuncsSess(s *Session) []string {
 	s = sessOrAmbient(s)
@@ -89,10 +81,6 @@ func ClearMonitoredFuncsSess(s *Session) {
 
 // SetCurrFunc mirrors OutputMgr::set_curr_func.
 // OutputMgr.cpp:77–79.
-func SetCurrFunc(fname string) {
-	SetCurrFuncSess(testAmbientSession, fname)
-}
-
 // SetCurrFuncSess sets curr_func_ on an explicit session bag.
 func SetCurrFuncSess(s *Session, fname string) {
 	sessOrAmbient(s).CurrFunc = fname
@@ -103,10 +91,6 @@ func CurrFuncSess(s *Session) string { return sessOrAmbient(s).CurrFunc }
 
 // IsMonitoredFunc mirrors OutputMgr::is_monitored_func.
 // OutputMgr.cpp:81–86 — empty list → all monitored; else curr must be in list.
-func IsMonitoredFunc() bool {
-	return IsMonitoredFuncSess(testAmbientSession)
-}
-
 // IsMonitoredFuncSess is IsMonitoredFunc on an explicit session bag.
 func IsMonitoredFuncSess(s *Session) bool {
 	s = sessOrAmbient(s)
@@ -149,10 +133,6 @@ func OutputHashFuncInvocation(indent int) string {
 
 // OutputStepHashFuncInvocation mirrors OutputMgr::OutputStepHashFuncInvocation.
 // OutputMgr.cpp:161–167 — only when is_monitored_func; else soft empty.
-func OutputStepHashFuncInvocation(indent, stmtID int) string {
-	return OutputStepHashFuncInvocationSess(testAmbientSession, indent, stmtID)
-}
-
 // OutputStepHashFuncInvocationSess is OutputStepHashFuncInvocation with explicit session residual sticky.
 func OutputStepHashFuncInvocationSess(s *Session, indent, stmtID int) string {
 	if !IsMonitoredFuncSess(s) {
@@ -173,10 +153,6 @@ func IsSplit(opts Options) bool { return opts.MaxSplitFiles > 0 }
 // CreateOutputDir mirrors DefaultOutputMgr::create_output_dir.
 // DefaultOutputMgr.cpp:99–101 → platform create_dir.
 // Empty dir sticky false (no invent cwd as success).
-func CreateOutputDir(dir string) bool {
-	return CreateOutputDirSess(testAmbientSession, dir)
-}
-
 // CreateOutputDirSess is CreateOutputDir with explicit session residual sticky.
 func CreateOutputDirSess(s *Session, dir string) bool {
 	if dir == "" {
@@ -189,10 +165,6 @@ func CreateOutputDirSess(s *Session, dir string) bool {
 // SplitOutputFilePath mirrors DefaultOutputMgr::open_one_output_file path build.
 // DefaultOutputMgr.cpp:79–85 — split_files_dir/rnd_output{N}.c (dir_sep = OS separator).
 // Empty split dir sticky "" (no invent relative bare name).
-func SplitOutputFilePath(opts Options, num int) string {
-	return SplitOutputFilePathSess(testAmbientSession, opts, num)
-}
-
 // SplitOutputFilePathSess is SplitOutputFilePath with explicit session residual sticky.
 func SplitOutputFilePathSess(s *Session, opts Options, num int) string {
 	dir := strings.TrimSpace(opts.SplitFilesDir)
@@ -211,10 +183,6 @@ func SplitOutputFilePathSess(s *Session, opts Options, num int) string {
 
 // SplitGlobalsHeaderPath is DefaultOutputMgr::OutputGlobals header path.
 // DefaultOutputMgr.cpp:104–105 — split_files_dir/rnd_globals.h.
-func SplitGlobalsHeaderPath(opts Options) string {
-	return SplitGlobalsHeaderPathSess(testAmbientSession, opts)
-}
-
 // SplitGlobalsHeaderPathSess is SplitGlobalsHeaderPath with explicit session residual sticky.
 func SplitGlobalsHeaderPathSess(s *Session, opts Options) string {
 	dir := strings.TrimSpace(opts.SplitFilesDir)
@@ -270,10 +238,6 @@ func CompactOutputLn(compact bool) string {
 
 // CompactOutputCommentLine mirrors DFSOutputMgr::output_comment_line.
 // DFSOutputMgr.cpp:99–103 — compact skips comments entirely.
-func CompactOutputCommentLine(comment string, compact, quiet, concise bool) string {
-	return CompactOutputCommentLineSess(testAmbientSession, comment, compact, quiet, concise)
-}
-
 // CompactOutputCommentLineSess is CompactOutputCommentLine with explicit session residual sticky.
 func CompactOutputCommentLineSess(s *Session, comment string, compact, quiet, concise bool) string {
 	if compact {
@@ -312,10 +276,6 @@ const (
 // CreateDefaultOutputMgr mirrors DefaultOutputMgr::CreateInstance + init.
 // DefaultOutputMgr.cpp:62–97 — record ofile path; if max_split_files>0 build split paths.
 // Does not open OS files (library returns paths/content); incomplete split dir sticky.
-func CreateDefaultOutputMgr(opts Options) bool {
-	return CreateDefaultOutputMgrSess(testAmbientSession, opts)
-}
-
 // CreateDefaultOutputMgrSess is CreateDefaultOutputMgr on an explicit session bag.
 func CreateDefaultOutputMgrSess(s *Session, opts Options) bool {
 	s = sessOrAmbient(s)
@@ -348,10 +308,6 @@ func CreateDefaultOutputMgrSess(s *Session, opts Options) bool {
 
 // CreateDFSOutputMgr mirrors DFSOutputMgr::CreateInstance.
 // DFSOutputMgr.cpp:49–61 — struct_output_ default or CGOptions::struct_output.
-func CreateDFSOutputMgr(opts Options) {
-	CreateDFSOutputMgrSess(testAmbientSession, opts)
-}
-
 // CreateDFSOutputMgrSess is CreateDFSOutputMgr on an explicit session bag.
 func CreateDFSOutputMgrSess(s *Session, opts Options) {
 	s = sessOrAmbient(s)
@@ -399,10 +355,6 @@ func ProcessOutputFileSess(s *Session) string { return sessOrAmbient(s).OutputFi
 // GetMainOutPath mirrors DefaultOutputMgr::get_main_out target name.
 // DefaultOutputMgr.cpp:197–205 — split → outs[0]; ofile_; else "" (stdout).
 // Empty string means stdout (library has no ostream).
-func GetMainOutPath(opts Options) string {
-	return GetMainOutPathSess(testAmbientSession, opts)
-}
-
 // GetMainOutPathSess is GetMainOutPath on an explicit session bag.
 func GetMainOutPathSess(s *Session, opts Options) string {
 	s = sessOrAmbient(s)
@@ -420,10 +372,6 @@ func GetMainOutPathSess(s *Session, opts Options) string {
 // PureRndUptoIndex mirrors pure_rnd_upto for split file pick.
 // DefaultOutputMgr.cpp:148 / 159 — index = pure_rnd_upto(size).
 // nFiles==0 sticky -1 (no invent index 0 into empty outs).
-func PureRndUptoIndex(nFiles int) int {
-	return PureRndUptoIndexSess(testAmbientSession, nFiles)
-}
-
 // PureRndUptoIndexSess is PureRndUptoIndex with explicit session residual sticky.
 func PureRndUptoIndexSess(s *Session, nFiles int) int {
 	if nFiles <= 0 {
@@ -436,20 +384,12 @@ func PureRndUptoIndexSess(s *Session, nFiles int) int {
 // RandomOutputVarDefs mirrors DefaultOutputMgr::RandomOutputVarDefs pure assignment.
 // DefaultOutputMgr.cpp:144–151 — each global → pure_rnd_upto(nFiles) file bucket.
 // Returns nFiles content strings (defs only, no headers). Incomplete globals sticky nil.
-func RandomOutputVarDefs(globals []*Variable, nFiles int, forceStatic bool) []string {
-	return RandomOutputVarDefsSess(testAmbientSession, globals, nFiles, forceStatic)
-}
-
 // RandomOutputVarDefsSess is RandomOutputVarDefs with Options/sticky from an explicit bag.
 func RandomOutputVarDefsSess(s *Session, globals []*Variable, nFiles int, forceStatic bool) []string {
 	return RandomOutputVarDefsOptsSess(s, globals, nFiles, forceStatic, sessOpts(s))
 }
 
 // RandomOutputVarDefsOpts is RandomOutputVarDefs with explicit session Options.
-func RandomOutputVarDefsOpts(globals []*Variable, nFiles int, forceStatic bool, opts Options) []string {
-	return RandomOutputVarDefsOptsSess(testAmbientSession, globals, nFiles, forceStatic, opts)
-}
-
 func RandomOutputVarDefsOptsSess(s *Session, globals []*Variable, nFiles int, forceStatic bool, opts Options) []string {
 	if nFiles <= 0 {
 		sessNoteError(s, ErrGeneric)
@@ -492,20 +432,12 @@ func RandomOutputVarDefsOptsSess(s *Session, globals []*Variable, nFiles int, fo
 // DefaultOutputMgr.cpp:154–163 — skip builtin; pure_rnd_upto file; Function::Output.
 // Returns nFiles body strings. Incomplete funcs sticky nil.}
 
-func RandomOutputFuncDefs(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
-	return RandomOutputFuncDefsSess(testAmbientSession, funcs, nFiles, forceStatic, funcAttr, rng)
-}
-
 // RandomOutputFuncDefsSess is RandomOutputFuncDefs with Options/sticky from an explicit bag.
 func RandomOutputFuncDefsSess(s *Session, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
 	return RandomOutputFuncDefsOptsSess(s, funcs, nFiles, forceStatic, funcAttr, rng, sessOpts(s))
 }
 
 // RandomOutputFuncDefsOpts is RandomOutputFuncDefs with explicit session Options.
-func RandomOutputFuncDefsOpts(funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng, opts Options) []string {
-	return RandomOutputFuncDefsOptsSess(testAmbientSession, funcs, nFiles, forceStatic, funcAttr, rng, opts)
-}
-
 func RandomOutputFuncDefsOptsSess(s *Session, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng, opts Options) []string {
 	if nFiles <= 0 {
 		sessNoteError(s, ErrGeneric)
@@ -542,20 +474,12 @@ func RandomOutputFuncDefsOptsSess(s *Session, funcs []*Function, nFiles int, for
 // RandomOutputDefs mirrors DefaultOutputMgr::RandomOutputDefs.
 // DefaultOutputMgr.cpp:165–168 — var defs then func defs into same nFiles buckets.}
 
-func RandomOutputDefs(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
-	return RandomOutputDefsSess(testAmbientSession, globals, funcs, nFiles, forceStatic, funcAttr, rng)
-}
-
 // RandomOutputDefsSess is RandomOutputDefs with Options/sticky from an explicit bag.
 func RandomOutputDefsSess(s *Session, globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng) []string {
 	return RandomOutputDefsOptsSess(s, globals, funcs, nFiles, forceStatic, funcAttr, rng, sessOpts(s))
 }
 
 // RandomOutputDefsOpts is RandomOutputDefs with explicit session Options.
-func RandomOutputDefsOpts(globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng, opts Options) []string {
-	return RandomOutputDefsOptsSess(testAmbientSession, globals, funcs, nFiles, forceStatic, funcAttr, rng, opts)
-}
-
 func RandomOutputDefsOptsSess(s *Session, globals []*Variable, funcs []*Function, nFiles int, forceStatic, funcAttr bool, rng *Rng, opts Options) []string {
 	vars := RandomOutputVarDefsOptsSess(s, globals, nFiles, forceStatic, opts)
 	if vars == nil || sessHasError(s) {
@@ -575,10 +499,6 @@ func RandomOutputDefsOptsSess(s *Session, globals []*Variable, funcs []*Function
 // SplitAllHeadersContent mirrors DefaultOutputMgr::OutputAllHeaders for N files.
 // DefaultOutputMgr.cpp:120–141 — secondary preambles; primary include; all get forwards.
 // forwards is OutputForwardDeclarations text (same into every file).
-
-func SplitAllHeadersContent(nFiles int, paranoid bool, forwards string) []string {
-	return SplitAllHeadersContentSess(testAmbientSession, nFiles, paranoid, forwards)
-}
 
 // SplitAllHeadersContentSess is SplitAllHeadersContent with explicit session residual sticky.
 func SplitAllHeadersContentSess(s *Session, nFiles int, paranoid bool, forwards string) []string {

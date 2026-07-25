@@ -11,7 +11,7 @@ func TestPickBinaryOpFullRange(t *testing.T) {
 	seen := map[BinaryOp]bool{}
 	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 500; i++ {
-		op := PickBinaryOp(r, opts)
+		op := PickBinaryOpSess(testAmbientSession, r, opts)
 		if int(op) < 0 || int(op) >= MaxBinaryOp {
 			t.Fatalf("out of range %v", op)
 		}
@@ -33,7 +33,7 @@ func TestPickBinaryOpRespectsNoMuls(t *testing.T) {
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	r := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 200; i++ {
-		op := PickBinaryOp(r, opts)
+		op := PickBinaryOpSess(testAmbientSession, r, opts)
 		if op == BinMul || op == BinDiv {
 			t.Fatalf("got disabled op %v", op)
 		}
@@ -41,12 +41,12 @@ func TestPickBinaryOpRespectsNoMuls(t *testing.T) {
 }
 
 func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
-	// no soft invent BinaryOpsFilter(opts) when process Probabilities unset
+	// no soft invent BinaryOpsFilterSess(testAmbientSession, opts) when process Probabilities unset
 	// non-sticky MAX (sticky poisons unit paths without process singleton)
 	prev := ProcessProbabilitiesSess(testAmbientSession)
 	SetProcessProbabilitiesSess(testAmbientSession, nil)
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
-	op := PickBinaryOp(NewRngSess(testAmbientSession, 1), Defaults())
+	op := PickBinaryOpSess(testAmbientSession, NewRngSess(testAmbientSession, 1), Defaults())
 	if int(op) != MaxBinaryOp {
 		t.Fatalf("want MAX without process probs, got %v", op)
 	}
@@ -55,14 +55,14 @@ func TestPickBinaryOpNilProbsFailClosed(t *testing.T) {
 func TestPickBinaryUnaryOpNilRNGSticky(t *testing.T) {
 	// always rnd_upto; sticky no invent eAdd/eMinus without RNG
 	ClearErrorSess(testAmbientSession)
-	if int(PickBinaryOp(nil, Defaults())) != MaxBinaryOp {
+	if int(PickBinaryOpSess(testAmbientSession, nil, Defaults())) != MaxBinaryOp {
 		t.Fatal("nil RNG PickBinaryOp must fail closed MAX")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG PickBinaryOp must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if int(PickUnaryOp(nil, Defaults())) != MaxUnaryOp {
+	if int(PickUnaryOpSess(testAmbientSession, nil, Defaults())) != MaxUnaryOp {
 		t.Fatal("nil RNG PickUnaryOp must fail closed MAX")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,28 +73,28 @@ func TestPickBinaryUnaryOpNilRNGSticky(t *testing.T) {
 
 func TestBinaryOpCTokens(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if BinAdd.BinaryOpC() != "+" || BinAnd.BinaryOpC() != "&&" || BinLShift.BinaryOpC() != "<<" {
+	if BinAdd.BinaryOpCSess(testAmbientSession) != "+" || BinAnd.BinaryOpCSess(testAmbientSession) != "&&" || BinLShift.BinaryOpCSess(testAmbientSession) != "<<" {
 		t.Fatal("token map")
 	}
-	if BinCmpLt.CmpOpC() != "<" {
+	if BinCmpLt.CmpOpCSess(testAmbientSession) != "<" {
 		t.Fatal("cmp")
 	}
 	// invalid op tokens sticky — no invent "+" / "<" / "-"
-	if BinaryOp(MaxBinaryOp).BinaryOpC() != "" {
+	if BinaryOp(MaxBinaryOp).BinaryOpCSess(testAmbientSession) != "" {
 		t.Fatal("invalid BinaryOpC must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("invalid BinaryOpC must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if BinAdd.CmpOpC() != "" {
+	if BinAdd.CmpOpCSess(testAmbientSession) != "" {
 		t.Fatal("non-cmp CmpOpC must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-cmp CmpOpC must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if UnaryOp(MaxUnaryOp).UnaryOpC() != "" {
+	if UnaryOp(MaxUnaryOp).UnaryOpCSess(testAmbientSession) != "" {
 		t.Fatal("invalid UnaryOpC must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {

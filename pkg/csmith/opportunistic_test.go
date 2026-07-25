@@ -343,29 +343,29 @@ func TestLhsCompatibleExpr(t *testing.T) {
 	lhs := &Lhs{Var: a, Type: GetIntTypeSess(testAmbientSession)}
 	ea := &Expression{Term: TermVariable, Var: a, ExprType: GetIntTypeSess(testAmbientSession)}
 	eb := &Expression{Term: TermVariable, Var: b, ExprType: GetIntTypeSess(testAmbientSession)}
-	if !lhs.CompatibleExpr(ea, false) {
+	if !lhs.CompatibleExprSess(testAmbientSession, ea, false) {
 		t.Fatal("same var")
 	}
-	if lhs.CompatibleExpr(eb, false) {
+	if lhs.CompatibleExprSess(testAmbientSession, eb, false) {
 		t.Fatal("other var")
 	}
 	// Lhs + Expression always live; sticky no invent not-compatible soft-skip
 	ClearErrorSess(testAmbientSession)
-	if (*Lhs)(nil).CompatibleExpr(ea, false) {
+	if (*Lhs)(nil).CompatibleExprSess(testAmbientSession, ea, false) {
 		t.Fatal("nil Lhs CompatibleExpr must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs CompatibleExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if lhs.CompatibleExpr(nil, false) {
+	if lhs.CompatibleExprSess(testAmbientSession, nil, false) {
 		t.Fatal("nil exp CompatibleExpr must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil exp CompatibleExpr must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Lhs)(nil).CompatibleVar(a, false) {
+	if (*Lhs)(nil).CompatibleVarSess(testAmbientSession, a, false) {
 		t.Fatal("nil Lhs CompatibleVar must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

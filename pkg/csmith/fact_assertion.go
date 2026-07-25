@@ -10,10 +10,6 @@ import (
 // IsTop mirrors FactPointTo::is_top — empty points-to set.
 // FactPointTo.h:93.
 // Incomplete Fact shell sticky false (no invent TOP / soft re-pick past hole).
-func (f *FactPointTo) IsTop() bool {
-	return f.IsTopSess(testAmbientSession)
-}
-
 // IsTopSess is IsTop with explicit session residual sticky.
 func (f *FactPointTo) IsTopSess(s *Session) bool {
 	// Fact always live; sticky incomplete no invent empty-complete TOP
@@ -26,10 +22,6 @@ func (f *FactPointTo) IsTopSess(s *Session) bool {
 
 // IsBottom mirrors FactPointTo::is_bottom — always false (no bottom lattice).
 // FactPointTo.h:94–96.
-func (f *FactPointTo) IsBottom() bool {
-	return f.IsBottomSess(testAmbientSession)
-}
-
 // IsBottomSess is IsBottom with explicit session residual sticky.
 func (f *FactPointTo) IsBottomSess(s *Session) bool {
 	if f == nil {
@@ -41,10 +33,6 @@ func (f *FactPointTo) IsBottomSess(s *Session) bool {
 
 // SetTop mirrors FactPointTo::set_top — clear points-to set.
 // FactPointTo.h:97.
-func (f *FactPointTo) SetTop() {
-	f.SetTopSess(testAmbientSession)
-}
-
 // SetTopSess is SetTop with explicit session residual sticky.
 func (f *FactPointTo) SetTopSess(s *Session) {
 	if f == nil {
@@ -56,10 +44,6 @@ func (f *FactPointTo) SetTopSess(s *Session) {
 
 // SetBottom mirrors FactPointTo::set_bottom — no-op.
 // FactPointTo.h:98.
-func (f *FactPointTo) SetBottom() {
-	f.SetBottomSess(testAmbientSession)
-}
-
 // SetBottomSess is SetBottom with explicit session residual sticky.
 func (f *FactPointTo) SetBottomSess(s *Session) {
 	if f == nil {
@@ -70,10 +54,6 @@ func (f *FactPointTo) SetBottomSess(s *Session) {
 
 // GetVar mirrors Fact::get_var / FactPointTo::get_var.
 // FactPointTo.h:64.
-func (f *FactPointTo) GetVar() *Variable {
-	return f.GetVarSess(testAmbientSession)
-}
-
 // GetVarSess is GetVar with explicit session residual sticky.
 func (f *FactPointTo) GetVarSess(s *Session) *Variable {
 	if f == nil {
@@ -85,10 +65,6 @@ func (f *FactPointTo) GetVarSess(s *Session) *Variable {
 
 // Output mirrors FactPointTo::Output — pointee set diagnostic.
 // FactPointTo.cpp Output — subject and pointees by name.
-func (f *FactPointTo) Output() string {
-	return f.OutputSess(testAmbientSession)
-}
-
 // OutputSess is Output with explicit session residual sticky.
 func (f *FactPointTo) OutputSess(s *Session) string {
 	if f == nil {
@@ -120,10 +96,6 @@ func (f *FactPointTo) OutputSess(s *Session) string {
 // FactPointTo.cpp:87–99 — subject or pointee not visible at stm parent.
 // Incomplete Param/LocalVars / PointTo holes fail closed sticky as invisible
 // (no invent "all visible" / soft re-pick past holes).
-func (f *FactPointTo) HasInvisible(stParent *Block) bool {
-	return f.HasInvisibleSess(testAmbientSession, stParent)
-}
-
 func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 	if f == nil || f.Var == nil {
 		sessNoteError(s, ErrGeneric)
@@ -173,10 +145,6 @@ func (f *FactPointTo) HasInvisibleSess(s *Session, stParent *Block) bool {
 // Incomplete PointTo fails closed sticky not-assertable (no invent skip GarbagePtr
 // / soft re-pick past hole via IsVariableInSet false membership).}
 
-func (f *FactPointTo) IsAssertable(stParent *Block) bool {
-	return f.IsAssertableSess(testAmbientSession, stParent)
-}
-
 // IsAssertableSess is IsAssertable with explicit session residual sticky.
 func (f *FactPointTo) IsAssertableSess(s *Session, stParent *Block) bool {
 	if f == nil || f.Var == nil {
@@ -211,17 +179,13 @@ func (f *FactPointTo) IsAssertableSess(s *Session, stParent *Block) bool {
 
 // OutputCondition mirrors FactPointTo::Output — C expression for the fact.
 // FactPointTo.cpp:627–658.
-func (f *FactPointTo) OutputCondition() string {
-	return f.OutputConditionSess(testAmbientSession)
-}
-
 func (f *FactPointTo) OutputConditionSess(s *Session) string {
 	// Fact subject always live; sticky no invent bare pointee compare without var
 	if f == nil || f.Var == nil {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	lhs := outputFactVar(f.Var)
+	lhs := outputFactVarSess(s, f.Var)
 	// residual ERROR sticky — no invent soft-empty condition past outputFactVar residual
 	if sessHasError(s) {
 		return ""
@@ -290,10 +254,6 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 	return strings.Join(parts, " || ")
 }
 
-func outputFactVar(v *Variable) string {
-	return outputFactVarSess(testAmbientSession, v)
-}
-
 func outputFactVarSess(s *Session, v *Variable) string {
 	// Variable always live at fact emit; sticky no invent empty lhs token
 	if v == nil {
@@ -332,10 +292,6 @@ func outputFactVarSess(s *Session, v *Variable) string {
 
 // OutputAssertion mirrors Fact::OutputAssertion.
 // Fact.cpp:64–73 — assert(cond); comment-out if not assertable.}
-
-func (f *FactPointTo) OutputAssertion(stParent *Block, indent string) string {
-	return f.OutputAssertionSess(testAmbientSession, stParent, indent)
-}
 
 func (f *FactPointTo) OutputAssertionSess(s *Session, stParent *Block, indent string) string {
 	// Fact* always live at assert emit; sticky no invent empty assert without it
@@ -442,7 +398,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 			}
 		}
 		// IsTop / empty OutputAssertion intentionally silent; non-nil fact still live
-		body.WriteString(f.OutputAssertion(stParent, indent))
+		body.WriteString(f.OutputAssertionSess(sessFromFM(fm), stParent, indent))
 		// residual ERROR sticky — no invent partial assertion section past hard IR hole
 		if hasErrFM(fm) {
 			return ""
@@ -471,10 +427,6 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 //
 // Label resolution: Statement.cpp:908–914 — find_jump_sources only (gotos[0]->label).
 // SourceLabel is generation-side dest mirror used when FactMgr is absent (no CFG).
-func PreOutput(st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
-	return PreOutputSess(testAmbientSession, st, fm, emitStepHash, emitLabelAttrs, attrRng, indent)
-}
-
 func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAttrs bool, attrRng *Rng, indent string) (out string, isGotoTarget bool) {
 	// Statement always live at pre_output; sticky incomplete no invent empty pre shell
 	if st == nil {

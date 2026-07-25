@@ -48,8 +48,8 @@ func BinaryOpFromString(s string) (BinaryOp, bool) {
 
 // GetBinopString mirrors FunctionInvocationBinary::get_binop_string.
 // FunctionInvocationBinary.cpp:313+ — same as BinaryOpC for known ops.
-func GetBinopString(op BinaryOp) string {
-	return op.BinaryOpC()
+func GetBinopStringSess(s *Session, op BinaryOp) string {
+	return op.BinaryOpCSess(s)
 }
 
 // IsReturnTypeFloat mirrors FunctionInvocationBinary::is_return_type_float.

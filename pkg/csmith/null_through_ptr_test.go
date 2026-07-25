@@ -26,7 +26,7 @@ func TestAssignNullThroughPointerRenewsPointee(t *testing.T) {
 	fm.SetGlobalFacts([]*FactPointTo{MakeFactPointToSess(testAmbientSession, g99, g77)}, "t")
 	lhs := &Lhs{Var: g99, Type: pt}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
-	if !fm.UpdateFactForAssignWant(g99, lhs.IndirectLevelSess(testAmbientSession), lhs.GetType(), rhs) {
+	if !fm.UpdateFactForAssignWant(g99, lhs.IndirectLevelSess(testAmbientSession), lhs.GetTypeSess(testAmbientSession), rhs) {
 		t.Fatal("UpdateFactForAssignWant returned false")
 	}
 	fg := FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, g77)

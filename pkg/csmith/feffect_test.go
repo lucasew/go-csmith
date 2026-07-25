@@ -19,7 +19,7 @@ func TestNoteWriteDoesNotTouchFEffect(t *testing.T) {
 		t.Fatal("NoteWrite must not invent mid-generation feffect updates")
 	}
 	// ComputeSummary still records globals from body effect
-	f.ComputeSummary(EmptyEffect().WriteVarSess(testAmbientSession, g))
+	f.ComputeSummarySess(testAmbientSession, EmptyEffect().WriteVarSess(testAmbientSession, g))
 	if !f.FEffect.IsWrittenSess(testAmbientSession, g) {
 		t.Fatal("ComputeSummary must add external global write")
 	}

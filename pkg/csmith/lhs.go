@@ -17,10 +17,6 @@ type Lhs struct {
 // Clone mirrors Lhs::clone.
 // Lhs.cpp:174 — new Lhs(*this).
 // Incomplete Lhs sticky nil (no invent empty Lhs shell).
-func (l *Lhs) Clone() *Lhs {
-	return l.CloneSess(testAmbientSession)
-}
-
 // CloneSess is Clone with explicit session residual sticky.
 func (l *Lhs) CloneSess(s *Session) *Lhs {
 	if l == nil || l.Var == nil {
@@ -33,10 +29,6 @@ func (l *Lhs) CloneSess(s *Session) *Lhs {
 
 // GetComplexity mirrors Expression::get_complexity for Lhs — ExpressionVariable leaf.
 // ExpressionVariable is complexity 0 (Bookkeeper ExpressionComplexity TermVariable).
-func (l *Lhs) GetComplexity() int {
-	return l.GetComplexitySess(testAmbientSession)
-}
-
 // GetComplexitySess is GetComplexity with explicit session residual sticky.
 func (l *Lhs) GetComplexitySess(s *Session) int {
 	if l == nil || l.Var == nil {
@@ -83,10 +75,6 @@ func (l *Lhs) PtrModifiedInRhs(cg *CGContext, facts []*FactPointTo) bool {
 // Lhs.cpp:190–192 — var.type.indirect - type.indirect.
 // Incomplete Lhs IR (nil var/type) returns 0 for the bit; callers that must not
 // invent non-deref visit success use IndirectLevelComplete.
-func (l *Lhs) IndirectLevel() int {
-	return l.IndirectLevelSess(testAmbientSession)
-}
-
 // IndirectLevelSess is IndirectLevel with sticky errors on bag s.
 func (l *Lhs) IndirectLevelSess(s *Session) int {
 	n, ok := l.IndirectLevelCompleteSess(s)
@@ -99,10 +87,6 @@ func (l *Lhs) IndirectLevelSess(s *Session) int {
 // IndirectLevelComplete is get_indirect_level with ok=false on incomplete Lhs IR
 // (no invent treat broken Lhs as bare non-deref level 0 for visit/validate).
 // Incomplete shell sticky (callers that only use IndirectLevel still surface ERROR).
-func (l *Lhs) IndirectLevelComplete() (n int, ok bool) {
-	return l.IndirectLevelCompleteSess(testAmbientSession)
-}
-
 func (l *Lhs) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 	// Lhs always live with Variable+Type; sticky incomplete no invent level 0 complete
 	if l == nil || l.Var == nil || l.Var.Type == nil {
@@ -132,10 +116,6 @@ func (l *Lhs) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 
 // GetVar mirrors Lhs::get_var.}
 
-func (l *Lhs) GetVar() *Variable {
-	return l.GetVarSess(testAmbientSession)
-}
-
 func (l *Lhs) GetVarSess(s *Session) *Variable {
 	// Lhs always live; sticky no invent missing subject shell
 	if l == nil {
@@ -151,10 +131,6 @@ func (l *Lhs) GetVarSess(s *Session) *Variable {
 }
 
 // GetType mirrors Lhs::get_type.}
-
-func (l *Lhs) GetType() *Type {
-	return l.GetTypeSess(testAmbientSession)
-}
 
 func (l *Lhs) GetTypeSess(s *Session) *Type {
 	// Lhs always live; sticky no invent type shell without it
@@ -177,10 +153,6 @@ func (l *Lhs) GetTypeSess(s *Session) *Type {
 // Lhs.cpp:220–222 — volatile after deref of indirect level.
 // Incomplete Lhs type IR fails closed sticky as volatile (restrictive — no invent
 // non-vol eligibility via invented level 0 / soft re-pick).}
-
-func (l *Lhs) IsVolatile() bool {
-	return l.IsVolatileSess(testAmbientSession)
-}
 
 func (l *Lhs) IsVolatileSess(s *Session) bool {
 	// Lhs always live; sticky incomplete fails closed true (restrictive volatile)
@@ -206,10 +178,6 @@ func (l *Lhs) IsVolatileSess(s *Session) bool {
 // Lhs.cpp:197–202 — var.qfer.indirect_qualifiers(indirect).
 // Incomplete Lhs type IR fails closed sticky error + empty qfer (no invent
 // storage-level quals via invented level 0).}
-
-func (l *Lhs) GetQualifiers() CVQualifiers {
-	return l.GetQualifiersSess(testAmbientSession)
-}
 
 func (l *Lhs) GetQualifiersSess(s *Session) CVQualifiers {
 	// Lhs always live; sticky incomplete empty qfer (no invent storage quals)
@@ -248,10 +216,6 @@ func (l *Lhs) GetQualifiersSess(s *Session) CVQualifiers {
 // Lhs.cpp:181–185 — merge pointees of var at indirect level.
 // Incomplete Lhs type IR fails closed IncompleteVariables (no invent level-0 merge).}
 
-func (l *Lhs) GetLvars(facts []*FactPointTo) []*Variable {
-	return l.GetLvarsSess(testAmbientSession, facts)
-}
-
 func (l *Lhs) GetLvarsSess(s *Session, facts []*FactPointTo) []*Variable {
 	if l == nil || l.Var == nil {
 		// incomplete Lhs fails closed sticky (no invent empty pointees / soft re-pick)
@@ -283,10 +247,6 @@ func (l *Lhs) GetLvarsSess(s *Session, facts []*FactPointTo) []*Variable {
 // Type* always live for non-special Var; Type-nil sticky IncompleteVariables
 // (IsPointer residual ERROR+false invents complete empty no-ptrs past shell).
 // Non-pointer live Var → complete empty nil.}
-
-func (l *Lhs) GetReferencedPtrs() []*Variable {
-	return l.GetReferencedPtrsSess(testAmbientSession)
-}
 
 func (l *Lhs) GetReferencedPtrsSess(s *Session) []*Variable {
 	if l == nil || l.Var == nil {
@@ -386,10 +346,6 @@ func (l *Lhs) VisitIndices(cg *CGContext, opts Options) bool {
 // CompatibleVar mirrors Lhs::compatible(Variable*).
 // Lhs.cpp:364.
 // Lhs + Var always live; sticky false (no invent not-compatible soft-skip past hole).
-func (l *Lhs) CompatibleVar(v *Variable, expandStruct bool) bool {
-	return l.CompatibleVarSess(testAmbientSession, v, expandStruct)
-}
-
 // CompatibleVarSess is CompatibleVar with explicit session residual sticky.
 func (l *Lhs) CompatibleVarSess(s *Session, v *Variable, expandStruct bool) bool {
 	if l == nil || l.Var == nil {
@@ -407,10 +363,6 @@ func (l *Lhs) CompatibleVarSess(s *Session, v *Variable, expandStruct bool) bool
 // CompatibleExpr mirrors Lhs::compatible(Expression*).
 // Lhs.cpp:359–362 — exp->compatible(&var).
 // Lhs + Var + Expression always live; sticky false (no invent not-compatible soft-skip).
-func (l *Lhs) CompatibleExpr(exp *Expression, expandStruct bool) bool {
-	return l.CompatibleExprSess(testAmbientSession, exp, expandStruct)
-}
-
 // CompatibleExprSess is CompatibleExpr with explicit session residual sticky.
 func (l *Lhs) CompatibleExprSess(s *Session, exp *Expression, expandStruct bool) bool {
 	if l == nil || l.Var == nil || exp == nil {
@@ -422,10 +374,6 @@ func (l *Lhs) CompatibleExprSess(s *Session, exp *Expression, expandStruct bool)
 
 // Output mirrors Lhs::Output — ExpressionVariable shape, optional VOL_LVAL wrap.
 // Lhs.cpp:207–218.
-func (l *Lhs) Output(wrapVolatiles bool) string {
-	return l.OutputSess(testAmbientSession, wrapVolatiles)
-}
-
 func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 	// Lhs always live with Var at emit; sticky no invent empty LHS without them
 	if l == nil || l.Var == nil {
@@ -475,20 +423,12 @@ func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 // ExpressionVariable.cpp:202–219 — (*…)/& + Variable::Output.
 // Ambient ProcessOptions bridge; emit prefers outputExpressionVariableSess.}
 
-func outputExpressionVariable(v *Variable, want *Type) string {
-	return outputExpressionVariableSess(testAmbientSession, v, want)
-}
-
 // outputExpressionVariableSess is outputExpressionVariable with Options/sticky from bag s.
 func outputExpressionVariableSess(s *Session, v *Variable, want *Type) string {
 	return outputExpressionVariableOptsSess(s, v, want, sessOpts(s))
 }
 
 // outputExpressionVariableOpts is outputExpressionVariable with access_once Options.
-func outputExpressionVariableOpts(v *Variable, want *Type, opts Options) string {
-	return outputExpressionVariableOptsSess(testAmbientSession, v, want, opts)
-}
-
 func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts Options) string {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -526,7 +466,7 @@ func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts 
 		return "(" + strings.Repeat("*", ind) + base + ")"
 	}
 	if ind < 0 {
-		// ExpressionVariable.cpp:210–216 — assert(indirect_level == -1); out << "&"; var.Output(out)
+		// ExpressionVariable.cpp:210–216 — assert(indirect_level == -1); out << "&"; var.OutputSess(s, out)
 		// var.Output is ArrayVariable::Output for itemized members (name[index]…), not bare get_actual_name.
 		if ind != -1 {
 			sessNoteError(s, ErrGeneric)

@@ -10,22 +10,22 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	f := MakeFactPointToSess(testAmbientSession, p, tgt)
-	cond := f.OutputCondition()
+	cond := f.OutputConditionSess(testAmbientSession)
 	if !strings.Contains(cond, "g_p == &g_1") {
 		t.Fatal(cond)
 	}
 	fn := MakeFactPointToSess(testAmbientSession, p, NullPtr)
-	if fn.OutputCondition() != "g_p == 0" {
-		t.Fatal(fn.OutputCondition())
+	if fn.OutputConditionSess(testAmbientSession) != "g_p == 0" {
+		t.Fatal(fn.OutputConditionSess(testAmbientSession))
 	}
 	fd := MakeFactPointToSess(testAmbientSession, p, GarbagePtr)
-	if !strings.Contains(fd.OutputCondition(), "dangling") {
-		t.Fatal(fd.OutputCondition())
+	if !strings.Contains(fd.OutputConditionSess(testAmbientSession), "dangling") {
+		t.Fatal(fd.OutputConditionSess(testAmbientSession))
 	}
 	// point_to_vars always live; sticky no invent skip nil holes in OR list
 	ClearErrorSess(testAmbientSession)
 	broken := &FactPointTo{Var: p, PointTo: []*Variable{tgt, nil}}
-	if cond := broken.OutputCondition(); cond != "" {
+	if cond := broken.OutputConditionSess(testAmbientSession); cond != "" {
 		t.Fatal("nil pointee must fail closed", cond)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -34,7 +34,7 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	// sticky no invent " == 0" without subject name
 	ClearErrorSess(testAmbientSession)
 	anon := &FactPointTo{Var: &Variable{Type: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}, PointTo: []*Variable{NullPtr}}
-	if cond := anon.OutputCondition(); cond != "" {
+	if cond := anon.OutputConditionSess(testAmbientSession); cond != "" {
 		t.Fatal("empty subject name must fail closed", cond)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -48,7 +48,7 @@ func TestFactPointToOutputCondition(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	arrNoName.AsArray = arrNoName
-	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arrNoName.Variable}}).OutputCondition(); cond != "" {
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arrNoName.Variable}}).OutputConditionSess(testAmbientSession); cond != "" {
 		t.Fatal("empty array bound name must fail closed", cond)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -57,7 +57,7 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	// IsArray without AsArray sticky (no invent bare-name range form)
 	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_shell", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
-	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{shell}}).OutputCondition(); cond != "" {
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{shell}}).OutputConditionSess(testAmbientSession); cond != "" {
 		t.Fatal("IsArray without AsArray must fail closed", cond)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -70,12 +70,12 @@ func TestFactPointToOutputCondition(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	arr.AsArray = arr
-	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arr.Variable}}).OutputCondition(); !strings.Contains(cond, "g_p >= &g_a") {
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arr.Variable}}).OutputConditionSess(testAmbientSession); !strings.Contains(cond, "g_p >= &g_a") {
 		t.Fatal("want array range form", cond)
 	}
 	// sticky no invent bare "&" pointee
 	ClearErrorSess(testAmbientSession)
-	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{{Type: GetIntTypeSess(testAmbientSession)}}}).OutputCondition(); cond != "" {
+	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{{Type: GetIntTypeSess(testAmbientSession)}}}).OutputConditionSess(testAmbientSession); cond != "" {
 		t.Fatal("empty pointee name must fail closed", cond)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -87,14 +87,14 @@ func TestFactPointToOutputCondition(t *testing.T) {
 func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	f := MakeFactPointToSess(testAmbientSession, p, GarbagePtr)
-	out := f.OutputAssertion(nil, "    ")
+	out := f.OutputAssertionSess(testAmbientSession, nil, "    ")
 	if !strings.HasPrefix(strings.TrimSpace(out), "//assert") && !strings.Contains(out, "//assert") {
 		t.Fatal(out)
 	}
 	// assertable: global → global
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	ok := MakeFactPointToSess(testAmbientSession, p, tgt)
-	out2 := ok.OutputAssertion(nil, "    ")
+	out2 := ok.OutputAssertionSess(testAmbientSession, nil, "    ")
 	if strings.Contains(out2, "//assert") {
 		t.Fatal(out2)
 	}
@@ -104,7 +104,7 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	// incomplete PointTo sticky not-assertable
 	ClearErrorSess(testAmbientSession)
 	hole := &FactPointTo{Var: p, PointTo: []*Variable{nil, GarbagePtr}}
-	if hole.IsAssertable(nil) {
+	if hole.IsAssertableSess(testAmbientSession, nil) {
 		t.Fatal("incomplete PointTo must fail closed not-assertable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -113,7 +113,7 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray subject sticky not-assertable
 	arrShell := &Variable{Name: "g_arr", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
-	if (&FactPointTo{Var: arrShell, PointTo: []*Variable{NullPtr}}).IsAssertable(nil) {
+	if (&FactPointTo{Var: arrShell, PointTo: []*Variable{NullPtr}}).IsAssertableSess(testAmbientSession, nil) {
 		t.Fatal("IsArray without AsArray subject must fail closed not-assertable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -126,14 +126,14 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc, nil}}
 	fl := MakeFactPointToSess(testAmbientSession, loc, NullPtr)
-	if !fl.HasInvisible(blk) {
+	if !fl.HasInvisibleSess(testAmbientSession, blk) {
 		t.Fatal("incomplete stack must HasInvisible true")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete stack HasInvisible must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if fl.IsAssertable(blk) {
+	if fl.IsAssertableSess(testAmbientSession, blk) {
 		t.Fatal("incomplete stack must not invent assertable")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -142,14 +142,14 @@ func TestOutputAssertionCommentedWhenNotAssertable(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Soft invent was IsAssertable residual then invent assert/commented assert line.
 	// Fair: sticky empty OutputAssertion.
-	if s := fl.OutputAssertion(blk, "  "); s != "" {
+	if s := fl.OutputAssertionSess(testAmbientSession, blk, "  "); s != "" {
 		t.Fatal("HasInvisible residual must fail closed empty OutputAssertion, not invent line", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("HasInvisible residual OutputAssertion must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := hole.OutputAssertion(nil, "  "); s != "" && !strings.Contains(s, "//") {
+	if s := hole.OutputAssertionSess(testAmbientSession, nil, "  "); s != "" && !strings.Contains(s, "//") {
 		// OutputCondition fails closed empty on hole → empty assertion
 		_ = s
 	}
@@ -210,7 +210,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 		t.Fatal("nil Stmt OutputAssertions must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := (*FactPointTo)(nil).OutputAssertion(nil, "  "); s != "" {
+	if s := (*FactPointTo)(nil).OutputAssertionSess(testAmbientSession, nil, "  "); s != "" {
 		t.Fatal("nil Fact OutputAssertion must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -265,14 +265,14 @@ func TestPostOutputInBlock(t *testing.T) {
 func TestIsTopEmpty(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &FactPointTo{Var: CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)}
-	if !f.IsTop() {
+	if !f.IsTopSess(testAmbientSession) {
 		t.Fatal("empty is top")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("empty PointTo IsTop must not sticky")
 	}
 	// nil Fact sticky false (no invent TOP)
-	if (*FactPointTo)(nil).IsTop() {
+	if (*FactPointTo)(nil).IsTopSess(testAmbientSession) {
 		t.Fatal("nil Fact IsTop must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -286,7 +286,7 @@ func TestPreOutputLabelSkipsStepHash(t *testing.T) {
 	// Statement.cpp:910 — no output_tab; label always column 0
 	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtAssign, StmID: 5, SourceLabel: "lbl_1"}
-	out, tgt := PreOutput(st, nil, true, false, nil, "    ")
+	out, tgt := PreOutputSess(testAmbientSession, st, nil, true, false, nil, "    ")
 	if !tgt || !strings.Contains(out, "lbl_1:") {
 		t.Fatal(out, tgt)
 	}
@@ -301,7 +301,7 @@ func TestPreOutputLabelSkipsStepHash(t *testing.T) {
 	}
 	// nil Stmt sticky
 	ClearErrorSess(testAmbientSession)
-	if o, g := PreOutput(nil, nil, true, false, nil, ""); o != "" || g {
+	if o, g := PreOutputSess(testAmbientSession, nil, nil, true, false, nil, ""); o != "" || g {
 		t.Fatal("nil Stmt PreOutput must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -313,7 +313,7 @@ func TestPreOutputLabelSkipsStepHash(t *testing.T) {
 func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	st := &Stmt{Kind: StmtAssign, StmID: 9}
-	out, tgt := PreOutput(st, nil, true, false, nil, "  ")
+	out, tgt := PreOutputSess(testAmbientSession, st, nil, true, false, nil, "  ")
 	if tgt || out != "  step_hash(9);\n" {
 		t.Fatal(out, tgt)
 	}
@@ -321,7 +321,7 @@ func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
 	// (valid StmID 0 is C++ first statement — must not fail closed)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	stBad := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID, SourceLabel: "lbl_invent"}
-	out0, tgt0 := PreOutput(stBad, fm, true, false, nil, "  ")
+	out0, tgt0 := PreOutputSess(testAmbientSession, stBad, fm, true, false, nil, "  ")
 	if out0 != "" || tgt0 {
 		t.Fatal("IncompleteStmID under FM must not invent SourceLabel/step_hash", out0, tgt0)
 	}
@@ -331,7 +331,7 @@ func TestPreOutputStepHashWhenNotTarget(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// valid id 0 under FM without jump sources → step_hash when enabled
 	st0 := &Stmt{Kind: StmtAssign, StmID: 0}
-	outOk, tgtOk := PreOutput(st0, fm, true, false, nil, "  ")
+	outOk, tgtOk := PreOutputSess(testAmbientSession, st0, fm, true, false, nil, "  ")
 	if tgtOk || outOk != "  step_hash(0);\n" {
 		t.Fatal("valid StmID 0 must step_hash", outOk, tgtOk)
 	}
@@ -349,7 +349,7 @@ func TestPreOutputFromCFGJumpSources(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.CFGEdges = []*CFGEdge{{SrcID: 2, DestStmID: 1}}
 	st := &body.Stmts[0]
-	out, tgt := PreOutput(st, fm, true, false, nil, "")
+	out, tgt := PreOutputSess(testAmbientSession, st, fm, true, false, nil, "")
 	if !tgt || !strings.Contains(out, "lbl_cfg:") {
 		t.Fatal(out, tgt)
 	}
@@ -382,7 +382,7 @@ func TestBlockOutputPreOutputNoHashOnLabel(t *testing.T) {
 
 func TestOutputConditionNilFactSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactPointTo)(nil).OutputCondition() != "" {
+	if (*FactPointTo)(nil).OutputConditionSess(testAmbientSession) != "" {
 		t.Fatal("nil Fact OutputCondition must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -394,7 +394,7 @@ func TestOutputConditionNilFactSticky(t *testing.T) {
 func TestOutputFactVarGetActualNameResidualSticky(t *testing.T) {
 	// GetActualName residual soft invent was invent "[0]" / condition past empty name shell.
 	ClearErrorSess(testAmbientSession)
-	if s := outputFactVar(&Variable{Type: GetIntTypeSess(testAmbientSession)}); s != "" {
+	if s := outputFactVarSess(testAmbientSession, &Variable{Type: GetIntTypeSess(testAmbientSession)}); s != "" {
 		t.Fatal("empty name residual must fail closed outputFactVar", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -403,7 +403,7 @@ func TestOutputFactVarGetActualNameResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// complete path hygiene
 	v := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
-	if s := outputFactVar(v); s != "g_p" {
+	if s := outputFactVarSess(testAmbientSession, v); s != "g_p" {
 		t.Fatal("complete outputFactVar", s)
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -459,7 +459,7 @@ func TestPostOutputOutputAssertionsResidualSticky(t *testing.T) {
 func TestOutputAssertionIsTopResidualSticky(t *testing.T) {
 	// IsTop residual soft invent was invent soft-empty assert past nil Fact.
 	ClearErrorSess(testAmbientSession)
-	if (*FactPointTo)(nil).OutputAssertion(nil, "  ") != "" {
+	if (*FactPointTo)(nil).OutputAssertionSess(testAmbientSession, nil, "  ") != "" {
 		t.Fatal("nil Fact OutputAssertion must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -469,7 +469,7 @@ func TestOutputAssertionIsTopResidualSticky(t *testing.T) {
 	// complete TOP empty assert
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	top := &FactPointTo{Var: p, PointTo: []*Variable{}}
-	if top.OutputAssertion(nil, "  ") != "" {
+	if top.OutputAssertionSess(testAmbientSession, nil, "  ") != "" {
 		t.Fatal("TOP OutputAssertion must soft empty")
 	}
 	if HasErrorSess(testAmbientSession) {

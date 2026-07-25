@@ -16,7 +16,7 @@ func TestMakeRandomLhsSelectsOrCreates(t *testing.T) {
 	if lhs == nil || lhs.Var == nil {
 		t.Fatal("nil lhs")
 	}
-	if lhs.GetType() == nil {
+	if lhs.GetTypeSess(testAmbientSession) == nil {
 		t.Fatal("nil type")
 	}
 	if lhs.Var.Name == "" {
@@ -128,7 +128,7 @@ func TestMakeRandomLhsResidualSticky(t *testing.T) {
 func TestLhsOutputVolLval(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)}
-	out := lhs.Output(true)
+	out := lhs.OutputSess(testAmbientSession, true)
 	if !strings.Contains(out, "VOL_LVAL(g_v") {
 		t.Fatal(out)
 	}
@@ -141,12 +141,12 @@ func TestLhsIndirectLevel(t *testing.T) {
 	if lhs.IndirectLevelSess(testAmbientSession) != 1 {
 		t.Fatal(lhs.IndirectLevelSess(testAmbientSession))
 	}
-	if lhs.Output(false) != "(*g_p)" {
-		t.Fatal(lhs.Output(false))
+	if lhs.OutputSess(testAmbientSession, false) != "(*g_p)" {
+		t.Fatal(lhs.OutputSess(testAmbientSession, false))
 	}
 	// incomplete Lhs type IR: Complete false sticky (no invent level 0 as complete)
 	broken := &Lhs{Var: &Variable{Name: "x"}} // Type nil
-	if _, ok := broken.IndirectLevelComplete(); ok {
+	if _, ok := broken.IndirectLevelCompleteSess(testAmbientSession); ok {
 		t.Fatal("nil Var.Type must fail closed Incomplete")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -165,7 +165,7 @@ func TestLhsIndirectLevel(t *testing.T) {
 		t.Fatal("nil Lhs IsVolatile must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if q := (*Lhs)(nil).GetQualifiers(); len(q.IsConsts) != 0 {
+	if q := (*Lhs)(nil).GetQualifiersSess(testAmbientSession); len(q.IsConsts) != 0 {
 		t.Fatal("nil Lhs GetQualifiers must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -176,21 +176,21 @@ func TestLhsIndirectLevel(t *testing.T) {
 	// IsArray without AsArray stickies GetCollective.
 	arrShell := &Variable{Name: "g_a", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{2}}
 	lhsArr := &Lhs{Var: arrShell, Type: GetIntTypeSess(testAmbientSession)}
-	if VariablesComplete(lhsArr.GetLvars(nil)) {
+	if VariablesComplete(lhsArr.GetLvarsSess(testAmbientSession, nil)) {
 		t.Fatal("GetCollective residual GetLvars must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetCollective residual GetLvars must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if VariablesComplete(broken.GetLvars(nil)) {
+	if VariablesComplete(broken.GetLvarsSess(testAmbientSession, nil)) {
 		t.Fatal("GetLvars incomplete must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("GetLvars incomplete must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if VariablesComplete((&Lhs{}).GetReferencedPtrs()) {
+	if VariablesComplete((&Lhs{}).GetReferencedPtrsSess(testAmbientSession)) {
 		t.Fatal("GetReferencedPtrs incomplete Lhs must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -200,7 +200,7 @@ func TestLhsIndirectLevel(t *testing.T) {
 	// Type-nil Var soft invent: IsPointer residual ERROR+false → complete empty no-ptrs
 	// fair: sticky IncompleteVariables before classify
 	tyNilLhs := &Lhs{Var: &Variable{Name: "g_typeless"}}
-	if VariablesComplete(tyNilLhs.GetReferencedPtrs()) {
+	if VariablesComplete(tyNilLhs.GetReferencedPtrsSess(testAmbientSession)) {
 		t.Fatal("GetReferencedPtrs Type-nil must fail closed incomplete, not empty-complete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -223,7 +223,7 @@ func TestPickUnaryOp(t *testing.T) {
 	seen := map[UnaryOp]bool{}
 	r := NewRngSess(testAmbientSession, 1)
 	for i := 0; i < 100; i++ {
-		seen[PickUnaryOp(r, opts)] = true
+		seen[PickUnaryOpSess(testAmbientSession, r, opts)] = true
 	}
 	if len(seen) < 3 {
 		t.Fatalf("seen %v", seen)
@@ -232,7 +232,7 @@ func TestPickUnaryOp(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	r2 := NewRngSess(testAmbientSession, 2)
 	for i := 0; i < 50; i++ {
-		if PickUnaryOp(r2, opts) == UnPlus {
+		if PickUnaryOpSess(testAmbientSession, r2, opts) == UnPlus {
 			t.Fatal("unary plus disabled")
 		}
 	}
@@ -479,14 +479,14 @@ func TestSelectWritableNilTypSticky(t *testing.T) {
 
 func TestLhsOutputNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Lhs)(nil).Output(false) != "" {
+	if (*Lhs)(nil).OutputSess(testAmbientSession, false) != "" {
 		t.Fatal("nil Lhs Output must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs Output must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&Lhs{}).Output(false) != "" {
+	if (&Lhs{}).OutputSess(testAmbientSession, false) != "" {
 		t.Fatal("nil Var Lhs Output must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -497,28 +497,28 @@ func TestLhsOutputNilSticky(t *testing.T) {
 
 func TestLhsGetVarGetTypeNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Lhs)(nil).GetVar() != nil {
+	if (*Lhs)(nil).GetVarSess(testAmbientSession) != nil {
 		t.Fatal("nil Lhs GetVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs GetVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&Lhs{}).GetVar() != nil {
+	if (&Lhs{}).GetVarSess(testAmbientSession) != nil {
 		t.Fatal("nil Var Lhs GetVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Var Lhs GetVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Lhs)(nil).GetType() != nil {
+	if (*Lhs)(nil).GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("nil Lhs GetType must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Lhs GetType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (&Lhs{Var: &Variable{Name: "x"}}).GetType() != nil {
+	if (&Lhs{Var: &Variable{Name: "x"}}).GetTypeSess(testAmbientSession) != nil {
 		t.Fatal("Lhs without type must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -566,7 +566,7 @@ func TestLhsOutputAccessResidualSticky(t *testing.T) {
 	}
 	item.AsArray = item
 	lhs := &Lhs{Var: &item.Variable, Type: GetIntTypeSess(testAmbientSession)}
-	if s := lhs.Output(false); s != "" {
+	if s := lhs.OutputSess(testAmbientSession, false); s != "" {
 		t.Fatal("OutputAccess residual must fail closed Lhs.Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -588,7 +588,7 @@ func TestLhsOutputCNameResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntTypeSess(testAmbientSession), false, true)
 	lhs := &Lhs{Var: v, Type: &Type{isStruct: true}} // unnamed struct → CName residual
-	if s := lhs.Output(true); s != "" {
+	if s := lhs.OutputSess(testAmbientSession, true); s != "" {
 		t.Fatal("CName residual must fail closed Lhs.Output VOL_LVAL wrap", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -677,7 +677,7 @@ func TestCompatibleVarResidualSticky(t *testing.T) {
 	// Compatible residual soft invent was invent soft-compat past nil other.
 	ClearErrorSess(testAmbientSession)
 	lhs := &Lhs{Var: CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)}
-	if lhs.CompatibleVar(nil, false) {
+	if lhs.CompatibleVarSess(testAmbientSession, nil, false) {
 		t.Fatal("nil other CompatibleVar must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -690,7 +690,7 @@ func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
 	// IndirectLevel residual soft invent was invent level-0 complete past Type-nil shell.
 	ClearErrorSess(testAmbientSession)
 	l := &Lhs{Var: &Variable{Name: "g_x", Type: nil}, Type: GetIntTypeSess(testAmbientSession)}
-	n, ok := l.IndirectLevelComplete()
+	n, ok := l.IndirectLevelCompleteSess(testAmbientSession)
 	if ok || n != 0 {
 		t.Fatal("Type-nil Lhs IndirectLevelComplete must fail closed 0,false", n, ok)
 	}
@@ -699,7 +699,7 @@ func TestLhsIndirectLevelCompleteResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil Lhs
-	n2, ok2 := (*Lhs)(nil).IndirectLevelComplete()
+	n2, ok2 := (*Lhs)(nil).IndirectLevelCompleteSess(testAmbientSession)
 	if ok2 || n2 != 0 {
 		t.Fatal("nil Lhs must fail closed")
 	}
@@ -713,12 +713,12 @@ func TestLhsCloneDereferencedComplexity(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
 	lhs := &Lhs{Var: v, Type: GetIntTypeSess(testAmbientSession)} // deref once: pointer → int
-	cl := lhs.Clone()
+	cl := lhs.CloneSess(testAmbientSession)
 	if cl == nil || cl.Var != v || cl == lhs {
 		t.Fatal(cl)
 	}
-	if lhs.GetComplexity() != 0 {
-		t.Fatal(lhs.GetComplexity())
+	if lhs.GetComplexitySess(testAmbientSession) != 0 {
+		t.Fatal(lhs.GetComplexitySess(testAmbientSession))
 	}
 	ptrs := lhs.GetDereferencedPtrsSess(testAmbientSession)
 	if len(ptrs) != 1 || ptrs[0].Var != v {
