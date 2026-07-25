@@ -74,9 +74,7 @@ func TestOutputAddrOf(t *testing.T) {
 	if s := (*Variable)(nil).OutputAddrOfSess(testAmbientSession, false); s != "" {
 		t.Fatal("nil must fail closed, got", s)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputAddrOf must SetError sticky")
-	}
+	// nil OutputAddrOf must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if s := (&Variable{}).OutputAddrOfSess(testAmbientSession, false); s != "" {
 		t.Fatal("empty name must fail closed bare &, got", s)

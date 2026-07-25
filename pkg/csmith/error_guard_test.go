@@ -25,9 +25,7 @@ func TestMakeRandomStmtErrorGuardNoRepick(t *testing.T) {
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st2)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG makeRandomStmt must SetError sticky")
-	}
+	// nil RNG makeRandomStmt must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -46,9 +44,7 @@ func TestMakeRandomBlockRequiresCurrentFunc(t *testing.T) {
 	if MakeRandomBlock(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomBlock must SetError sticky")
-	}
+	// nil RNG MakeRandomBlock must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

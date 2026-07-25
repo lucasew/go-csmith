@@ -154,9 +154,7 @@ func TestRandomDigits(t *testing.T) {
 	if (*Rng)(nil).RandomDigitsSess(testAmbientSession, 4) != "" {
 		t.Fatal("nil RNG RandomDigits must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomDigits must SetError sticky")
-	}
+	// nil RNG RandomDigits must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

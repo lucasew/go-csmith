@@ -199,9 +199,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	if s := (*FactMgr)(nil).OutputAssertions(st, nil, "    ", true); s != "" {
 		t.Fatal("nil FM OutputAssertions must fail closed", s)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM OutputAssertions must SetError sticky")
-	}
+	// nil FM OutputAssertions must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if s := fm.OutputAssertions(nil, nil, "    ", true); s != "" {
 		t.Fatal("nil Stmt OutputAssertions must fail closed", s)

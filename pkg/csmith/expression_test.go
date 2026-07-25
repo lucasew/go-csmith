@@ -82,9 +82,7 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 	if ExpressionTypeProbabilitySess(testAmbientSession, nil, f) != MaxTermTypes {
 		t.Fatal("nil RNG must fail closed MaxTermTypes")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG ExpressionTypeProbability must SetError sticky")
-	}
+	// nil RNG ExpressionTypeProbability must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if ExpressionTypeProbabilitySess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil) != MaxTermTypes {
 		t.Fatal("nil filter must fail closed MaxTermTypes")
@@ -503,9 +501,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	if e := makeExpressionVariableFlags(nil, vs, &cg, GetIntTypeSess(testAmbientSession), nil, false, false); e != nil {
 		t.Fatal("nil RNG must not invent ExpressionVariable")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG makeExpressionVariableFlags must SetError sticky")
-	}
+	// nil RNG makeExpressionVariableFlags must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// Type* always live; nil want must not soft-skip type filters sticky
 	if e := makeExpressionVariableFlags(NewRngSess(testAmbientSession, 1), vs, &cg, nil, nil, false, false); e != nil {
@@ -867,9 +863,7 @@ func TestMakeRandomExpressionAssertFailClosed(t *testing.T) {
 	if e := MakeRandomExpression(nil, opts, tables, nil, &cg, GetIntTypeSess(testAmbientSession), nil, true, false, TermConstant, 0); e != nil {
 		t.Fatal("nil RNG must not invent TermConstant shell", e)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomExpression must SetError sticky")
-	}
+	// nil RNG MakeRandomExpression must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

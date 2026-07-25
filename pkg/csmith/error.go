@@ -37,11 +37,10 @@ func sessNoteError(s *Session, code int) {
 	s.GenError = code
 }
 
-// noteErrFM notes sticky on fm.Sess. Nil fm uses testAmbientSession explicitly
-// (unit-test nil-receiver sticky only — not dual-fill via fmSess(nil)).
+// noteErrFM notes sticky on fm.Sess. Nil fm: no sticky (fail-closed only — no ambient dual-fill).
 func noteErrFM(fm *FactMgr, code int) {
 	if fm == nil {
-		sessNoteError(testAmbientSession, code)
+		// No bag: fail-closed returns only — do not dual-fill ambient.
 		return
 	}
 	if fm.Sess == nil {
@@ -50,10 +49,10 @@ func noteErrFM(fm *FactMgr, code int) {
 	sessNoteError(fm.Sess, code)
 }
 
-// noteErrCG notes sticky on c.Sess. Nil c uses testAmbientSession explicitly.
+// noteErrCG notes sticky on c.Sess. Nil c: no sticky (fail-closed only — no ambient dual-fill).
 func noteErrCG(c *CGContext, code int) {
 	if c == nil {
-		sessNoteError(testAmbientSession, code)
+		// No bag: fail-closed returns only — do not dual-fill ambient.
 		return
 	}
 	if c.Sess == nil {
@@ -62,10 +61,10 @@ func noteErrCG(c *CGContext, code int) {
 	sessNoteError(c.Sess, code)
 }
 
-// noteErrVS notes sticky on vs.Sess. Nil vs uses testAmbientSession explicitly.
+// noteErrVS notes sticky on vs.Sess. Nil vs: no sticky (fail-closed only — no ambient dual-fill).
 func noteErrVS(vs *VariableSelector, code int) {
 	if vs == nil {
-		sessNoteError(testAmbientSession, code)
+		// No bag: fail-closed returns only — do not dual-fill ambient.
 		return
 	}
 	if vs.Sess == nil {
@@ -74,10 +73,10 @@ func noteErrVS(vs *VariableSelector, code int) {
 	sessNoteError(vs.Sess, code)
 }
 
-// noteErrG notes sticky on g.Sess. Nil g uses testAmbientSession explicitly.
+// noteErrG notes sticky on g.Sess. Nil g: no sticky (fail-closed only — no ambient dual-fill).
 func noteErrG(g *ProgramGenerator, code int) {
 	if g == nil {
-		sessNoteError(testAmbientSession, code)
+		// No bag: fail-closed returns only — do not dual-fill ambient.
 		return
 	}
 	if g.Sess == nil {
@@ -86,10 +85,10 @@ func noteErrG(g *ProgramGenerator, code int) {
 	sessNoteError(g.Sess, code)
 }
 
-// noteErrEnv notes sticky on env.Sess. Nil env uses testAmbientSession explicitly.
+// noteErrEnv notes sticky on env.Sess. Nil env: no sticky (fail-closed only — no ambient dual-fill).
 func noteErrEnv(env *TypeEnv, code int) {
 	if env == nil {
-		sessNoteError(testAmbientSession, code)
+		// No bag: fail-closed returns only — do not dual-fill ambient.
 		return
 	}
 	if env.Sess == nil {
@@ -98,10 +97,10 @@ func noteErrEnv(env *TypeEnv, code int) {
 	sessNoteError(env.Sess, code)
 }
 
-// hasErrFM reports sticky on fm.Sess. Nil fm reads testAmbientSession explicitly.
+// hasErrFM reports sticky on fm.Sess. Nil fm: no sticky.
 func hasErrFM(fm *FactMgr) bool {
 	if fm == nil {
-		return sessHasError(testAmbientSession)
+		return false // no bag → no sticky
 	}
 	if fm.Sess == nil {
 		panic("hasErrFM: Sess unset (use NewFactMgrSess)")
@@ -109,10 +108,10 @@ func hasErrFM(fm *FactMgr) bool {
 	return sessHasError(fm.Sess)
 }
 
-// hasErrCG reports sticky on c.Sess. Nil c reads testAmbientSession explicitly.
+// hasErrCG reports sticky on c.Sess. Nil c: no sticky.
 func hasErrCG(c *CGContext) bool {
 	if c == nil {
-		return sessHasError(testAmbientSession)
+		return false // no bag → no sticky
 	}
 	if c.Sess == nil {
 		panic("hasErrCG: Sess unset (use WithSession / set Sess)")
@@ -120,10 +119,10 @@ func hasErrCG(c *CGContext) bool {
 	return sessHasError(c.Sess)
 }
 
-// hasErrVS reports sticky on vs.Sess. Nil vs reads testAmbientSession explicitly.
+// hasErrVS reports sticky on vs.Sess. Nil vs: no sticky.
 func hasErrVS(vs *VariableSelector) bool {
 	if vs == nil {
-		return sessHasError(testAmbientSession)
+		return false // no bag → no sticky
 	}
 	if vs.Sess == nil {
 		panic("hasErrVS: Sess unset (use NewVariableSelector or set VS.Sess)")
@@ -131,10 +130,10 @@ func hasErrVS(vs *VariableSelector) bool {
 	return sessHasError(vs.Sess)
 }
 
-// hasErrG reports sticky on g.Sess. Nil g reads testAmbientSession explicitly.
+// hasErrG reports sticky on g.Sess. Nil g: no sticky.
 func hasErrG(g *ProgramGenerator) bool {
 	if g == nil {
-		return sessHasError(testAmbientSession)
+		return false // no bag → no sticky
 	}
 	if g.Sess == nil {
 		panic("hasErrG: Sess unset (use NewProgramGenerator or set g.Sess)")
@@ -142,10 +141,10 @@ func hasErrG(g *ProgramGenerator) bool {
 	return sessHasError(g.Sess)
 }
 
-// hasErrEnv reports sticky on env.Sess. Nil env reads testAmbientSession explicitly.
+// hasErrEnv reports sticky on env.Sess. Nil env: no sticky.
 func hasErrEnv(env *TypeEnv) bool {
 	if env == nil {
-		return sessHasError(testAmbientSession)
+		return false // no bag → no sticky
 	}
 	if env.Sess == nil {
 		panic("hasErrEnv: Sess unset (set TypeEnv.Sess)")
@@ -157,6 +156,7 @@ func hasErrEnv(env *TypeEnv) bool {
 // Unset Sess on live c still panics via cgSess.
 func sessFromCG(c *CGContext) *Session {
 	if c == nil {
+		// Unit-test residual when cg pointer absent — Generate always passes live cg.
 		return testAmbientSession
 	}
 	return cgSess(c)
@@ -165,6 +165,7 @@ func sessFromCG(c *CGContext) *Session {
 // sessFromFM returns fm.Sess. Nil fm → testAmbientSession.
 func sessFromFM(fm *FactMgr) *Session {
 	if fm == nil {
+		// Unit-test residual when fm pointer absent — Generate always passes live fm.
 		return testAmbientSession
 	}
 	return fmSess(fm)
@@ -173,6 +174,7 @@ func sessFromFM(fm *FactMgr) *Session {
 // sessFromVS returns vs.Sess. Nil vs → testAmbientSession.
 func sessFromVS(vs *VariableSelector) *Session {
 	if vs == nil {
+		// Unit-test residual when vs pointer absent — Generate always passes live vs.
 		return testAmbientSession
 	}
 	return vsSess(vs)
@@ -181,6 +183,7 @@ func sessFromVS(vs *VariableSelector) *Session {
 // sessFromEnv returns env.Sess. Nil env → testAmbientSession.
 func sessFromEnv(env *TypeEnv) *Session {
 	if env == nil {
+		// Unit-test residual when env pointer absent — Generate always passes live env.
 		return testAmbientSession
 	}
 	return envSess(env)
@@ -189,6 +192,7 @@ func sessFromEnv(env *TypeEnv) *Session {
 // sessFromG returns g.Sess. Nil g → testAmbientSession.
 func sessFromG(g *ProgramGenerator) *Session {
 	if g == nil {
+		// Unit-test residual when g pointer absent — Generate always passes live g.
 		return testAmbientSession
 	}
 	return gSess(g)

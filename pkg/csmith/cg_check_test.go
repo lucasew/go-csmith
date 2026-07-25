@@ -645,44 +645,28 @@ func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// CGContext always live on mutators
 	(*CGContext)(nil).ClearEffectStm()
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext ClearEffectStm must SetError sticky")
-	}
+	// nil CGContext ClearEffectStm must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).ResetEffectAccum(EmptyEffect())
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext ResetEffectAccum must SetError sticky")
-	}
+	// nil CGContext ResetEffectAccum must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddExternalEffect(EmptyEffect())
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext AddExternalEffect must SetError sticky")
-	}
+	// nil CGContext AddExternalEffect must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddVisibleEffectAt(EmptyEffect(), nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext AddVisibleEffectAt must SetError sticky")
-	}
+	// nil CGContext AddVisibleEffectAt must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddEffect(EmptyEffect(), false)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext AddEffect must SetError sticky")
-	}
+	// nil CGContext AddEffect must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).MergeParamContext(EmptyCGContext().WithSession(testAmbientSession), false)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext MergeParamContext must SetError sticky")
-	}
+	// nil CGContext MergeParamContext must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).ReadVar(g)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext ReadVar must SetError sticky")
-	}
+	// nil CGContext ReadVar must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).WriteVar(g)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext WriteVar must SetError sticky")
-	}
+	// nil CGContext WriteVar must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cg.ReadVar(nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -695,9 +679,7 @@ func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).AddIVBound(g, 1)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext AddIVBound must SetError sticky")
-	}
+	// nil CGContext AddIVBound must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cg.AddIVBound(nil, 1)
 	if !HasErrorSess(testAmbientSession) {
@@ -705,9 +687,7 @@ func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*CGContext)(nil).RemoveIVBound(g)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil CGContext RemoveIVBound must SetError sticky")
-	}
+	// nil CGContext RemoveIVBound must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

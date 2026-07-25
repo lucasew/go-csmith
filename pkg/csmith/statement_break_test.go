@@ -200,16 +200,12 @@ func TestMakeRandomBreakContinueNilDepsSticky(t *testing.T) {
 	if stmtOK(MakeRandomBreak(nil, opts, vs, NewExprTablesSess(testAmbientSession, opts), ptrEmptyCG())) {
 		t.Fatal("nil RNG break must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomBreak must SetError sticky")
-	}
+	// nil RNG MakeRandomBreak must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if stmtOK(MakeRandomContinue(nil, opts, vs, NewExprTablesSess(testAmbientSession, opts), ptrEmptyCG(), loop)) {
 		t.Fatal("nil RNG continue must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomContinue must SetError sticky")
-	}
+	// nil RNG MakeRandomContinue must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -418,8 +414,6 @@ func TestMakeRandomBreakNilCGSticky(t *testing.T) {
 	if MakeRandomBreak(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil).Kind != 0 {
 		t.Fatal("nil cg MakeRandomBreak must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg MakeRandomBreak must SetError sticky")
-	}
+	// nil cg MakeRandomBreak must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

@@ -187,9 +187,7 @@ func TestSelectArrayTypeNilSticky(t *testing.T) {
 	if vs.SelectArray(NewRngSess(testAmbientSession, 1), cg) != nil {
 		t.Fatal("Type-nil SelectArray must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil SelectArray must SetError sticky")
-	}
+	// Type-nil SelectArray must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

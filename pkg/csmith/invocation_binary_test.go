@@ -232,9 +232,7 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomAssign must SetError sticky")
-	}
+	// nil RNG MakeRandomAssign must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -249,16 +247,12 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("nil RNG binary")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG binary must SetError sticky")
-	}
+	// nil RNG binary must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if fi := MakeRandomUnaryInvocation(nil, opts, vs, tables, &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("nil RNG unary")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG unary must SetError sticky")
-	}
+	// nil RNG unary must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if fi := MakeRandomInvocation(nil, opts, probs, vs, tables, &cg, nil, GetIntTypeSess(testAmbientSession), nil, true); fi == nil || !fi.Failed {
 		// MakeRandomInvocation may Failed shell without sticky when rng nil early

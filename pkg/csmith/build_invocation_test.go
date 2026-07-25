@@ -33,17 +33,13 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil RNG must fail closed user invoke")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
-	}
+	// nil RNG BuildUserInvocation must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG BuildInvocationAndFunction must SetError sticky")
-	}
+	// nil RNG BuildInvocationAndFunction must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// callee / cg hard IR sticky Failed
 	fi3 := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, nil)
@@ -70,9 +66,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	if fi5 == nil || !fi5.Failed {
 		t.Fatal("nil RNG MakeRandomInvocation must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomInvocation must SetError sticky")
-	}
+	// nil RNG MakeRandomInvocation must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

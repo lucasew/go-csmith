@@ -301,9 +301,7 @@ func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	PostCreationAnalysis(st, []*FactPointTo{}, nil, EmptyEffect(), nil, Defaults())
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
-	}
+	// nil cg PostCreationAnalysis must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cgNoFM := EmptyCGContext().WithSession(testAmbientSession)
 	PostCreationAnalysis(st, []*FactPointTo{}, nil, EmptyEffect(), &cgNoFM, Defaults())

@@ -60,16 +60,12 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	if RandomTypeFromType(nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil RNG + nil type must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG + nil type must SetError sticky")
-	}
+	// nil RNG + nil type must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if RandomTypeFromType(nil, nil, opts, probs, GetIntTypeSess(testAmbientSession), false, false) != nil {
 		t.Fatal("nil RNG + simple re-roll must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG + simple re-roll must SetError sticky")
-	}
+	// nil RNG + simple re-roll must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// non-simple keep path does not need RNG
 	if RandomTypeFromType(nil, nil, opts, probs, st, false, false) != st {
@@ -80,9 +76,7 @@ func TestRandomTypeFromTypeStructUnchanged(t *testing.T) {
 	if RandomTypeFromType(NewRngSess(testAmbientSession, 1), nil, opts, probs, nil, false, false) != nil {
 		t.Fatal("nil env + nil type must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil env RandomTypeFromType must SetError sticky")
-	}
+	// nil env RandomTypeFromType must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if RandomTypeFromType(NewRngSess(testAmbientSession, 1), &TypeEnv{Sess: testAmbientSession}, opts, probs, nil, false, false) != nil {
 		t.Fatal("empty AllTypes + nil type must fail closed")

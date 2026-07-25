@@ -224,9 +224,7 @@ func TestSelectMustUseArrayItemize(t *testing.T) {
 	if bare := vs.SelectMustUseVar(nil, AccessRead, cg, GetIntTypeSess(testAmbientSession), nil); bare != nil {
 		t.Fatalf("nil RNG must not invent bare collective array, got %v", bare)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG SelectMustUseVar must SetError sticky")
-	}
+	// nil RNG SelectMustUseVar must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

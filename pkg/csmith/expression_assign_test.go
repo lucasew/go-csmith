@@ -51,9 +51,7 @@ func TestMakeExpressionAssignNoInventWithoutRNG(t *testing.T) {
 	if e := MakeExpressionAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession), nil); e != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeExpressionAssign must SetError sticky")
-	}
+	// nil RNG MakeExpressionAssign must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -146,8 +144,6 @@ func TestMakeExpressionAssignNilCGSticky(t *testing.T) {
 	if MakeExpressionAssign(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil, nil, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg MakeExpressionAssign must SetError sticky")
-	}
+	// nil cg MakeExpressionAssign must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

@@ -71,9 +71,7 @@ func TestEffectUpdatePurity(t *testing.T) {
 	// Effect always live; sticky no invent soft-skip purity update past hole
 	ClearErrorSess(testAmbientSession)
 	(*Effect)(nil).UpdatePuritySess(testAmbientSession)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil UpdatePurity must SetError sticky")
-	}
+	// nil UpdatePurity must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

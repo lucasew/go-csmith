@@ -7,11 +7,15 @@ package csmith
 // Note: unlike must_return, does not require break_stms empty.
 // Block always live; sticky false (no invent not-must-break soft-skip past hole).
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
-	// sessFromFM: nil fm → unit-test ambient; live fm requires fm.Sess
-	s := sessFromFM(fm)
 	if b == nil {
-		sessNoteError(s, ErrGeneric)
 		return false
+	}
+	// Live FM → run bag; nil FM uses throwaway for residual (no ambient dual-fill).
+	var s *Session
+	if fm != nil {
+		s = sessFromFM(fm)
+	} else {
+		s = NewSession(Defaults())
 	}
 	if len(b.Stmts) == 0 {
 		return false

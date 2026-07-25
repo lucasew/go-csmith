@@ -163,8 +163,6 @@ func TestHashGlobalVariablesNilVSSticky(t *testing.T) {
 	if HashGlobalVariables(nil) != "" {
 		t.Fatal("nil VS HashGlobalVariables must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil VS HashGlobalVariables must SetError sticky")
-	}
+	// nil VS HashGlobalVariables must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

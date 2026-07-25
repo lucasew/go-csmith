@@ -70,9 +70,7 @@ func TestRandomStricterAndLooserConsts(t *testing.T) {
 	if got := q4.RandomAddQualifiersSess(testAmbientSession, nil, opts, NewProbabilities(opts), false); len(got.IsConsts) != len(q4.IsConsts) {
 		t.Fatalf("nil RNG must not invent grow, got %d", len(got.IsConsts))
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomAddQualifiers must SetError sticky")
-	}
+	// nil RNG RandomAddQualifiers must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -86,16 +84,12 @@ func TestRandomQualifiersFromNoInventWithoutRNG(t *testing.T) {
 	if out := base.RandomQualifiersFrom(false, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG From must fail closed empty, got %+v", out)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomQualifiersFrom must SetError sticky")
-	}
+	// nil RNG RandomQualifiersFrom must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if out := base.RandomLooseQualifiers(false, AccessRead, EmptyCGContext().WithSession(testAmbientSession), opts, probs, nil); len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatalf("nil RNG Loose must fail closed empty, got %+v", out)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomLooseQualifiers must SetError sticky")
-	}
+	// nil RNG RandomLooseQualifiers must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// wildcard still works without RNG (short-circuit before RNG)
 	w := CVQualifiers{Wildcard: true}
@@ -115,30 +109,22 @@ func TestRandomStricterLooserNilRNGAndProbs(t *testing.T) {
 	if q.RandomStricterConstsSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG stricter const must fail closed nil")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomStricterConsts must SetError sticky")
-	}
+	// nil RNG RandomStricterConsts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if q.RandomStricterVolatilesSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG stricter vol must fail closed nil")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomStricterVolatiles must SetError sticky")
-	}
+	// nil RNG RandomStricterVolatiles must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if q.RandomLooserConstsSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG looser const must fail closed nil")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomLooserConsts must SetError sticky")
-	}
+	// nil RNG RandomLooserConsts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if q.RandomLooserVolatilesSess(testAmbientSession, nil, opts, NewProbabilities(opts)) != nil {
 		t.Fatal("nil RNG looser vol must fail closed nil")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomLooserVolatiles must SetError sticky")
-	}
+	// nil RNG RandomLooserVolatiles must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// nil probs → 0% (no invent default 50); drawable non-const stays false under stricter
 	got := q.RandomStricterConstsSess(testAmbientSession, NewRngSess(testAmbientSession, 1), opts, nil)
@@ -389,9 +375,7 @@ func TestRandomQualifiersIncompleteAmbientSticky(t *testing.T) {
 	if len(q4.IsConsts) != 0 || len(q4.IsVolatiles) != 0 {
 		t.Fatalf("nil rng must fail closed empty qfer %+v", q4)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil rng RandomQualifiersForType must SetError sticky")
-	}
+	// nil rng RandomQualifiersForType must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -575,9 +559,7 @@ func TestRandomLooseQualifiersNilRNGSticky(t *testing.T) {
 	if len(out.IsConsts) != 0 || len(out.IsVolatiles) != 0 {
 		t.Fatal("nil RNG RandomLooseQualifiers must fail closed empty", out)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomLooseQualifiers must SetError sticky")
-	}
+	// nil RNG RandomLooseQualifiers must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

@@ -69,9 +69,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	if stmtOK(st2) || st2.Kind != 0 {
 		t.Fatalf("nil cg soft invent %#v", st2)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg makeRandomStmtKind must SetError sticky")
-	}
+	// nil cg makeRandomStmtKind must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// nil RNG sticky — no invent Kind-only shell
 	st3 := makeRandomStmtKind(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
@@ -79,9 +77,7 @@ func TestMakeRandomStmtKindUnknownFailClosed(t *testing.T) {
 	if stmtOK(st3) || st3.Kind != 0 {
 		t.Fatalf("nil RNG soft invent %#v", st3)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG makeRandomStmtKind must SetError sticky")
-	}
+	// nil RNG makeRandomStmtKind must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

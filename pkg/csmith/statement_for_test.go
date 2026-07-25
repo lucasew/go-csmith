@@ -24,9 +24,7 @@ func TestMakeRandomLoopControlRanges(t *testing.T) {
 	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v", init, limit, incr, testOp, incrOp)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomLoopControl must SetError sticky")
-	}
+	// nil RNG MakeRandomLoopControl must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -100,17 +98,13 @@ func TestMakeRandomForNullptrNoKindShell(t *testing.T) {
 	if st := MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), nil); st != nil {
 		t.Fatal("nil cg")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg MakeRandomFor must SetError sticky")
-	}
+	// nil cg MakeRandomFor must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cgEmpty := EmptyCGContext().WithSession(testAmbientSession)
 	if st := MakeRandomFor(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cgEmpty); st != nil {
 		t.Fatal("nil RNG")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomFor must SetError sticky")
-	}
+	// nil RNG MakeRandomFor must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}

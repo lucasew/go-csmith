@@ -77,9 +77,7 @@ func TestMakeRandomArrayControlOOBIncrements(t *testing.T) {
 	if init != 0 || limit != 0 || incr != 0 || testOp != 0 || incrOp != 0 || outBound != 0 {
 		t.Fatalf("nil RNG must fail closed zeros, got %d %d %d %v %v %d", init, limit, incr, testOp, incrOp, outBound)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomArrayControl must SetError sticky")
-	}
+	// nil RNG MakeRandomArrayControl must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -312,9 +310,7 @@ func TestMakeRandomArrayLoopSetupNilSelectFailClosed(t *testing.T) {
 	if MakeRandomArrayLoopSetup(nil, opts, vs, EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("nil RNG setup must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomArrayLoopSetup must SetError sticky")
-	}
+	// nil RNG MakeRandomArrayLoopSetup must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

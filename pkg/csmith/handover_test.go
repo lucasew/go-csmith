@@ -80,9 +80,7 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// FactMgr + Func + inputs always live; sticky no invent soft-skip handover past hole
 	(*FactMgr)(nil).CallerToCalleeHandover(nil, &facts)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM CallerToCalleeHandover must SetError sticky")
-	}
+	// nil FM CallerToCalleeHandover must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.CallerToCalleeHandover(nil, nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -90,9 +88,7 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).RemoveRVFacts(&facts)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM RemoveRVFacts must SetError sticky")
-	}
+	// nil FM RemoveRVFacts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.RemoveRVFacts(nil)
 	if !HasErrorSess(testAmbientSession) {

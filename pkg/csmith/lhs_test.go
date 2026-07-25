@@ -397,9 +397,7 @@ func TestMakeRandomLhsNilGatesSticky(t *testing.T) {
 	if MakeRandomLhs(nil, opts, NewProbabilities(opts), vs, &cg, GetIntTypeSess(testAmbientSession), false, false, nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomLhs must SetError sticky")
-	}
+	// nil RNG MakeRandomLhs must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if MakeRandomLhs(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, &cg, nil, false, false, nil) != nil {
 		t.Fatal("nil type must fail closed")

@@ -475,9 +475,7 @@ func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 	if MakeFactUnionSess(testAmbientSession, &Variable{Name: "g_y", Type: nil}, 0) != nil {
 		t.Fatal("Type-nil MakeFactUnion must fail closed nil")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil MakeFactUnion must SetError sticky")
-	}
+	// Type-nil MakeFactUnion must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

@@ -64,9 +64,7 @@ func TestResetBlockFactMaps(t *testing.T) {
 	// FactMgr + Block always live; sticky no invent soft-skip reset past hole
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).ResetBlockFactMaps(b)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM ResetBlockFactMaps must SetError sticky")
-	}
+	// nil FM ResetBlockFactMaps must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.ResetBlockFactMaps(nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -74,9 +72,7 @@ func TestResetBlockFactMaps(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).ResetStmFactMaps(&Stmt{StmID: 1})
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM ResetStmFactMaps must SetError sticky")
-	}
+	// nil FM ResetStmFactMaps must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.ResetStmFactMaps(nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -106,9 +102,7 @@ func TestFindJumpSources(t *testing.T) {
 	if (*FactMgr)(nil).FindJumpSources(5) != nil {
 		t.Fatal("nil FM FindJumpSources must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindJumpSources must SetError sticky")
-	}
+	// nil FM FindJumpSources must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if fm.FindJumpSources(IncompleteStmID) != nil {
 		t.Fatal("destStmID 0 FindJumpSources must fail closed")
@@ -253,9 +247,7 @@ func TestMustBreakOrReturnFullBackEdge(t *testing.T) {
 	if (*Block)(nil).MustBreakOrReturnFull(fm) {
 		t.Fatal("nil MustBreakOrReturnFull must fail closed false")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil MustBreakOrReturnFull must SetError sticky")
-	}
+	// nil MustBreakOrReturnFull must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// Block always live at remove_stmt; sticky no invent no-op remove soft-skip
 	if (*Block)(nil).RemoveStmt(1, fm) != 0 {
@@ -396,9 +388,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	if MakeDummyBlockCG(nil, opts) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg must SetError sticky")
-	}
+	// nil cg must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	empty := EmptyCGContext().WithSession(testAmbientSession)
 	if MakeDummyBlockCG(&empty, opts) != nil {
@@ -495,9 +485,7 @@ func TestBlockPostCreationIncompletePreEffectFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	b.PostCreationAnalysis(nil, Defaults(), EmptyEffect(), nil, nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg PostCreationAnalysis must SetError sticky")
-	}
+	// nil cg PostCreationAnalysis must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -1562,9 +1550,7 @@ func TestFindJumpLabelNilFMSticky(t *testing.T) {
 	if FindJumpLabel(nil, 1) != "" {
 		t.Fatal("nil FM FindJumpLabel must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindJumpLabel must SetError sticky")
-	}
+	// nil FM FindJumpLabel must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -1581,9 +1567,7 @@ func TestContainsBackEdgeIncompleteSticky(t *testing.T) {
 	if !b.ContainsBackEdge(nil) {
 		t.Fatal("nil FM ContainsBackEdge must fail closed true")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM ContainsBackEdge must SetError sticky")
-	}
+	// nil FM ContainsBackEdge must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

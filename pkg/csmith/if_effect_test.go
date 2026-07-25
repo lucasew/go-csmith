@@ -381,17 +381,13 @@ func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), nil); st != nil {
 		t.Fatal("nil RNG+cg")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG+cg MakeRandomIf must SetError sticky")
-	}
+	// nil RNG+cg MakeRandomIf must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), &cg); st != nil {
 		t.Fatal("nil RNG")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomIf must SetError sticky")
-	}
+	// nil RNG MakeRandomIf must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

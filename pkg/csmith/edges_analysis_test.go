@@ -125,9 +125,7 @@ func TestHasEdgeInNilFMFailClosed(t *testing.T) {
 	if !fm.HasEdgeIn(1, false, true) {
 		t.Fatal("nil FM must HasEdgeIn true")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM HasEdgeIn must SetError sticky")
-	}
+	// nil FM HasEdgeIn must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -504,9 +502,7 @@ func TestSetAccumulatedEffectAfterBlock(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVarSess(testAmbientSession, v), nil, EmptyEffect())
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg SetAccumulatedEffectAfterBlock must SetError sticky")
-	}
+	// nil cg SetAccumulatedEffectAfterBlock must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cgNoFM := EmptyCGContext().WithSession(testAmbientSession)
 	SetAccumulatedEffectAfterBlock(st, EmptyEffect().WriteVarSess(testAmbientSession, v), &cgNoFM, EmptyEffect())
@@ -526,16 +522,12 @@ func TestFindEdgesInNilFMSticky(t *testing.T) {
 	if (*FactMgr)(nil).FindEdgesIn(1, false, false) != nil {
 		t.Fatal("nil FM FindEdgesIn must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindEdgesIn must SetError sticky")
-	}
+	// nil FM FindEdgesIn must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if (*FactMgr)(nil).FindEdgesInToBlock(&Block{}, false, false) != nil {
 		t.Fatal("nil FM FindEdgesInToBlock must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindEdgesInToBlock must SetError sticky")
-	}
+	// nil FM FindEdgesInToBlock must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

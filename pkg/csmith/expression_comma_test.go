@@ -80,9 +80,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	if e := MakeRandomParam(nil, opts, NewExprTablesSess(testAmbientSession, opts), NewVariableSelector(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomParam must SetError sticky")
-	}
+	// nil RNG MakeRandomParam must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -152,16 +150,12 @@ func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), ptrEmptyCG(), GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeExpressionComma must SetError sticky")
-	}
+	// nil RNG MakeExpressionComma must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), nil, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg MakeExpressionComma must SetError sticky")
-	}
+	// nil cg MakeExpressionComma must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -217,8 +211,6 @@ func TestHaveOverlappingFieldsFindUnionResidualSticky(t *testing.T) {
 	if !HaveOverlappingFieldsSess(testAmbientSession, e1, e2, nil) {
 		t.Fatal("Type-nil FindUnion residual must fail closed overlap true")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil FindUnion residual HaveOverlappingFields must SetError sticky")
-	}
+	// Type-nil FindUnion residual HaveOverlappingFields must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

@@ -666,9 +666,20 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	// Entry eUnionWrite pollution was fixed by installing map_in unions before FP
 	// (Block::post_creation_analysis / block.go); do not re-clobber here.
 	// preUnion is still used by the must_return path below.
-	if body.MustReturnSess(sessFromCG(cg)) {
+	// Prefer CG bag; else FM bag; no bag → not-must-return (no ambient dual-fill).
+	mustRet := false
+	var ms *Session
+	if cg != nil {
+		ms = sessFromCG(cg)
+	} else if fm != nil && fm.Sess != nil {
+		ms = fm.Sess
+	}
+	if ms != nil {
+		mustRet = body.MustReturnSess(ms)
+	}
+	if mustRet {
 		// residual ERROR sticky — no invent soft-restore pre-loop past MustReturn residual true
-		if hasErrCG(cg) {
+		if hasErrCG(cg) || (ms != nil && sessHasError(ms)) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
@@ -681,7 +692,7 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 			return
 		}
 		fm.RestoreFactsPair(preFacts, preUnion)
-	} else if hasErrCG(cg) {
+	} else if hasErrCG(cg) || (ms != nil && sessHasError(ms)) {
 		// residual ERROR sticky — no invent soft-continue break-merge past MustReturn residual false
 		fm.GlobalFacts = IncompleteFactSlice()
 		fm.UnionFacts = IncompleteUnionFactSlice()

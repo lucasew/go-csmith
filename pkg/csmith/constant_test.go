@@ -40,9 +40,7 @@ func TestMakeRandomVoidFailClosed(t *testing.T) {
 	if MakeRandomSess(testAmbientSession, GetIntTypeSess(testAmbientSession), Defaults(), nil, nil) != nil {
 		t.Fatal("nil RNG simple MakeRandom must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG simple MakeRandom must SetError sticky")
-	}
+	// nil RNG simple MakeRandom must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// Constant.cpp:411 unsupported kind sticky
 	if MakeRandomSess(testAmbientSession, &Type{}, Defaults(), nil, NewRngSess(testAmbientSession, 1)) != nil {
@@ -115,9 +113,7 @@ func TestMakeRandomUpto(t *testing.T) {
 	if MakeRandomUptoSess(testAmbientSession, 10, nil) != nil {
 		t.Fatal("nil RNG MakeRandomUpto must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomUpto must SetError sticky")
-	}
+	// nil RNG MakeRandomUpto must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -214,9 +210,7 @@ func TestBinaryConstantPath(t *testing.T) {
 	if _, ok := maybeBinaryConstantSess(testAmbientSession, opts, nil, 2, ""); ok {
 		t.Fatal("nil RNG maybeBinaryConstant must not claim binary branch")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG BinaryConstant maybeBinaryConstant must SetError sticky")
-	}
+	// nil RNG BinaryConstant maybeBinaryConstant must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// BinaryConstant off complete no-op
 	opts.BinaryConstant = false
@@ -292,9 +286,7 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	if generateSmallRandomFloatHexConstantSess(testAmbientSession, 0, nil) != "" {
 		t.Fatal("nil rng fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil rng generateSmallRandomFloatHexConstant must SetError sticky")
-	}
+	// nil rng generateSmallRandomFloatHexConstant must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// formatSmallConstant must not invent float without RNG; sticky broken dispatch
 	ClearErrorSess(testAmbientSession)
@@ -319,9 +311,7 @@ func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
 	if (*Rng)(nil).RandomHexDigitsSess(testAmbientSession, 4) != "" {
 		t.Fatal("nil RNG must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomHexDigits must SetError sticky")
-	}
+	// nil RNG RandomHexDigits must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

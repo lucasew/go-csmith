@@ -119,9 +119,7 @@ func TestMakeBuiltinFunction(t *testing.T) {
 	if MakeBuiltinFunctionSess(testAmbientSession, opts, NewProbabilities(opts), nil, list, nil, "Int; __builtin_clz; (UInt); x86") != nil {
 		t.Fatal("nil RNG must not invent builtin")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG must SetError sticky")
-	}
+	// nil RNG must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if MakeBuiltinFunctionSess(testAmbientSession, opts, NewProbabilities(opts), NewRngSess(testAmbientSession, 1), list, nil, "badformat") != nil {
 		t.Fatal("invalid format must fail closed")

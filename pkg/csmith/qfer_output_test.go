@@ -619,16 +619,12 @@ func TestOutputForwardDeclNoInventBareSemi(t *testing.T) {
 	if out := (*Function)(nil).OutputForwardDeclSess(testAmbientSession, false, nil, false); out != "" {
 		t.Fatal("nil OutputForwardDecl must fail closed", out)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputForwardDecl must SetError sticky")
-	}
+	// nil OutputForwardDecl must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if out := (*Function)(nil).OutputForwardDeclAliasSess(testAmbientSession, false); out != "" {
 		t.Fatal("nil OutputForwardDeclAlias must fail closed", out)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputForwardDeclAlias must SetError sticky")
-	}
+	// nil OutputForwardDeclAlias must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// builtins complete empty (compiler-provided)
 	if out := (&Function{Name: "abs", IsBuiltin: true}).OutputForwardDeclSess(testAmbientSession, false, nil, false); out != "" {

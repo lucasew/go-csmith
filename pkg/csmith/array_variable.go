@@ -53,13 +53,26 @@ func CreateArrayVariable(
 		noteErrCG(cg, ErrGeneric)
 		return nil
 	}
-	simple := elem.IsSimpleSess(sessFromCG(cg))
+	// Prefer live CG bag; else Rng.Sess when set (tests use NewRngSess); else throwaway.
+	// Do not dual-fill package ambient from nil-cg library calls.
+	var s *Session
+	if cg != nil {
+		s = sessFromCG(cg)
+	} else if r != nil && r.Sess != nil {
+		s = r.Sess
+	} else {
+		s = NewSession(Defaults())
+	}
+	simple := elem.IsSimpleSess(s)
 	// residual ERROR sticky — no invent soft-array past IsSimple residual
-	if hasErrCG(cg) {
+	if hasErrCG(cg) || sessHasError(s) {
 		return nil
 	}
-	if simple && elem.SimpleSess(sessFromCG(cg)) == EVoid {
+	if simple && elem.SimpleSess(s) == EVoid {
 		noteErrCG(cg, ErrGeneric)
+		if cg == nil {
+			sessNoteError(s, ErrGeneric)
+		}
 		return nil
 	}
 	// incomplete ambient / facts fail closed sticky when CG is live (make_init_value path)
@@ -78,9 +91,9 @@ func CreateArrayVariable(
 	}
 	// dimension: 1d 60%, 2d 30%, … via rnd_upto(99)+1 stepping
 	// ArrayVariable.cpp:131–144
-	num := int(r.RndUptoSess(sessFromCG(cg), 99)) + 1
+	num := int(r.RndUptoSess(s, 99)) + 1
 	// ArrayVariable.cpp:133 — ERROR_GUARD(nullptr)
-	if hasErrCG(cg) {
+	if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 		return nil
 	}
 	dimension := 0
@@ -102,9 +115,9 @@ func CreateArrayVariable(
 	sizes := make([]int, 0, dimension)
 	total := 1
 	for i := 0; i < dimension; i++ {
-		dimen := int(r.RndUptoSess(sessFromCG(cg), uint32(opts.MaxArrayLenPerDim))) + 1
+		dimen := int(r.RndUptoSess(s, uint32(opts.MaxArrayLenPerDim))) + 1
 		// ArrayVariable.cpp:149–150 — rnd_upto(max_len_per_dim)+1; ERROR_GUARD
-		if hasErrCG(cg) {
+		if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 			return nil
 		}
 		if opts.MaxArrayLength > 0 && total*dimen > opts.MaxArrayLength {
@@ -130,21 +143,21 @@ func CreateArrayVariable(
 		Block: blk,
 	}
 	// ArrayVariable.cpp:161 — ERROR_GUARD_AND_DEL1 after new ArrayVariable
-	if hasErrCG(cg) {
+	if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 		return nil
 	}
 	// self-link for ChooseOKVar itemize (VariableSelector.cpp:332–337)
 	av.AsArray = av
 	// ArrayVariable.cpp:161–163 — create_field_vars for aggregate element type
-	if elem.IsAggregateSess(sessFromCG(cg)) {
-		if hasErrCG(cg) {
+	if elem.IsAggregateSess(s) {
+		if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 			return nil
 		}
-		av.CreateFieldVarsSess(sessFromCG(cg))
-	} else if hasErrCG(cg) {
+		av.CreateFieldVarsSess(s)
+	} else if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 		return nil
 	}
-	if hasErrCG(cg) {
+	if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 		return nil
 	}
 	// ArrayVariable.cpp:165–186 — pure_rnd_upto(total_size/2) then alt inits.
@@ -153,8 +166,8 @@ func CreateArrayVariable(
 	half := uint32(total / 2)
 	// Prefer process pure path when r is the live session generator (C++ pure_rnd_*)
 	var initNum int
-	if pr := sessRng(sessFromCG(cg)); pr != nil && pr == r {
-		initNum = int(PureRndUptoSess(sessFromCG(cg), half, nil))
+	if pr := sessRng(s); pr != nil && pr == r {
+		initNum = int(PureRndUptoSess(s, half, nil))
 	} else {
 		initNum = int(r.RndUptoSess(rSess(r), half))
 	}
@@ -163,13 +176,13 @@ func CreateArrayVariable(
 		// if (!pointer || strict_const_arrays) Constant::make_random
 		// else VariableSelector::make_init_value
 		var e *Expression
-		ptrLike := elem.IsPointerLikeSess(sessFromCG(cg))
-		if hasErrCG(cg) {
+		ptrLike := elem.IsPointerLikeSess(s)
+		if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 			return nil
 		}
 		if !ptrLike || opts.StrictConstArrays {
-			c := MakeRandomSess(sessFromCG(cg), elem, opts, probs, r)
-			if hasErrCG(cg) {
+			c := MakeRandomSess(s, elem, opts, probs, r)
+			if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 				return nil
 			}
 			if c != nil {
@@ -182,7 +195,7 @@ func CreateArrayVariable(
 			}
 			qf := qfer
 			e = vs.MakeInitValue(AccessRead, *cg, elem, &qf, blk, r)
-			if hasErrCG(cg) {
+			if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 				return nil
 			}
 		}
@@ -192,8 +205,8 @@ func CreateArrayVariable(
 		}
 		av.InitExprs = append(av.InitExprs, e)
 		// Keep InitValues for legacy tests / Fact paths that read strings
-		val := e.OutputSess(sessFromCG(cg))
-		if hasErrCG(cg) {
+		val := e.OutputSess(s)
+		if hasErrCG(cg) || (cg == nil && sessHasError(s)) {
 			return nil
 		}
 		if val != "" {

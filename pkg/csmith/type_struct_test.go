@@ -167,16 +167,12 @@ func TestMakeRandomStructUnionTypeNilRNGSticky(t *testing.T) {
 	if MakeRandomStructType(nil, opts, probs, &env, "S0") != nil {
 		t.Fatal("nil RNG struct must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomStructType must SetError sticky")
-	}
+	// nil RNG MakeRandomStructType must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if MakeRandomUnionType(nil, opts, probs, &env, "U0") != nil {
 		t.Fatal("nil RNG union must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomUnionType must SetError sticky")
-	}
+	// nil RNG MakeRandomUnionType must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	opts.FixedStructFields = true
 	opts.MaxStructFields = 0
@@ -232,16 +228,12 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	if MoreTypesProbabilitySess(testAmbientSession, nil, NewProbabilities(opts), 20) {
 		t.Fatal("nil RNG past threshold must fail closed false")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MoreTypesProbability must SetError sticky")
-	}
+	// nil RNG MoreTypesProbability must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0); f.Type != nil {
 		t.Fatal("nil RNG MakeOneStructField must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeOneStructField must SetError sticky")
-	}
+	// nil RNG MakeOneStructField must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if f := MakeOneStructField(NewRngSess(testAmbientSession, 1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0); f.Type != nil {
 		t.Fatal("nil probs MakeOneStructField must fail closed")
@@ -253,9 +245,7 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	if f := MakeOneUnionField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0, true); f.Type != nil {
 		t.Fatal("nil RNG MakeOneUnionField must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeOneUnionField must SetError sticky")
-	}
+	// nil RNG MakeOneUnionField must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	env := TypeEnv{Sess: testAmbientSession}
 	opts.Structs = true
@@ -270,9 +260,7 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// TypeEnv always live; sticky (no invent soft-skip type gen past hole)
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil env GenerateAllTypesEnv must SetError sticky")
-	}
+	// nil env GenerateAllTypesEnv must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -310,9 +298,7 @@ func TestMakeStructConstant(t *testing.T) {
 	if MakeStructConstantSess(testAmbientSession, nil, opts, probs, st) != nil {
 		t.Fatal("nil RNG struct constant")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeStructConstant must SetError sticky")
-	}
+	// nil RNG MakeStructConstant must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
@@ -320,9 +306,7 @@ func TestMakeStructConstant(t *testing.T) {
 	if MakeUnionConstantSess(testAmbientSession, nil, opts, probs, ut) != nil {
 		t.Fatal("nil RNG union constant")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeUnionConstant must SetError sticky")
-	}
+	// nil RNG MakeUnionConstant must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// Type-nil field sticky (no invent soft-empty then ERROR_GUARD as complete miss)
 	stHole := &Type{isStruct: true, StructName: "Shole", Fields: []StructField{

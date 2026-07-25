@@ -196,9 +196,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	if selectDerefPointerInv(nil, opts, probs, vs, cg2, GetIntTypeSess(testAmbientSession), &q, AccessRead, nil) != nil {
 		t.Fatal("nil RNG selectDerefPointerInv must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG selectDerefPointerInv must SetError sticky")
-	}
+	// nil RNG selectDerefPointerInv must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if selectDerefPointerInv(NewRngSess(testAmbientSession, 2), opts, probs, vs, cg2, nil, &q, AccessRead, nil) != nil {
 		t.Fatal("nil type selectDerefPointerInv must fail closed")

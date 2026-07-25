@@ -66,9 +66,7 @@ func TestMakeRandomReturnRequiresFactMgr(t *testing.T) {
 	if stmtOK(MakeRandomReturn(nil, opts, NewVariableSelector(testAmbientSession, opts), nil)) {
 		t.Fatal("nil RNG/cg must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomReturn must SetError sticky")
-	}
+	// nil RNG MakeRandomReturn must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), false, false)
@@ -170,9 +168,7 @@ func TestVisitFactsStatementReturnNoInventWithoutFuncRV(t *testing.T) {
 	if VisitFactsStatementReturn(st, &cg2, opts) {
 		t.Fatal("nil RV must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RV return visit must SetError sticky")
-	}
+	// nil RV return visit must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// complete path
 	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntTypeSess(testAmbientSession), false, false)

@@ -482,17 +482,19 @@ func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAtt
 		attr := st.LabelAttr
 		if attr == "" && emitLabelAttrs && attrRng != nil {
 			// Prefer emit bag s; FactMgr bag only when present (unit tests may omit FM).
-			// Prefer emit bag s; FactMgr bag when s unset (sessFromFM nil-fm → unit-test ambient).
+			// Prefer emit bag s; FactMgr bag when s unset. No bag → skip attrs (no ambient).
 			attrSess := s
-			if attrSess == nil {
+			if attrSess == nil && fm != nil {
 				attrSess = sessFromFM(fm)
 			}
-			if ag := EnsureLabelAttrGeneratorSess(attrSess); ag != nil {
-				attr = ag.OutputSess(attrSess, attrRng)
-			}
-			// residual ERROR sticky — no invent soft-continue label past attr residual
-			if sessHasError(s) {
-				return "", false
+			if attrSess != nil {
+				if ag := EnsureLabelAttrGeneratorSess(attrSess); ag != nil {
+					attr = ag.OutputSess(attrSess, attrRng)
+				}
+				// residual ERROR sticky — no invent soft-continue label past attr residual
+				if sessHasError(attrSess) {
+					return "", false
+				}
 			}
 		}
 		if attr != "" {

@@ -373,9 +373,7 @@ func TestCombineBranchFacts(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	CombineBranchFacts(st, &pre, &preU, nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM CombineBranchFacts must SetError sticky")
-	}
+	// nil FM CombineBranchFacts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	CombineBranchFacts(st, &pre, &preU, fm)
 	if FindRelatedPointToSess(testAmbientSession, fm.GlobalFacts, p) == nil {

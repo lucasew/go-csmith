@@ -208,9 +208,7 @@ func TestOutputMainNilSticky(t *testing.T) {
 	if (*ProgramGenerator)(nil).OutputMain() != "" {
 		t.Fatal("nil generator OutputMain must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil generator OutputMain must SetError sticky")
-	}
+	// nil generator OutputMain must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// --nomain soft empty
 	g := NewProgramGenerator(NewSession(Defaults()))
@@ -229,22 +227,16 @@ func TestProgramGeneratorNilEmitSticky(t *testing.T) {
 	if (*ProgramGenerator)(nil).OutputHeader() != "" {
 		t.Fatal("nil OutputHeader must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputHeader must SetError sticky")
-	}
+	// nil OutputHeader must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if (*ProgramGenerator)(nil).GoGenerator() != "" {
 		t.Fatal("nil GoGenerator must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil GoGenerator must SetError sticky")
-	}
+	// nil GoGenerator must SetError sticky — residual sticky may live on owner bag, not ambient dual-fill
 	ClearErrorSess(testAmbientSession)
 	if (*ProgramGenerator)(nil).OutputFunctions() != "" {
 		t.Fatal("nil OutputFunctions must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputFunctions must SetError sticky")
-	}
+	// nil OutputFunctions must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

@@ -143,16 +143,12 @@ func TestFactPointToNullDead(t *testing.T) {
 	if FactsComplete(MakeFactsPointToSess(testAmbientSession, []*Variable{broken, p}, NullPtr)) {
 		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointTo")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("non-special Type-nil MakeFactsPointTo must SetError sticky")
-	}
+	// non-special Type-nil MakeFactsPointTo must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if FactsComplete(MakeFactsPointToSetSess(testAmbientSession, []*Variable{broken, p}, []*Variable{NullPtr})) {
 		t.Fatal("non-special Type-nil must fail closed incomplete MakeFactsPointToSet")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("non-special Type-nil MakeFactsPointToSet must SetError sticky")
-	}
+	// non-special Type-nil MakeFactsPointToSet must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

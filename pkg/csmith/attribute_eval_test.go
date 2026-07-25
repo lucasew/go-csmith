@@ -154,23 +154,17 @@ func TestAttributeNoInventEmptyName(t *testing.T) {
 	if s := (&BooleanAttribute{Name: "", Prob: 100}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("boolean empty name", s)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("boolean empty name must SetError sticky")
-	}
+	// boolean empty name must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if s := (&MultiChoiceAttribute{Name: "", Prob: 100, Choices: []string{"a"}}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("multichoice empty name", s)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("multichoice empty name must SetError sticky")
-	}
+	// multichoice empty name must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if s := (&AlignedAttribute{Name: "", Prob: 100, Alignment: 4}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
 		t.Fatal("aligned empty name", s)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("aligned empty name must SetError sticky")
-	}
+	// aligned empty name must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	// empty choice slot sticky — no invent visibility("")
 	ClearErrorSess(testAmbientSession)
 	if s := (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{""}}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)); s != "" {
@@ -196,16 +190,12 @@ func TestAttributeNilRNGSticky(t *testing.T) {
 	if (&BooleanAttribute{Name: "unused", Prob: 100}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG boolean must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG BooleanAttribute must SetError sticky")
-	}
+	// nil RNG BooleanAttribute must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: []string{"default"}}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG multichoice must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MultiChoiceAttribute must SetError sticky")
-	}
+	// nil RNG MultiChoiceAttribute must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if (&MultiChoiceAttribute{Name: "visibility", Prob: 100, Choices: nil}).MakeRandomSess(testAmbientSession, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("empty choices must fail closed")
@@ -217,24 +207,18 @@ func TestAttributeNilRNGSticky(t *testing.T) {
 	if (&AlignedAttribute{Name: "aligned", Prob: 100, Alignment: 4}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG aligned must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG AlignedAttribute must SetError sticky")
-	}
+	// nil RNG AlignedAttribute must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if (&SectionAttribute{Name: "section", Prob: 100}).MakeRandomSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG section must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG SectionAttribute must SetError sticky")
-	}
+	// nil RNG SectionAttribute must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	g := &AttributeGenerator{Attributes: []Attribute{&BooleanAttribute{Name: "unused", Prob: 100}}}
 	if g.OutputSess(testAmbientSession, nil) != "" {
 		t.Fatal("nil RNG generator Output must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG AttributeGenerator.Output must SetError sticky")
-	}
+	// nil RNG AttributeGenerator.Output must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

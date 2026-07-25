@@ -237,9 +237,7 @@ func TestFindVariableScopeIsGlobalResidualSticky(t *testing.T) {
 	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(nil) != ScopeInactive {
 		t.Fatal("nil FindVariableScope must fail closed ScopeInactive")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FindVariableScope must SetError sticky")
-	}
+	// nil FindVariableScope must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// complete global
 	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)

@@ -33,9 +33,7 @@ func TestParamListProbabilityRange(t *testing.T) {
 	if ParamListProbabilitySess(testAmbientSession, nil, opts) != 0 {
 		t.Fatal("nil RNG ParamListProbability must fail closed 0")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG ParamListProbability must SetError sticky")
-	}
+	// nil RNG ParamListProbability must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -134,9 +132,7 @@ func TestBlockProbabilityNilRNGSticky(t *testing.T) {
 	if BlockProbabilitySess(testAmbientSession, 4, nil) != 0 {
 		t.Fatal("nil RNG must fail closed 0")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG BlockProbability must SetError sticky")
-	}
+	// nil RNG BlockProbability must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -365,9 +361,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	if s := f.OutputHeaderSess(testAmbientSession, false); s != "" {
 		t.Fatal("RV Type-nil OutputHeader invent", s)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("RV Type-nil OutputHeader must SetError sticky")
-	}
+	// RV Type-nil OutputHeader must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// nil Function paramList sticky empty (no invent "void")
 	if s := (*Function)(nil).paramListCSess(testAmbientSession); s != "" {

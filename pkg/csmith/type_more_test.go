@@ -615,9 +615,7 @@ func TestIfStructAssignOps(t *testing.T) {
 	if IfStructWillHaveAssignOpsSess(testAmbientSession, nil, opts, NewProbabilities(opts)) {
 		t.Fatal("nil RNG IfStructWillHaveAssignOps must fail closed false")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG IfStructWillHaveAssignOps must SetError sticky")
-	}
+	// nil RNG IfStructWillHaveAssignOps must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

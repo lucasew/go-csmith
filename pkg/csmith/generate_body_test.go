@@ -244,9 +244,7 @@ func TestGenerateBodyNoInventWithoutRNG(t *testing.T) {
 	if f.Body != nil || f.BuildState != BuildUnbuilt {
 		t.Fatalf("nil RNG must not invent body/Built, state=%v body=%v", f.BuildState, f.Body != nil)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG GenerateBody must SetError sticky")
-	}
+	// nil RNG GenerateBody must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// Function always live; sticky (no invent soft-skip body gen past hole)
 	(*Function)(nil).GenerateBody(NewRngSess(testAmbientSession, 1), Defaults(), NewProbabilities(Defaults()), NewVariableSelector(testAmbientSession, Defaults()), NewExprTablesSess(testAmbientSession, Defaults()), NewStatementThresholdTableSess(testAmbientSession, Defaults()), EmptyCGContext().WithSession(testAmbientSession))

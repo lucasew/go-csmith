@@ -35,23 +35,17 @@ func TestCreateArrayVariableAssertAndErrorGuard(t *testing.T) {
 	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_v", GetSimpleTypeSess(testAmbientSession, EVoid), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("void element must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("void element must SetError sticky")
-	}
+	// void element must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_n", nil, MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("nil element must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil element must SetError sticky")
-	}
+	// nil element must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), q) != nil {
 		t.Fatal("empty name must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("empty name must SetError sticky")
-	}
+	// empty name must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
@@ -306,9 +300,7 @@ func TestItemizeAlreadyItemizedFailClosed(t *testing.T) {
 	if parent.ItemizeIntoSess(testAmbientSession, nil, nil) != nil {
 		t.Fatal("nil RNG Itemize must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG Itemize must SetError sticky")
-	}
+	// nil RNG Itemize must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

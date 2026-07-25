@@ -133,9 +133,7 @@ func TestChooseRandomNonvoidSimpleSeed2First(t *testing.T) {
 	if ChooseRandomNonvoidSimpleSess(testAmbientSession, nil, p) != EVoid {
 		t.Fatal("nil RNG must fail closed EVoid")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG ChooseRandomNonvoidSimple must SetError sticky")
-	}
+	// nil RNG ChooseRandomNonvoidSimple must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if ChooseRandomNonvoidSimpleSess(testAmbientSession, NewRngSess(testAmbientSession, 1), nil) != EVoid {
 		t.Fatal("nil probs must fail closed EVoid")

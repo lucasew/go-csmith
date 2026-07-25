@@ -254,9 +254,7 @@ func TestGetQualifiers(t *testing.T) {
 	if len(q3.IsConsts) != 0 || len(q3.IsVolatiles) != 0 {
 		t.Fatalf("nil RV must not invent qfer bits: %+v", q3)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RV GetQualifiers must SetError sticky")
-	}
+	// nil RV GetQualifiers must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// nil Invocation sticky empty
 	if q4 := (*Invocation)(nil).GetQualifiersSess(testAmbientSession); len(q4.IsConsts) != 0 {

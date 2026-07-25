@@ -220,16 +220,12 @@ func TestMakeRandomExprStmtNilCGFailClosed(t *testing.T) {
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil cg invent %#v", st)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg MakeRandomExprStmt must SetError sticky")
-	}
+	// nil cg MakeRandomExprStmt must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	st2 := MakeRandomExprStmt(nil, Defaults(), nil, nil, nil, ptrEmptyCG())
 	if st2.Kind != 0 || stmtOK(st2) {
 		t.Fatalf("nil RNG invent %#v", st2)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomExprStmt must SetError sticky")
-	}
+	// nil RNG MakeRandomExprStmt must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

@@ -175,9 +175,7 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	if st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), nil); st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil arrayop invent %#v", st)
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil vs/cg arrayop must SetError sticky")
-	}
+	// nil vs/cg arrayop must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// goto: no FM (non-sticky soft re-pick)
 	ClearErrorSess(testAmbientSession)

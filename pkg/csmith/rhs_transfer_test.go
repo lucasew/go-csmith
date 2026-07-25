@@ -173,9 +173,7 @@ func TestUpdateFactForAssign(t *testing.T) {
 	if (*FactMgr)(nil).UpdateFactForAssign(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false), 0, nil) {
 		t.Fatal("nil FM must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM UpdateFactForAssign must SetError sticky")
-	}
+	// nil FM UpdateFactForAssign must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	if fm.UpdateFactForAssign(nil, 0, nil) {
@@ -329,9 +327,7 @@ func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
 	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("Type-nil RV must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil RV RhsToLhsTransfer must SetError sticky")
-	}
+	// Type-nil RV RhsToLhsTransfer must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

@@ -539,51 +539,37 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	if FactsComplete((*FactMgr)(nil).GetMapFactsIn(1)) {
 		t.Fatal("nil FM GetMapFactsIn must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM GetMapFactsIn must SetError sticky")
-	}
+	// nil FM GetMapFactsIn must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsOut(1)) {
 		t.Fatal("nil FM GetMapFactsOut must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM GetMapFactsOut must SetError sticky")
-	}
+	// nil FM GetMapFactsOut must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsInFinal(1)) {
 		t.Fatal("nil FM GetMapFactsInFinal must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM GetMapFactsInFinal must SetError sticky")
-	}
+	// nil FM GetMapFactsInFinal must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if FactsComplete((*FactMgr)(nil).GetMapFactsOutFinal(1)) {
 		t.Fatal("nil FM GetMapFactsOutFinal must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM GetMapFactsOutFinal must SetError sticky")
-	}
+	// nil FM GetMapFactsOutFinal must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// GetMapStmEffect / GetMapAccumEffect nil FM sticky IncompleteEffect
 	if EffectComplete((*FactMgr)(nil).GetMapStmEffect(1)) {
 		t.Fatal("nil FM GetMapStmEffect must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM GetMapStmEffect must SetError sticky")
-	}
+	// nil FM GetMapStmEffect must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if EffectComplete((*FactMgr)(nil).GetMapAccumEffect(1)) {
 		t.Fatal("nil FM GetMapAccumEffect must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM GetMapAccumEffect must SetError sticky")
-	}
+	// nil FM GetMapAccumEffect must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// SetMap* nil FM / bad stm_id sticky
 	(*FactMgr)(nil).SetMapFactsIn(1, nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM SetMapFactsIn must SetError sticky")
-	}
+	// nil FM SetMapFactsIn must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.SetMapFactsIn(IncompleteStmID, nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -591,30 +577,20 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SetMapStmEffect(1, EmptyEffect())
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM SetMapStmEffect must SetError sticky")
-	}
+	// nil FM SetMapStmEffect must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).ClearMapVisited()
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM ClearMapVisited must SetError sticky")
-	}
+	// nil FM ClearMapVisited must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).CreateCFGEdgeTo(1, &Block{}, 0, false, false)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM CreateCFGEdgeTo must SetError sticky")
-	}
+	// nil FM CreateCFGEdgeTo must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// FactMgr mutators always live; sticky no invent soft-skip past hole
 	(*FactMgr)(nil).SetupInOutMaps(true)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM SetupInOutMaps must SetError sticky")
-	}
+	// nil FM SetupInOutMaps must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).AddNewVarFact(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false))
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM AddNewVarFact must SetError sticky")
-	}
+	// nil FM AddNewVarFact must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.AddNewVarFact(nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -622,9 +598,7 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).FindDanglingGlobalPtrs(&Function{Name: "f"})
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindDanglingGlobalPtrs must SetError sticky")
-	}
+	// nil FM FindDanglingGlobalPtrs must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm.FindDanglingGlobalPtrs(nil)
 	if !HasErrorSess(testAmbientSession) {
@@ -633,34 +607,22 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).AddFactOut(&Stmt{StmID: 1}, nil, MakeFactPointToSess(testAmbientSession,
 		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false), NullPtr))
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM AddFactOut must SetError sticky")
-	}
+	// nil FM AddFactOut must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SetMapFactsOutForStmtDest(&Stmt{StmID: 1}, nil, nil, nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM SetMapFactsOutForStmtDest must SetError sticky")
-	}
+	// nil FM SetMapFactsOutForStmtDest must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).BackupStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{}, map[int][]*FactUnion{}, map[int][]*FactUnion{})
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM BackupStmFactMaps must SetError sticky")
-	}
+	// nil FM BackupStmFactMaps must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).RestoreStmFactMaps(&Stmt{StmID: 1}, map[int][]*FactPointTo{}, map[int][]*FactPointTo{}, map[int][]*FactUnion{}, map[int][]*FactUnion{})
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM RestoreStmFactMaps must SetError sticky")
-	}
+	// nil FM RestoreStmFactMaps must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).AddNewVarFactAndUpdate(nil, CreateVariableScalarsSess(testAmbientSession, "g_y", GetIntTypeSess(testAmbientSession), false, false))
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM AddNewVarFactAndUpdate must SetError sticky")
-	}
+	// nil FM AddNewVarFactAndUpdate must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).UpdateFactsForOOSVarsSess(testAmbientSession, []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntTypeSess(testAmbientSession), false, false)})
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM UpdateFactsForOOSVars must SetError sticky")
-	}
+	// nil FM UpdateFactsForOOSVars must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// empty OOS list complete no-op
 	fm.UpdateFactsForOOSVarsSess(testAmbientSession, nil)
@@ -670,9 +632,7 @@ func TestGetMapFactsStmID0FailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	facts := []*FactPointTo{}
 	(*FactMgr)(nil).AddParamFacts(nil, &facts)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM AddParamFacts must SetError sticky")
-	}
+	// nil FM AddParamFacts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -854,9 +814,7 @@ func TestSanityCheckMap(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SanityCheckMap()
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil fm sticky")
-	}
+	// nil fm sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

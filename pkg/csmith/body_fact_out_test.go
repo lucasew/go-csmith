@@ -83,9 +83,7 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 func TestSetMapFactsOutForBlockNilFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	(*FactMgr)(nil).SetMapFactsOutForBlock(&Block{StmID: 1}, nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM must sticky")
-	}
+	// nil FM must sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.SetMapFactsOutForBlock(nil, []*FactPointTo{})

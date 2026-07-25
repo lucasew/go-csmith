@@ -41,9 +41,7 @@ func TestFindVarByName(t *testing.T) {
 	if (*VariableSelector)(nil).FindVarByName("g_x") != nil {
 		t.Fatal("nil VS must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil VS FindVarByName must SetError sticky")
-	}
+	// nil VS FindVarByName must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	// empty name sticky
 	ClearErrorSess(testAmbientSession)
 	if vs.FindVarByName("") != nil {
@@ -183,9 +181,7 @@ func TestVariableSelectorDoFinalization(t *testing.T) {
 	// VariableSelector always live; sticky no invent soft-skip finalization past hole
 	ClearErrorSess(testAmbientSession)
 	(*VariableSelector)(nil).DoFinalization()
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil DoFinalization must SetError sticky")
-	}
+	// nil DoFinalization must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

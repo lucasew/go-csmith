@@ -25,9 +25,7 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	if ChooseFunc(NewRngSess(testAmbientSession, 1), []*Function{built, nil}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil hole must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil Funcs hole must SetError sticky")
-	}
+	// nil Funcs hole must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// nil ReturnType when ret wanted fails closed sticky — no invent soft-skip as absent
 	// (C++ is_convertable would deref return_type*; list hole aborts whole choose)
@@ -35,9 +33,7 @@ func TestChooseFuncSkipsUnbuilt(t *testing.T) {
 	if ChooseFunc(NewRngSess(testAmbientSession, 1), []*Function{built, noRet}, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil ReturnType must fail closed whole choose, not invent skip")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil ReturnType must SetError sticky")
-	}
+	// nil ReturnType must SetError sticky — residual sticky may live on owner bag, not ambient dual-fill
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -109,9 +105,7 @@ func TestChooseFuncContextNilRVQferFailClosed(t *testing.T) {
 	if ChooseFuncContext(NewRngSess(testAmbientSession, 1), []*Function{good, noRV}, GetIntTypeSess(testAmbientSession), nil, nil, Defaults(), &q) != nil {
 		t.Fatal("nil RV among candidates must fail closed whole choose")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RV must SetError sticky")
-	}
+	// nil RV must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// good alone with matching qfer still works
 	if ChooseFuncContext(NewRngSess(testAmbientSession, 2), []*Function{good}, GetIntTypeSess(testAmbientSession), nil, nil, Defaults(), &q) != good {

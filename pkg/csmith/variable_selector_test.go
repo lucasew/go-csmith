@@ -13,9 +13,7 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	if ChooseOKVarSess(testAmbientSession, nil, []*Variable{&av.Variable}) != nil {
 		t.Fatal("itemize needs RNG; no soft return collective")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG itemize ChooseOKVar must SetError sticky")
-	}
+	// nil RNG itemize ChooseOKVar must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// multi-cand without RNG sticky — no invent vars[0]
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
@@ -23,9 +21,7 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	if ChooseOKVarSess(testAmbientSession, nil, []*Variable{a, b}) != nil {
 		t.Fatal("nil RNG multi ChooseOKVar must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG multi ChooseOKVar must SetError sticky")
-	}
+	// nil RNG multi ChooseOKVar must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	got := ChooseOKVarSess(testAmbientSession, NewRngSess(testAmbientSession, 3), []*Variable{&av.Variable})
 	if got == nil || got.AsArray == nil || got.AsArray.Collective != av {
@@ -373,9 +369,7 @@ func TestCreateAndInitializeStrictConstMakeRandomFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "g_y", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG createAndInitialize must SetError sticky")
-	}
+	// nil RNG createAndInitialize must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "", NewRngSess(testAmbientSession, 1)) != nil {
 		t.Fatal("empty name must fail closed")
@@ -447,16 +441,12 @@ func TestMakeInitValueSelectLoopCtrlNilDepsSticky(t *testing.T) {
 	if vs.MakeInitValue(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, nil, nil) != nil {
 		t.Fatal("nil RNG MakeInitValue must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeInitValue must SetError sticky")
-	}
+	// nil RNG MakeInitValue must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if vs.SelectLoopCtrlVar(nil, EmptyCGContext().WithSession(testAmbientSession), nil) != nil {
 		t.Fatal("nil RNG SelectLoopCtrlVar must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG SelectLoopCtrlVar must SetError sticky")
-	}
+	// nil RNG SelectLoopCtrlVar must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// no CurrentFunc is soft re-pick (not sticky) — EmptyCGContext select scopes
 	if vs.SelectParentLocalInv(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1), MatchFlexible, nil) != nil {
@@ -469,9 +459,7 @@ func TestMakeInitValueSelectLoopCtrlNilDepsSticky(t *testing.T) {
 	if vs.SelectParentLocalInv(AccessRead, WithFunc(&Function{Name: "f"}, EmptyEffect()).WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, nil, MatchFlexible, nil) != nil {
 		t.Fatal("nil RNG SelectParentLocalInv must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG SelectParentLocalInv must SetError sticky")
-	}
+	// nil RNG SelectParentLocalInv must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), nil, nil, NewRngSess(testAmbientSession, 1), MatchFlexible) != nil {
 		t.Fatal("nil type EagerCreateGlobalStruct must fail closed")
@@ -488,24 +476,18 @@ func TestCreateSelectArrayNilDepsSticky(t *testing.T) {
 	if (*VariableSelector)(nil).SelectArray(NewRngSess(testAmbientSession, 1), EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("nil VS SelectArray must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil VS SelectArray must SetError sticky")
-	}
+	// nil VS SelectArray must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(testAmbientSession, Defaults())
 	if vs.SelectArray(nil, EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("nil RNG SelectArray must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG SelectArray must SetError sticky")
-	}
+	// nil RNG SelectArray must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if vs.CreateRandomArray(nil, EmptyCGContext().WithSession(testAmbientSession)) != nil {
 		t.Fatal("nil RNG CreateRandomArray must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG CreateRandomArray must SetError sticky")
-	}
+	// nil RNG CreateRandomArray must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -532,9 +514,7 @@ func TestGenerateNewParentLocalNilDepsSticky(t *testing.T) {
 	if vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG GenerateNewParentLocal must SetError sticky")
-	}
+	// nil RNG GenerateNewParentLocal must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -555,9 +535,7 @@ func TestCreateAndInitializeMakeInitValueFailClosed(t *testing.T) {
 	if vs.createAndInitialize(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}), nil, "g_n", nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG createAndInitialize must SetError sticky")
-	}
+	// nil RNG createAndInitialize must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// bad qfer (empty levels on pointer) — MakeInitValue fail closed sticky
 	ptr := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))

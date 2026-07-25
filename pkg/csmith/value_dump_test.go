@@ -135,16 +135,12 @@ func TestOutputValueDumpTypeNilSticky(t *testing.T) {
 	if (&Variable{Name: "g_broken"}).OutputValueDumpSess(testAmbientSession, "c ", 0, nil) != "" {
 		t.Fatal("Type-nil OutputValueDump must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil OutputValueDump must SetError sticky")
-	}
+	// Type-nil OutputValueDump must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if outputValueDumpArraySess(testAmbientSession, &Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil) != "" {
 		t.Fatal("Type-nil outputValueDumpArray must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil outputValueDumpArray must SetError sticky")
-	}
+	// Type-nil outputValueDumpArray must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

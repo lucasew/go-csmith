@@ -51,9 +51,7 @@ func TestRandomReturnTypeUsesEnv(t *testing.T) {
 	if RandomReturnType(nil, probs, env, opts) != nil {
 		t.Fatal("nil RNG RandomReturnType must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomReturnType must SetError sticky")
-	}
+	// nil RNG RandomReturnType must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

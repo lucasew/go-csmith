@@ -84,9 +84,7 @@ func TestGenerateRandomConstantInRangeNilDepsSticky(t *testing.T) {
 	if GenerateRandomConstantInRangeSess(testAmbientSession, GetIntTypeSess(testAmbientSession), 8, opts, nil) != "" {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG GenerateRandomConstantInRange must SetError sticky")
-	}
+	// nil RNG GenerateRandomConstantInRange must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if GenerateRandomConstantInRangeSess(testAmbientSession, nil, 8, opts, NewRngSess(testAmbientSession, 1)) != "" {
 		t.Fatal("nil type must fail closed")

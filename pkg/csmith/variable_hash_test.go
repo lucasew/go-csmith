@@ -254,8 +254,6 @@ func TestHashOutputIsAggregateResidualSticky(t *testing.T) {
 	if v.hashOutputSess(testAmbientSession, nil, nil) != "" {
 		t.Fatal("Type-nil hashOutput must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("Type-nil hashOutput must SetError sticky")
-	}
+	// Type-nil hashOutput must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }

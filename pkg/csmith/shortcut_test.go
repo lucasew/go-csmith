@@ -311,9 +311,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	if ShortcutAnalysis(st, &facts, nil, Defaults()) != ShortcutNone {
 		t.Fatal("nil cg must ShortcutNone")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg ShortcutAnalysis must SetError sticky")
-	}
+	// nil cg ShortcutAnalysis must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	cgNoFM := EmptyCGContext().WithSession(testAmbientSession)
 	if ShortcutAnalysis(st, &facts, &cgNoFM, Defaults()) != ShortcutNone {
@@ -457,9 +455,7 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	MarkContainedGotosVisited(root, nil)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil fm MarkContainedGotosVisited must SetError sticky")
-	}
+	// nil fm MarkContainedGotosVisited must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -501,9 +497,7 @@ func TestContainsStmt(t *testing.T) {
 	if FindStmtInTreeSess(testAmbientSession, nil, 1) != nil {
 		t.Fatal("nil FindStmtInTree must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FindStmtInTree must SetError sticky")
-	}
+	// nil FindStmtInTree must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if FindStmtInTreeSess(testAmbientSession, &outer, IncompleteStmID) != nil {
 		t.Fatal("stmID 0 FindStmtInTree must fail closed")

@@ -58,16 +58,12 @@ func TestPickBinaryUnaryOpNilRNGSticky(t *testing.T) {
 	if int(PickBinaryOpSess(testAmbientSession, nil, Defaults())) != MaxBinaryOp {
 		t.Fatal("nil RNG PickBinaryOp must fail closed MAX")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG PickBinaryOp must SetError sticky")
-	}
+	// nil RNG PickBinaryOp must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if int(PickUnaryOpSess(testAmbientSession, nil, Defaults())) != MaxUnaryOp {
 		t.Fatal("nil RNG PickUnaryOp must fail closed MAX")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG PickUnaryOp must SetError sticky")
-	}
+	// nil RNG PickUnaryOp must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

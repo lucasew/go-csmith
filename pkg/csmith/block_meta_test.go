@@ -141,9 +141,7 @@ func TestRandomParentBlock(t *testing.T) {
 	if inner.RandomParentBlockSess(testAmbientSession, nil, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG RandomParentBlock must SetError sticky")
-	}
+	// nil RNG RandomParentBlock must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

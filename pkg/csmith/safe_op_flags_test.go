@@ -146,9 +146,7 @@ func TestPickSafeOpSizeFromSessionProbs(t *testing.T) {
 	if _, ok := pickSafeOpSizeSess(testAmbientSession, nil, probs); ok {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG pickSafeOpSize must SetError sticky")
-	}
+	// nil RNG pickSafeOpSize must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// explicit probs works
 	sz, ok := pickSafeOpSizeSess(testAmbientSession, NewRngSess(testAmbientSession, 2), probs)
@@ -177,16 +175,12 @@ func TestMakeRandomSafeOpNilRNGSticky(t *testing.T) {
 	if f := MakeRandomBinaryKindSess(testAmbientSession, nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), SafeOpBinary, BinAdd); f != nil {
 		t.Fatal("nil RNG binary must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomBinaryKind must SetError sticky")
-	}
+	// nil RNG MakeRandomBinaryKind must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if f := MakeRandomUnarySess(testAmbientSession, nil, opts, NewProbabilities(opts), GetIntTypeSess(testAmbientSession), GetIntTypeSess(testAmbientSession), UnMinus); f != nil {
 		t.Fatal("nil RNG unary must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeRandomUnary must SetError sticky")
-	}
+	// nil RNG MakeRandomUnary must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

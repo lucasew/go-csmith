@@ -338,9 +338,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if FactsComplete((*FactMgr)(nil).FindUpdatedFacts(1)) {
 		t.Fatal("nil FM FindUpdatedFacts must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindUpdatedFacts must SetError sticky")
-	}
+	// nil FM FindUpdatedFacts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if FactsComplete(fm.FindUpdatedFacts(IncompleteStmID)) {
 		t.Fatal("stmID 0 FindUpdatedFacts must fail closed incomplete")
@@ -352,9 +350,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 	if FactsComplete((*FactMgr)(nil).FindUpdatedFinalFacts(1)) {
 		t.Fatal("nil FM FindUpdatedFinalFacts must fail closed incomplete")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM FindUpdatedFinalFacts must SetError sticky")
-	}
+	// nil FM FindUpdatedFinalFacts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// equal → no update
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
@@ -446,9 +442,7 @@ func TestRestoreFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// FactMgr always live; sticky no invent soft-skip restore past hole
 	(*FactMgr)(nil).RestoreFacts(old)
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM RestoreFacts must SetError sticky")
-	}
+	// nil FM RestoreFacts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

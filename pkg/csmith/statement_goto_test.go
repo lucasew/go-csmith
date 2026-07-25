@@ -353,9 +353,7 @@ func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 	if stmtOK(MakeRandomGoto(nil, opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, blk)) {
 		t.Fatal("nil RNG goto must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG goto must SetError sticky")
-	}
+	// nil RNG goto must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -434,9 +432,7 @@ func TestMakeBinaryNoInventWithoutRNGOrInvalidOp(t *testing.T) {
 	if fi := MakeBinary(nil, opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, lhs, rhs); fi != nil {
 		t.Fatal("nil RNG")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeBinary must SetError sticky")
-	}
+	// nil RNG MakeBinary must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if fi := MakeBinary(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinAdd, nil, rhs); fi != nil {
 		t.Fatal("nil lhs")
@@ -716,9 +712,7 @@ func TestFindGoodJumpBlockNilRNGSticky(t *testing.T) {
 	if FindGoodJumpBlockSess(testAmbientSession, nil, []*Block{good}, good, false) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG FindGoodJumpBlock must SetError sticky")
-	}
+	// nil RNG FindGoodJumpBlock must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

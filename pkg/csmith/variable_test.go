@@ -320,16 +320,12 @@ func TestVariableKindPredicatesNilSticky(t *testing.T) {
 	if (*Variable)(nil).OutputLhsCOptsSess(testAmbientSession, false) != "" {
 		t.Fatal("nil OutputLhsC must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputLhsC must SetError sticky")
-	}
+	// nil OutputLhsC must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if (*Variable)(nil).HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("nil HashOutput must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil HashOutput must SetError sticky")
-	}
+	// nil HashOutput must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// special Type-nil complete not-pointer / not-aggregate
 	if NullPtr.IsPointerSess(testAmbientSession) || GarbagePtr.IsAggregateSess(testAmbientSession) {

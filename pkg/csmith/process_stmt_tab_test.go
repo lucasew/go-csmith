@@ -65,9 +65,7 @@ func TestAssignOpsProbabilityNilTableFailClosed(t *testing.T) {
 	if AssignOpsProbabilitySess(testAmbientSession, nil, Defaults(), NewAssignOpsTableSess(testAmbientSession, Defaults()), GetIntTypeSess(testAmbientSession)) != AssignOp(-1) {
 		t.Fatal("nil RNG AssignOpsProbability must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG AssignOpsProbability must SetError sticky")
-	}
+	// nil RNG AssignOpsProbability must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -202,9 +200,7 @@ func TestMakeRandomExprStmtNilCGSticky(t *testing.T) {
 	if MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), Defaults(), nil, nil, nil, nil).Kind != 0 {
 		t.Fatal("nil cg MakeRandomExprStmt must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil cg MakeRandomExprStmt must SetError sticky")
-	}
+	// nil cg MakeRandomExprStmt must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

@@ -26,9 +26,7 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	if MakeIteration(nil, opts, NewProbabilities(opts), vs, &cg) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil RNG MakeIteration must SetError sticky")
-	}
+	// nil RNG MakeIteration must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 

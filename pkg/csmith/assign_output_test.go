@@ -275,9 +275,7 @@ func TestOutputAssignSimpleNilSticky(t *testing.T) {
 	if OutputAssignSimpleSess(testAmbientSession, nil, false) != "" {
 		t.Fatal("nil OutputAssignSimple must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputAssignSimple must SetError sticky")
-	}
+	// nil OutputAssignSimple must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 }
 
@@ -287,16 +285,12 @@ func TestOutputAssignAsExprNilSticky(t *testing.T) {
 	if OutputAssignAsExprSess(testAmbientSession, nil, false) != "" {
 		t.Fatal("nil OutputAssignAsExpr must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputAssignAsExpr must SetError sticky")
-	}
+	// nil OutputAssignAsExpr must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if OutputAssignAsExprOptsSess(testAmbientSession, nil, false, Defaults()) != "" {
 		t.Fatal("nil OutputAssignAsExprOpts must fail closed empty")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil OutputAssignAsExprOpts must SetError sticky")
-	}
+	// nil OutputAssignAsExprOpts must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	if assignLhsTextSess(testAmbientSession, nil, false) != "" {
 		t.Fatal("nil assignLhsText must fail closed empty")

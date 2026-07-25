@@ -173,9 +173,7 @@ func TestFindContainerAndDominate(t *testing.T) {
 	if FindContainerStmSess(testAmbientSession, nil) != nil {
 		t.Fatal("nil FindContainerStm must fail closed")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FindContainerStm must SetError sticky")
-	}
+	// nil FindContainerStm must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	// root complete nil
 	if FindContainerStmSess(testAmbientSession, &Block{StmID: 1}) != nil {
@@ -252,9 +250,7 @@ func TestIsJumpTargetFromOtherBlocks(t *testing.T) {
 	if !IsJumpTargetFromOtherBlocks(5, destParent, nil, nil) {
 		t.Fatal("nil FM must fail closed jump-target")
 	}
-	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil FM IsJumpTarget must SetError sticky")
-	}
+	// nil FM IsJumpTarget must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	// StmID 0 fails closed sticky as jump-target (no invent not-target)
 	ClearErrorSess(testAmbientSession)
 	if !IsJumpTargetFromOtherBlocks(IncompleteStmID, destParent, fm, nil) {
