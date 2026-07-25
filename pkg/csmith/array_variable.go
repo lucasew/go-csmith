@@ -634,8 +634,13 @@ func (av *ArrayVariable) IsVariantSess(s *Session, other *Variable) bool {
 // Itemized member (Collective set) is complete soft miss (not incomplete IR).}
 
 func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSelector) *ArrayVariable {
+	// Explicit bag: VS when present, else unit-test ambient (ItemizeConstIndices(nil vs)).
+	bag := vsSess(vs)
+	if bag == nil {
+		bag = testAmbientSession
+	}
 	if av == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		sessNoteError(bag, ErrGeneric)
 		return nil
 	}
 	if av.Collective != nil {
@@ -663,22 +668,22 @@ func (av *ArrayVariable) ItemizeConstIndices(constIndices []int, vs *VariableSel
 	}
 	item.AsArray = item
 	for _, idx := range constIndices {
-		s := fmt.Sprintf("%d", idx)
-		item.Indices = append(item.Indices, s)
+		is := fmt.Sprintf("%d", idx)
+		item.Indices = append(item.Indices, is)
 		item.IndexExprs = append(item.IndexExprs, &Expression{
-			Term: TermConstant, Con: MakeIntSess(vsSess(vs), idx), ExprType: GetIntType(),
+			Term: TermConstant, Con: MakeIntSess(bag, idx), ExprType: GetIntType(),
 		})
 	}
 	// ArrayVariable.cpp:288–291 — type always live; type->is_aggregate()
 	// sticky no invent itemize soft-success past Type-nil shell (skip field expand)
 	if item.Type == nil {
-		sessNoteError(vsSess(vs), ErrGeneric)
+		sessNoteError(bag, ErrGeneric)
 		return nil
 	}
 	if item.Type.IsAggregate() {
-		item.CreateFieldVarsSess(vsSess(vs))
+		item.CreateFieldVarsSess(bag)
 		// residual ERROR sticky — no invent itemize shell past CreateFieldVars residual
-		if sessHasError(vsSess(vs)) {
+		if sessHasError(bag) {
 			return nil
 		}
 	}
@@ -1259,8 +1264,13 @@ func (av *ArrayVariable) ItemizeInto(r *Rng, vs *VariableSelector) *ArrayVariabl
 }
 
 func (av *ArrayVariable) ItemizeIntoSess(s *Session, r *Rng, vs *VariableSelector) *ArrayVariable {
-	// Prefer explicit s; fall back to vs.Sess (unit tests that only pass VS).
-	s = firstSess(s, vsSess(vs))
+	// Prefer explicit s; then vs.Sess; then unit-test ambient (Itemize/ItemizeInto).
+	if s == nil {
+		s = vsSess(vs)
+	}
+	if s == nil {
+		s = testAmbientSession
+	}
 	// ArrayVariable::itemize (void) — ArrayVariable.cpp:249–278
 	if av == nil || r == nil {
 		// nil receiver/RNG incomplete sticky (no invent itemize without live array/rng)

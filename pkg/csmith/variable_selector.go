@@ -23,13 +23,17 @@ type VariableSelector struct {
 	Arrays []*ArrayVariable
 }
 
-// vsSess returns vs.Sess when set; else the quarantined unit-test ambient bag.
-// Generate always installs VS.Sess; unit tests often construct VS without a bag.
+// vsSess returns vs.Sess. Nil vs → unit-test ambient. Non-nil vs with unset
+// Sess lazy-installs ambient on the object (visible as vs.Sess == testAmbientSession).
+// Generate always overwrites VS.Sess with the run bag before draws.
 func vsSess(vs *VariableSelector) *Session {
-	if vs != nil && vs.Sess != nil {
-		return vs.Sess
+	if vs == nil {
+		return testAmbientSession
 	}
-	return testAmbientSession
+	if vs.Sess == nil {
+		vs.Sess = testAmbientSession
+	}
+	return vs.Sess
 }
 
 // NewVariableSelector constructs an empty selector sharing process Probabilities
@@ -41,10 +45,12 @@ func NewVariableSelector(opts Options) *VariableSelector {
 
 // NewVariableSelectorProbs constructs a selector sharing session Probabilities
 // (C++ process singleton). probs may be nil; callers that need tables pass live ones.
+// Sess defaults to the unit-test ambient bag; NewProgramGenerator overwrites for Generate.
 func NewVariableSelectorProbs(opts Options, probs *Probabilities) *VariableSelector {
 	return &VariableSelector{
 		Opts:  opts,
 		Probs: probs,
+		Sess:  testAmbientSession,
 	}
 }
 

@@ -8,6 +8,9 @@ package csmith
 // Block always live; sticky false (no invent not-must-break soft-skip past hole).
 func (b *Block) MustBreakOrReturnFull(fm *FactMgr) bool {
 	s := fmSess(fm)
+	if s == nil {
+		s = testAmbientSession
+	}
 	if b == nil {
 		sessNoteError(s, ErrGeneric)
 		return false

@@ -104,14 +104,16 @@ type FactMgr struct {
 	MapVisited map[int]bool
 }
 
-// NewFactMgr constructs a FactMgr for f (FactMgr::FactMgr(Function*)).
-// fmSess returns fm.Sess when set; else the quarantined unit-test ambient bag.
-// Generate pairs FactMgr with an explicit bag; unit tests may omit Sess.
+// fmSess returns fm.Sess. Nil fm → unit-test ambient. Non-nil fm with unset
+// Sess lazy-installs ambient on the object. NewFactMgrSess always installs a bag.
 func fmSess(fm *FactMgr) *Session {
-	if fm != nil && fm.Sess != nil {
-		return fm.Sess
+	if fm == nil {
+		return testAmbientSession
 	}
-	return testAmbientSession
+	if fm.Sess == nil {
+		fm.Sess = testAmbientSession
+	}
+	return fm.Sess
 }
 
 func NewFactMgr(f *Function) *FactMgr {
@@ -119,8 +121,11 @@ func NewFactMgr(f *Function) *FactMgr {
 }
 
 // NewFactMgrSess constructs a FactMgr on an explicit session bag.
-// Nil s leaves Sess nil for unit tests that install later (no ambient dual-install).
+// Nil s uses the unit-test ambient bag (always stores a non-nil Sess).
 func NewFactMgrSess(s *Session, f *Function) *FactMgr {
+	if s == nil {
+		s = testAmbientSession
+	}
 	return &FactMgr{
 		Sess:             s,
 		Func:             f,

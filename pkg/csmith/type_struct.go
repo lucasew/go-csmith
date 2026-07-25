@@ -280,8 +280,13 @@ func CheckImplicitNontrivialAssignOpsSess(s *Session, opts Options, fields []Str
 // TypeEnv always live; sticky (no invent soft-skip type gen past hole).
 func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEnv) {
 	if env == nil {
-		sessNoteError(envSess(env), ErrGeneric)
+		// no TypeEnv bag — sticky on unit-test ambient (cannot envSess(nil))
+		sessNoteError(testAmbientSession, ErrGeneric)
 		return
+	}
+	// Install bag when unset (unit tests); Generate overwrites Types.Sess on the run bag.
+	if env.Sess == nil {
+		env.Sess = testAmbientSession
 	}
 	// Type.cpp:1170–1176 GenerateSimpleTypes — push eChar..eUInt128 always.
 	// Float/int64/int128 gates are probability filters + ChooseRandomTypeFilter,

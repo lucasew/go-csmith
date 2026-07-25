@@ -529,8 +529,16 @@ func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAtt
 		b.WriteString(":")
 		attr := st.LabelAttr
 		if attr == "" && emitLabelAttrs && attrRng != nil {
-			if ag := EnsureLabelAttrGeneratorSess(fmSess(fm)); ag != nil {
-				attr = ag.OutputSess(s, attrRng)
+			// Prefer emit bag s; FactMgr bag only when present (unit tests may omit FM).
+			attrSess := s
+			if attrSess == nil {
+				attrSess = fmSess(fm)
+			}
+			if attrSess == nil {
+				attrSess = testAmbientSession
+			}
+			if ag := EnsureLabelAttrGeneratorSess(attrSess); ag != nil {
+				attr = ag.OutputSess(attrSess, attrRng)
 			}
 			// residual ERROR sticky — no invent soft-continue label past attr residual
 			if sessHasError(s) {

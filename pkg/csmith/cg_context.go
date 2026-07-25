@@ -60,8 +60,9 @@ type CGContext struct {
 }
 
 // EmptyCGContext mirrors CGContext::get_empty_context() (empty effect context).
+// Sess defaults to the unit-test ambient bag; Generate uses WithSession(run bag).
 func EmptyCGContext() CGContext {
-	return CGContext{effectContext: EmptyEffect()}
+	return CGContext{effectContext: EmptyEffect(), Sess: testAmbientSession}
 }
 
 // WithSession attaches the pure-run bag (copied by later With* value receivers).
@@ -71,8 +72,8 @@ func (c CGContext) WithSession(s *Session) CGContext {
 }
 
 // cgSess returns c.Sess when set; else the quarantined unit-test ambient bag.
-// Pass &cg for by-value CGContext params. Generate always installs cg.Sess;
-// unit tests often build CGContext without a bag.
+// Pass &cg for by-value CGContext params. Zero-value CGContext{} still falls
+// back (ubiquitous in unit tests); constructors install ambient Sess when possible.
 func cgSess(c *CGContext) *Session {
 	if c != nil && c.Sess != nil {
 		return c.Sess
@@ -117,12 +118,12 @@ func (c *CGContext) NoteRead(v *Variable) {
 
 // WithEffectContext returns a context with the given effect_context.
 func WithEffectContext(eff Effect) CGContext {
-	return CGContext{effectContext: eff}
+	return CGContext{effectContext: eff, Sess: testAmbientSession}
 }
 
 // WithFunc returns a context for generating inside f.
 func WithFunc(f *Function, eff Effect) CGContext {
-	return CGContext{effectContext: eff, CurrentFunc: f}
+	return CGContext{effectContext: eff, CurrentFunc: f, Sess: testAmbientSession}
 }
 
 // WithFuncList attaches the session function list.

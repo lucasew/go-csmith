@@ -20,13 +20,17 @@ type TypeEnv struct {
 	AggregateSeq int
 }
 
-// envSess returns env.Sess when set; else the quarantined unit-test ambient bag.
-// Generate always installs Types.Sess; unit tests often build TypeEnv without a bag.
+// envSess returns env.Sess. Nil env → unit-test ambient (SelectLType etc. unit paths).
+// Non-nil env with unset Sess lazy-installs ambient on the env object.
+// Generate always installs Types.Sess on the run bag first.
 func envSess(env *TypeEnv) *Session {
-	if env != nil && env.Sess != nil {
-		return env.Sess
+	if env == nil {
+		return testAmbientSession
 	}
-	return testAmbientSession
+	if env.Sess == nil {
+		env.Sess = testAmbientSession
+	}
+	return env.Sess
 }
 
 // FindPointerType mirrors Type::find_pointer_type(t, add).

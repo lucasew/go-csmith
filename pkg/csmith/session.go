@@ -10,10 +10,10 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession + Process*/SetError bridges for legacy unit tests
-//   - non-Sess wrappers pass testAmbientSession into *Sess helpers explicitly
-//   - vsSess/cgSess/fmSess/envSess fall back to testAmbientSession when unset
+//   - constructors + *Sess helpers install/return ambient when Sess unset
+//     (install is on the owner object when non-nil; Generate overwrites)
 //   - sessOrAmbient(nil) / sessNoteError(nil) / sessHasError(nil) panics
-//     (no silent ambient dual-fill mid-Generate)
+//     (must pass a bag — helpers always yield non-nil)
 //
 // Read-only package data: const tables, name maps, builtin lists, simpleTypes
 // (canonical eSimple *Type cache — Used marks live on Session.simpleUsed, not
@@ -201,7 +201,8 @@ func sessOrAmbient(s *Session) *Session {
 	panic("residual ambient sessOrAmbient(nil)")
 }
 
-// firstSess returns the first non-nil session among a, b; else testAmbientSession.
+// firstSess returns the first non-nil session among a, b; else unit-test ambient.
+// Prefer vsSess/cgSess which lazy-install on their owners when possible.
 func firstSess(a, b *Session) *Session {
 	if a != nil {
 		return a
