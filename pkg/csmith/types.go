@@ -92,8 +92,12 @@ func init() {
 // Type.cpp get_simple_type indexes simple_types[MAX_SIMPLE_TYPES]; OOB is assert
 // path — fail closed nil (no invent eInt for invalid eSimpleType).
 func GetSimpleType(st ESimpleType) *Type {
+	return GetSimpleTypeSess(nil, st)
+}
+
+func GetSimpleTypeSess(s *Session, st ESimpleType) *Type {
 	if st < 0 || int(st) >= MaxSimpleTypes {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	return simpleTypes[st]
@@ -131,6 +135,10 @@ func (t *Type) IsUnionSess(s *Session) bool {
 // IsAggregate mirrors Type::is_aggregate (struct/union).}
 
 func (t *Type) IsAggregate() bool {
+	return t.IsAggregateSess(nil)
+}
+
+func (t *Type) IsAggregateSess(s *Session) bool {
 	return t != nil && (t.isStruct || t.isUnion)
 }
 
@@ -473,19 +481,23 @@ func (t *Type) ContainPointerFieldSess(s *Session) bool {
 // Type* always live; sticky false (no invent not-float soft-skip past hole).}
 
 func (t *Type) IsFloat() bool {
+	return t.IsFloatSess(nil)
+}
+
+func (t *Type) IsFloatSess(s *Session) bool {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !t.IsSimple() {
+	if !t.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent not-float soft-skip past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue float check past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return t.simple == EFloat
@@ -495,19 +507,23 @@ func (t *Type) IsFloat() bool {
 // Type.h:265–268 — eSimple && eChar (signed char).
 // Type* always live; sticky false (no invent not-char soft-skip past hole).
 func (t *Type) IsSignedChar() bool {
+	return t.IsSignedCharSess(nil)
+}
+
+func (t *Type) IsSignedCharSess(s *Session) bool {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !t.IsSimple() {
+	if !t.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent not-char soft-skip past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue char check past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	return t.simple == EChar
@@ -517,19 +533,23 @@ func (t *Type) IsSignedChar() bool {
 // Type.cpp:1316–1324 — every field is a bitfield (BitWidth >= 0).
 // Type* always live; sticky true (no invent not-full-bitfields soft-skip past hole).
 func (t *Type) IsFullBitfieldsStruct() bool {
+	return t.IsFullBitfieldsStructSess(nil)
+}
+
+func (t *Type) IsFullBitfieldsStructSess(s *Session) bool {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !t.IsStruct() || len(t.Fields) == 0 {
+	if !t.IsStructSess(s) || len(t.Fields) == 0 {
 		// residual ERROR sticky — no invent not-full soft-skip past IsStruct residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue full check past IsStruct residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	for _, f := range t.Fields {
@@ -543,19 +563,23 @@ func (t *Type) IsFullBitfieldsStruct() bool {
 // IsSigned mirrors Type::is_signed (Type.cpp:1326–1347).
 // Type* always live; sticky true (no invent unsigned soft-skip past hole).
 func (t *Type) IsSigned() bool {
+	return t.IsSignedSess(nil)
+}
+
+func (t *Type) IsSignedSess(s *Session) bool {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if !t.IsSimple() {
+	if !t.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent unsigned soft-skip past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue signed check past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return true
 	}
 	switch t.simple {
@@ -571,37 +595,41 @@ func (t *Type) IsSigned() bool {
 // Type.cpp:1349–1377 — map signed simple types to unsigned counterparts.
 // Type* always live at to_unsigned; sticky nil (no invent soft-skip past hole).
 func (t *Type) ToUnsigned() *Type {
+	return t.ToUnsignedSess(nil)
+}
+
+func (t *Type) ToUnsignedSess(s *Session) *Type {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
-	if !t.IsSimple() {
+	if !t.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent soft-nil unsigned past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return nil
 		}
 		return nil
 	}
 	// residual ERROR sticky — no invent soft-continue unsigned past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return nil
 	}
 	switch t.simple {
 	case EUChar, EUInt, EUShort, EULong, EULongLong, EUInt128:
 		return t
 	case EChar:
-		return GetSimpleType(EUChar)
+		return GetSimpleTypeSess(s, EUChar)
 	case EInt:
-		return GetSimpleType(EUInt)
+		return GetSimpleTypeSess(s, EUInt)
 	case EShort:
-		return GetSimpleType(EUShort)
+		return GetSimpleTypeSess(s, EUShort)
 	case ELong:
-		return GetSimpleType(EULong)
+		return GetSimpleTypeSess(s, EULong)
 	case ELongLong:
-		return GetSimpleType(EULongLong)
+		return GetSimpleTypeSess(s, EULongLong)
 	case EInt128:
 		// Type.cpp:1369–1372 — int128 stays as itself (and uint128)
-		return GetSimpleType(EInt128)
+		return GetSimpleTypeSess(s, EInt128)
 	default:
 		return nil
 	}
@@ -684,7 +712,7 @@ func (t *Type) CNameSess(s *Session) string {
 		return ""
 	}
 	if t.ptrTo != nil {
-		inner := t.ptrTo.CName()
+		inner := t.ptrTo.CNameSess(s)
 		if inner == "" {
 			// incomplete pointee sticky — no invent bare "*"
 			if !sessHasError(s) {
@@ -901,19 +929,23 @@ func (t *Type) MatchOptsSess(s *Session, other *Type, mt MatchType, opts Options
 // Type* always live; sticky false (no invent not-promotable soft-skip past hole).}
 
 func (t *Type) IsPromotable(other *Type) bool {
+	return t.IsPromotableSess(nil, other)
+}
+
+func (t *Type) IsPromotableSess(s *Session, other *Type) bool {
 	if t == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if !t.IsSimple() || !other.IsSimple() {
+	if !t.IsSimpleSess(s) || !other.IsSimpleSess(s) {
 		// residual ERROR sticky — no invent not-promotable soft-skip past IsSimple residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return false
 		}
 		return false
 	}
 	// residual ERROR sticky — no invent soft-continue promote past IsSimple residual true
-	if sessHasError(nil) {
+	if sessHasError(s) {
 		return false
 	}
 	switch t.simple {
@@ -1040,8 +1072,12 @@ func (t *Type) IsConvertableOptsSess(s *Session, other *Type, opts Options) bool
 // Type* always live; sticky false (no invent not-deref soft-skip past hole).}
 
 func (t *Type) IsDereferencedFrom(other *Type) bool {
+	return t.IsDereferencedFromSess(nil, other)
+}
+
+func (t *Type) IsDereferencedFromSess(s *Session, other *Type) bool {
 	if t == nil || other == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	if other.ptrTo == nil {
@@ -1147,8 +1183,12 @@ func (t *Type) IsEquivalentSess(s *Session, other *Type) bool {
 // past hole / soft re-pick).}
 
 func (t *Type) BaseType() *Type {
+	return t.BaseTypeSess(nil)
+}
+
+func (t *Type) BaseTypeSess(s *Session) *Type {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 	for t.ptrTo != nil {
@@ -1207,8 +1247,12 @@ func (t *Type) NeedsCastSess(s *Session, other *Type) bool {
 // Type* always live on Fields; nil field hole sticky true (no invent bitfield-free).}
 
 func (t *Type) HasBitfields() bool {
+	return t.HasBitfieldsSess(nil)
+}
+
+func (t *Type) HasBitfieldsSess(s *Session) bool {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return true
 	}
 	for _, f := range t.Fields {
@@ -1217,24 +1261,24 @@ func (t *Type) HasBitfields() bool {
 		}
 		if f.Type == nil {
 			// incomplete field Type sticky has-bitfields (restrictive)
-			sessNoteError(nil, ErrGeneric)
+			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		isStruct := f.Type.IsStruct()
+		isStruct := f.Type.IsStructSess(s)
 		// residual ERROR sticky — no invent soft-continue later fields past IsStruct residual
-		if sessHasError(nil) {
+		if sessHasError(s) {
 			return true
 		}
 		if isStruct {
-			if f.Type.HasBitfields() {
+			if f.Type.HasBitfieldsSess(s) {
 				// residual ERROR sticky — no invent has-bitfields true past nested hole
-				if sessHasError(nil) {
+				if sessHasError(s) {
 					return true
 				}
 				return true
 			}
 			// residual ERROR sticky — no invent soft-continue later fields past nested residual false
-			if sessHasError(nil) {
+			if sessHasError(s) {
 				return true
 			}
 		}
@@ -1245,14 +1289,18 @@ func (t *Type) HasBitfields() bool {
 // IsBitfieldIndex mirrors Type::is_bitfield(index).
 // Type.cpp:1286–1288 — assert(index < bitfields_length_.size()); BitWidth >= 0.
 func (t *Type) IsBitfieldIndex(index int) bool {
+	return t.IsBitfieldIndexSess(nil, index)
+}
+
+func (t *Type) IsBitfieldIndexSess(s *Session, index int) bool {
 	// Type* always live; sticky false (no invent non-bitfield soft-skip past hole)
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// OOB is assert path sticky — fail closed false (not invent non-bitfield / soft skip)
 	if index < 0 || index >= len(t.Fields) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	return t.Fields[index].BitWidth >= 0
@@ -1261,14 +1309,18 @@ func (t *Type) IsBitfieldIndex(index int) bool {
 // IsUnamedPadding mirrors Type::is_unamed_padding.
 // Type.cpp:1278–1283 — assert(index < sz); bitfields_length_[index] == 0.
 func (t *Type) IsUnamedPadding(index int) bool {
+	return t.IsUnamedPaddingSess(nil, index)
+}
+
+func (t *Type) IsUnamedPaddingSess(s *Session, index int) bool {
 	// Type* always live; sticky false (no invent not-padding soft success past hole)
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// assert OOB sticky — no invent "not padding" soft success past hole
 	if index < 0 || index >= len(t.Fields) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// only bitfield slots can be zero-width padding
@@ -1329,9 +1381,13 @@ func (t *Type) HasPaddingSess(s *Session) bool {
 // Type.cpp:1246 — assert(ty != eVoid) on choose_random_simple; filter zeros void weight.}
 
 func ChooseRandomNonvoidSimple(r *Rng, probs *Probabilities) ESimpleType {
+	return ChooseRandomNonvoidSimpleSess(nil, r, probs)
+}
+
+func ChooseRandomNonvoidSimpleSess(s *Session, r *Rng, probs *Probabilities) ESimpleType {
 	// C++ always has RNG + probs; sticky no soft invent EInt when missing
 	if r == nil || probs == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return EVoid
 	}
 	v := r.RndUptoFilter(uint32(MaxSimpleTypes), probs.SimpleTypesFilter())
@@ -1392,38 +1448,42 @@ func (t *Type) SignedOverflowPossibleSess(s *Session, intSize int) bool {
 // Type.cpp:370–402 — builtin name → simple type; default assert(0) sticky.}
 
 func GetTypeFromString(typeString string) *Type {
+	return GetTypeFromStringSess(nil, typeString)
+}
+
+func GetTypeFromStringSess(s *Session, typeString string) *Type {
 	switch typeString {
 	case "Void":
-		return GetSimpleType(EVoid)
+		return GetSimpleTypeSess(s, EVoid)
 	case "Char":
-		return GetSimpleType(EChar)
+		return GetSimpleTypeSess(s, EChar)
 	case "UChar":
-		return GetSimpleType(EUChar)
+		return GetSimpleTypeSess(s, EUChar)
 	case "Short":
-		return GetSimpleType(EShort)
+		return GetSimpleTypeSess(s, EShort)
 	case "UShort":
-		return GetSimpleType(EUShort)
+		return GetSimpleTypeSess(s, EUShort)
 	case "Int":
-		return GetSimpleType(EInt)
+		return GetSimpleTypeSess(s, EInt)
 	case "UInt":
-		return GetSimpleType(EUInt)
+		return GetSimpleTypeSess(s, EUInt)
 	case "Long":
-		return GetSimpleType(ELong)
+		return GetSimpleTypeSess(s, ELong)
 	case "ULong":
-		return GetSimpleType(EULong)
+		return GetSimpleTypeSess(s, EULong)
 	case "Longlong", "LongLong":
-		return GetSimpleType(ELongLong)
+		return GetSimpleTypeSess(s, ELongLong)
 	case "ULonglong", "ULongLong":
-		return GetSimpleType(EULongLong)
+		return GetSimpleTypeSess(s, EULongLong)
 	case "Float":
-		return GetSimpleType(EFloat)
+		return GetSimpleTypeSess(s, EFloat)
 	case "Int128":
-		return GetSimpleType(EInt128)
+		return GetSimpleTypeSess(s, EInt128)
 	case "UInt128":
-		return GetSimpleType(EUInt128)
+		return GetSimpleTypeSess(s, EUInt128)
 	default:
 		// Type.cpp:401 assert(0); sticky — no soft invent GetIntType for unknown names
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return nil
 	}
 }
@@ -1596,16 +1656,20 @@ func (t *Type) PrintfDirectiveSess(s *Session) string {
 // Type.cpp:1708–1714 — Output on live Type*; sticky no invent sizeof()/sizeof(void).}
 
 func (t *Type) SizeofString() string {
+	return t.SizeofStringSess(nil)
+}
+
+func (t *Type) SizeofStringSess(s *Session) string {
 	// Type* always live; sticky no invent sizeof(void)/sizeof()
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	cn := t.CName()
+	cn := t.CNameSess(s)
 	if cn == "" {
 		// incomplete CName IR sticky (CName may already SetError)
-		if !sessHasError(nil) {
-			sessNoteError(nil, ErrGeneric)
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
 		}
 		return ""
 	}
@@ -1693,13 +1757,17 @@ func HasLongLongFieldSess(s *Session, fields []StructField) bool {
 // Type* always live; sticky false (no invent not-padding soft success past hole).}
 
 func (t *Type) IsUnnamedPadding(index int) bool {
+	return t.IsUnnamedPaddingSess(nil, index)
+}
+
+func (t *Type) IsUnnamedPaddingSess(s *Session, index int) bool {
 	if t == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// assert OOB sticky — no invent "not padding" soft success past hole
 	if index < 0 || index >= len(t.Fields) {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	f := t.Fields[index]
@@ -1712,11 +1780,15 @@ func (t *Type) IsUnnamedPadding(index int) bool {
 // Non-C++ is complete false. RNG always live under C++; sticky false (no invent
 // no-assign-ops soft-skip past hole). Nil probs → 0% (no invent default 50).
 func IfStructWillHaveAssignOps(r *Rng, opts Options, probs *Probabilities) bool {
+	return IfStructWillHaveAssignOpsSess(nil, r, opts, probs)
+}
+
+func IfStructWillHaveAssignOpsSess(s *Session, r *Rng, opts Options, probs *Probabilities) bool {
 	if !opts.LangCPP {
 		return false
 	}
 	if r == nil {
-		sessNoteError(nil, ErrGeneric)
+		sessNoteError(s, ErrGeneric)
 		return false
 	}
 	// nil probs → 0% (no invent default 50 / NewProbabilities)

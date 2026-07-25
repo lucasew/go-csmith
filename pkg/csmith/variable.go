@@ -1908,7 +1908,7 @@ func (v *Variable) IsAggregateSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := v.Type.IsAggregate()
+	ok := v.Type.IsAggregateSess(s)
 	// residual ERROR sticky — no invent soft not-aggregate past IsAggregate residual
 	if sessHasError(s) {
 		return false
