@@ -77,7 +77,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 	cg.EffectAccum = &eff
 	cg.Types = vs.Types
 	cg.ExprDepth = 0
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// single seed may fail Lhs/exact qfer; retry like other factories
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
@@ -95,7 +95,7 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 		t.Fatal("no lhs", st)
 	}
 	// successful assign with RHS expression bumps depth via merge
-	if st.Expr != nil && BumpsExprDepth(st.Expr) && cg.ExprDepth < 1 {
+	if st.Expr != nil && BumpsExprDepthSess(testAmbientSession, st.Expr) && cg.ExprDepth < 1 {
 		t.Fatalf("ExprDepth=%d after assign with leaf RHS (want ≥1)", cg.ExprDepth)
 	}
 	// LHS write lands on shared effect_accum via visit_facts + merge_param_context.
@@ -396,7 +396,7 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.FM = fm
 	cg.CurrentFunc = fm.Func
-	st := MakeRandomAssign(r, opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil)
+	st := MakeRandomAssign(r, opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, nil)
 	if HasErrorSess(testAmbientSession) {
 		ClearErrorSess(testAmbientSession)
 		// may fail to generate; that is ok — key is no fact mutation on success

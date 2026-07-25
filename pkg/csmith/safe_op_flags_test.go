@@ -55,7 +55,7 @@ func TestSafeBinaryInvocationOutput(t *testing.T) {
 	opts.SafeMath = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// FunctionInvocationBinary.cpp:68 assert(blk) for safe_ops temps
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
@@ -85,7 +85,7 @@ func TestNoSafeWhenDisabled(t *testing.T) {
 	opts.SafeMath = false
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

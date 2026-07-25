@@ -144,7 +144,7 @@ func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	e := MakeExpressionAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), nil)
+	e := MakeExpressionAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession), nil)
 	if e == nil || e.Term != TermAssignment || e.Assign == nil {
 		t.Fatal(e)
 	}
@@ -152,7 +152,7 @@ func TestMakeExpressionAssignSetsTypeAndFacts(t *testing.T) {
 		t.Fatal("ExprType")
 	}
 	// Output is parenthesized assign
-	s := e.Output()
+	s := e.OutputSess(testAmbientSession)
 	if !strings.Contains(s, "(") || !strings.Contains(s, ")") {
 		t.Fatal(s)
 	}

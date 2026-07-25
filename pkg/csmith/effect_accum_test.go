@@ -10,7 +10,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// Force assign-only statement table
 	tab := &ThresholdTable{}
 	tab.AddSess(testAmbientSession, 100, int(StmtAssign))
@@ -124,7 +124,7 @@ func TestExpressionCommaUsesEnv(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))

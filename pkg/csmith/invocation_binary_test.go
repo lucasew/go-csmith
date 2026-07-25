@@ -52,7 +52,7 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 	}
 	// Expression.EqualsInt through funcall
 	e := &Expression{Term: TermFunction, Invoke: &Invocation{IsStd: true, Binary: "*", Args: []*Expression{zero, one}}}
-	if !e.EqualsInt(0) {
+	if !e.EqualsIntSess(testAmbientSession, 0) {
 		t.Fatal("expr fold")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -215,7 +215,7 @@ func TestMakeRandomAssignRequiresFactMgr(t *testing.T) {
 	// StatementAssign.cpp:127 assert(fm) — nullptr empty (stmtOK false; StmtAssign is iota 0)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	st := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
+	st := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession))
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil FM must fail closed empty assign, got %#v", st)
 	}
@@ -228,7 +228,7 @@ func TestMakeRandomAssignNoInventWithoutRNG(t *testing.T) {
 	opts.CompoundAssignment = false
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
+	st := MakeRandomAssign(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession))
 	if stmtOK(st) || st.LhsVar != nil || st.Expr != nil {
 		t.Fatalf("nil RNG must fail closed empty assign, got %#v", st)
 	}
@@ -244,7 +244,7 @@ func TestMakeRandomBinaryUnaryInvocationNoInventWithoutRNG(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if fi := MakeRandomBinaryInvocation(nil, opts, probs, vs, tables, &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("nil RNG binary")
@@ -282,7 +282,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
-	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 1), opts, vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomUnaryInvocation")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -292,7 +292,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	cg2 := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg2.EffectAccum = &eff
-	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 2), opts, vs, NewExprTables(opts), &cg2, GetIntTypeSess(testAmbientSession)); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 2), opts, vs, NewExprTablesSess(testAmbientSession, opts), &cg2, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomUnaryInvocation")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -303,7 +303,7 @@ func TestMakeRandomUnaryInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = IncompleteFactSlice()
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTables(opts), &cg3, GetIntTypeSess(testAmbientSession)); fi != nil {
+	if fi := MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, 3), opts, vs, NewExprTablesSess(testAmbientSession, opts), &cg3, GetIntTypeSess(testAmbientSession)); fi != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomUnaryInvocation")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -366,7 +366,7 @@ func TestShiftByNonConstantProbNoInventHardcoded50(t *testing.T) {
 	defer SetProcessProbabilitiesSess(testAmbientSession, prev)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
@@ -423,7 +423,7 @@ func TestShiftNonConstantRHSNoConstFilter(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
 	loc := &Variable{Name: "l_shift", Type: GetIntTypeSess(testAmbientSession)}
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
@@ -647,12 +647,12 @@ func TestExpressionFuncallGetTypeViaInvoke(t *testing.T) {
 	arg := &Expression{Term: TermConstant, Con: &Constant{Type: GetSimpleTypeSess(testAmbientSession, EShort), Value: "1"}}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{arg}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
-	if e.GetType() != GetSimpleTypeSess(testAmbientSession, EShort) {
-		t.Fatalf("got %v", e.GetType())
+	if e.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EShort) {
+		t.Fatalf("got %v", e.GetTypeSess(testAmbientSession))
 	}
 	// user return type
 	e2 := &Expression{Term: TermFunction, Invoke: &Invocation{User: &Function{Name: "f", ReturnType: GetSimpleTypeSess(testAmbientSession, EFloat)}}}
-	if e2.GetType() != GetSimpleTypeSess(testAmbientSession, EFloat) {
+	if e2.GetTypeSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EFloat) {
 		t.Fatal("user")
 	}
 }
@@ -861,7 +861,7 @@ func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
 	r := NewRngSess(testAmbientSession, 1)
 	// stdFunc=true, typ=nil → must draw StdUnary (100% true) then fail closed
 	// (C++ assert(type) / no invent binary after true unary draw).
-	fi := MakeRandomInvocation(r, opts, probs, vs, NewExprTables(opts), &cg, list, nil, nil, true)
+	fi := MakeRandomInvocation(r, opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, nil, nil, true)
 	if fi == nil || !fi.Failed {
 		t.Fatalf("nil-type + unary draw must Failed shell, got %#v", fi)
 	}
@@ -877,7 +877,7 @@ func TestMakeRandomInvocationStdUnaryAlwaysDrawsNilType(t *testing.T) {
 	probs.single[PStdUnaryFuncProb] = 0
 	r2 := NewRngSess(testAmbientSession, 2)
 	ClearErrorSess(testAmbientSession)
-	_ = MakeRandomInvocation(r2, opts, probs, vs, NewExprTables(opts), &cg, list, nil, nil, true)
+	_ = MakeRandomInvocation(r2, opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, nil, nil, true)
 	// binary with nil type may Failed or produce; key is flipcoin was drawn
 	if r2.randDepth < 1 {
 		t.Fatal("StdUnaryFuncProb flipcoin must advance randDepth when prob=0 typ nil")
@@ -894,7 +894,7 @@ func TestBinarySubcontextClearsCurrRHS(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Probs = probs
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

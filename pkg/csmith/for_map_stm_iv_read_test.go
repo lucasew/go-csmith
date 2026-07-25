@@ -28,7 +28,7 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	cg.EffectAccum = &Effect{}
 	*cg.EffectAccum = EmptyEffect()
 	cg.EffectStm = EmptyEffect()
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := buildStatementThresholdTable(testAmbientSession, opts)
 
 	var forSt *Stmt

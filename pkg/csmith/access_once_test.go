@@ -61,7 +61,7 @@ func TestForSafeIncrEmit(t *testing.T) {
 	opts.SafeMath = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
 	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, tables, stmtTab, nil, nil)

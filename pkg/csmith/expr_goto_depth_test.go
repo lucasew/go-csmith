@@ -24,7 +24,7 @@ func TestExpressionUseVar(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), true, false)
 	w := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
 	e := &Expression{Term: TermVariable, Var: v}
-	if !e.UseVar(v) || e.UseVar(w) {
+	if !e.UseVarSess(testAmbientSession, v) || e.UseVarSess(testAmbientSession, w) {
 		t.Fatal("var")
 	}
 	call := &Expression{
@@ -33,7 +33,7 @@ func TestExpressionUseVar(t *testing.T) {
 			{Term: TermVariable, Var: v},
 		}},
 	}
-	if !call.UseVar(v) || call.UseVar(w) {
+	if !call.UseVarSess(testAmbientSession, v) || call.UseVarSess(testAmbientSession, w) {
 		t.Fatal("call")
 	}
 	comma := &Expression{
@@ -41,25 +41,25 @@ func TestExpressionUseVar(t *testing.T) {
 		CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)},
 		CommaRHS: e,
 	}
-	if !comma.UseVar(v) {
+	if !comma.UseVarSess(testAmbientSession, v) {
 		t.Fatal("comma")
 	}
 	// incomplete IR fails closed sticky as uses (no invent conflict-free non-use)
-	if !(&Expression{Term: TermFunction, Invoke: &Invocation{Args: []*Expression{nil}}}).UseVar(v) {
+	if !(&Expression{Term: TermFunction, Invoke: &Invocation{Args: []*Expression{nil}}}).UseVarSess(testAmbientSession, v) {
 		t.Fatal("nil arg hole must fail closed as uses")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil arg hole UseVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(&Expression{Term: TermCommaExpr, CommaLHS: nil, CommaRHS: e}).UseVar(v) {
+	if !(&Expression{Term: TermCommaExpr, CommaLHS: nil, CommaRHS: e}).UseVarSess(testAmbientSession, v) {
 		t.Fatal("nil comma side must fail closed as uses")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil comma side UseVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !(&Expression{Term: TermVariable, Var: nil}).UseVar(v) {
+	if !(&Expression{Term: TermVariable, Var: nil}).UseVarSess(testAmbientSession, v) {
 		t.Fatal("nil TermVariable must fail closed as uses")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -213,12 +213,12 @@ func TestVisitFactsGotoSubsetClearsDestStmID0(t *testing.T) {
 
 func TestExpressionToString(t *testing.T) {
 	e := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 42)}
-	if e.ToString() != "42" && e.ToString() != e.Output() {
-		t.Fatal(e.ToString())
+	if e.ToStringSess(testAmbientSession) != "42" && e.ToStringSess(testAmbientSession) != e.OutputSess(testAmbientSession) {
+		t.Fatal(e.ToStringSess(testAmbientSession))
 	}
 	// Expression always live; sticky empty via Output (no invent soft-skip past hole)
 	ClearErrorSess(testAmbientSession)
-	if (*Expression)(nil).ToString() != "" {
+	if (*Expression)(nil).ToStringSess(testAmbientSession) != "" {
 		t.Fatal("nil ToString must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {

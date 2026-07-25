@@ -68,7 +68,7 @@ func TestBuildInvocationHandoverNewGlobals(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		list.Funcs = []*Function{caller}
 		caller.NewGlobals = nil
-		fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+		fi = BuildInvocationAndFunction(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 		if fi != nil && !fi.Failed {
 			break
 		}
@@ -104,12 +104,12 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.ExprDepth = 0
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, nil, callee)
 	if fi == nil || len(fi.Args) != 1 {
 		t.Fatal("args")
 	}
 	// constant/variable param bumps depth via make_random_param + merge
-	if fi.Args[0] != nil && BumpsExprDepth(fi.Args[0]) && cg.ExprDepth < 1 {
+	if fi.Args[0] != nil && BumpsExprDepthSess(testAmbientSession, fi.Args[0]) && cg.ExprDepth < 1 {
 		t.Fatalf("ExprDepth=%d after param (want ≥1)", cg.ExprDepth)
 	}
 }
@@ -130,7 +130,7 @@ func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	defer ClearErrorSess(testAmbientSession)
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, nil, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("sticky error must fail invocation, not invent params")
 	}
@@ -167,7 +167,7 @@ func TestMakeRandomUnaryInvocationBumpsExprDepth(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		cg = WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 		cg.ExprDepth = 1
-		fi = MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, seed), opts, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))
+		fi = MakeRandomUnaryInvocation(NewRngSess(testAmbientSession, seed), opts, vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))
 		if fi != nil && fi.IsUnary {
 			break
 		}

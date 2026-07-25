@@ -389,7 +389,7 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntTypeSess(testAmbientSession)}
 	u1 := FindUnionPointeesSess(testAmbientSession, facts, e1)
 	if len(u1) == 0 {
-		t.Fatalf("expected union pointees, ind=%d", e1.IndirectLevel())
+		t.Fatalf("expected union pointees, ind=%d", e1.IndirectLevelSess(testAmbientSession))
 	}
 	if !HaveOverlappingFieldsSess(testAmbientSession, e1, e2, facts) {
 		t.Fatal("overlap", u1)

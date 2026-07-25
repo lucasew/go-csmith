@@ -12,7 +12,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// ExpressionComma lhs uses type nullptr → needs Type env (GenerateSimpleTypes)
 	seedTypesForTest(NewRngSess(testAmbientSession, 1), opts, probs, vs, nil)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	r := NewRngSess(testAmbientSession, 2)
 	e := func() *Expression {
 		// ExpressionFuncall / make_random paths need get_fact_mgr
@@ -23,7 +23,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	if e == nil || e.Term != TermCommaExpr || e.CommaLHS == nil || e.CommaRHS == nil {
 		t.Fatalf("%+v", e)
 	}
-	out := e.Output()
+	out := e.OutputSess(testAmbientSession)
 	// ExpressionComma.cpp:141 — " , " (spaces around comma)
 	if !strings.Contains(out, " , ") {
 		t.Fatal(out)
@@ -47,16 +47,16 @@ func TestMakeExpressionComma(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// ExpressionComma always has live lhs/rhs; sticky no invent "( , )" for missing sides
 	bare := &Expression{Term: TermCommaExpr}
-	if bare.Output() != "" {
-		t.Fatalf("incomplete comma must fail closed empty, got %q", bare.Output())
+	if bare.OutputSess(testAmbientSession) != "" {
+		t.Fatalf("incomplete comma must fail closed empty, got %q", bare.OutputSess(testAmbientSession))
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("incomplete comma Output must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	oneSide := &Expression{Term: TermCommaExpr, CommaLHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}}
-	if oneSide.Output() != "" {
-		t.Fatalf("one-side comma must fail closed empty, got %q", oneSide.Output())
+	if oneSide.OutputSess(testAmbientSession) != "" {
+		t.Fatalf("one-side comma must fail closed empty, got %q", oneSide.OutputSess(testAmbientSession))
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("one-side comma Output must SetError sticky")
@@ -69,7 +69,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	c := EmptyCGContext().WithSession(testAmbientSession)
-	if e := MakeRandomParam(NewRngSess(testAmbientSession, 1), opts, NewExprTables(opts), NewVariableSelector(testAmbientSession, opts), &c, nil, nil, 0); e != nil {
+	if e := MakeRandomParam(NewRngSess(testAmbientSession, 1), opts, NewExprTablesSess(testAmbientSession, opts), NewVariableSelector(testAmbientSession, opts), &c, nil, nil, 0); e != nil {
 		t.Fatal("nil type must not soft-fallback")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -77,7 +77,7 @@ func TestMakeRandomParamNilType(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Expression.cpp always has RNG sticky; no invent param shell
-	if e := MakeRandomParam(nil, opts, NewExprTables(opts), NewVariableSelector(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession), nil, 0); e != nil {
+	if e := MakeRandomParam(nil, opts, NewExprTablesSess(testAmbientSession, opts), NewVariableSelector(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession), nil, 0); e != nil {
 		t.Fatal("nil RNG must not invent param expr")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -93,7 +93,7 @@ func TestMakeExpressionCommaLHSNoConstPreference(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, nil)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// Many seeds: LHS should not always be a bare hex constant-only pattern... soft check
 	e := func() *Expression {
 		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
@@ -136,7 +136,7 @@ func TestMakeExpressionCommaIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
-	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), nil) != nil {
+	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeExpressionComma")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -149,14 +149,14 @@ func TestMakeExpressionCommaNilDepsSticky(t *testing.T) {
 	// ExpressionComma always has RNG + CGContext; sticky no invent comma shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), ptrEmptyCG(), GetIntTypeSess(testAmbientSession), nil) != nil {
+	if MakeExpressionComma(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), ptrEmptyCG(), GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil RNG must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil RNG MakeExpressionComma must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntTypeSess(testAmbientSession), nil) != nil {
+	if MakeExpressionComma(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), nil, GetIntTypeSess(testAmbientSession), nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -199,7 +199,7 @@ func TestCommaOutputLHSResidualSticky(t *testing.T) {
 		CommaLHS: &Expression{Term: TermConstant, Con: &Constant{Value: "1"}}, // Type-nil residual
 		CommaRHS: &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)},
 	}
-	if s := e.Output(); s != "" {
+	if s := e.OutputSess(testAmbientSession); s != "" {
 		t.Fatal("LHS Output residual must fail closed comma Output", s)
 	}
 	if !HasErrorSess(testAmbientSession) {

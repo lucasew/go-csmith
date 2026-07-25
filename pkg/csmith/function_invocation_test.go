@@ -35,7 +35,7 @@ func TestMakeRandomBinaryInvocationOutput(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// FunctionInvocationBinary.cpp:68 assert(blk) — need live block for safe_ops temps
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
@@ -76,7 +76,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))
+	fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))
 	if fi != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomBinaryInvocation")
 	}
@@ -90,7 +90,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectAccum = &eff
-	fi2 := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntTypeSess(testAmbientSession))
+	fi2 := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg2, GetIntTypeSess(testAmbientSession))
 	if fi2 != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomBinaryInvocation")
 	}
@@ -111,7 +111,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	fi := MakeRandomInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil, false)
+	fi := MakeRandomInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil, false)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomInvocation")
 	}
@@ -124,7 +124,7 @@ func TestMakeRandomInvocationIncompleteAmbientFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
 	cg2.EffectAccum = &eff
-	fi2 := MakeRandomInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil, false)
+	fi2 := MakeRandomInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil, false)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomInvocation")
 	}
@@ -152,7 +152,7 @@ func TestMakeRandomBinaryHasPointerTypeIncompleteSticky(t *testing.T) {
 	var sawSticky bool
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
-		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))
 		if HasErrorSess(testAmbientSession) {
 			sawSticky = true
 			if fi != nil {
@@ -195,7 +195,7 @@ func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 		cg.EffectAccum = &eff
 		cg.ExprDepth = 0
 		cg.EffectStm = EmptyEffect()
-		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))
+		fi = MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))
 		if fi != nil && len(fi.Args) == 2 && fi.Args[0] != nil {
 			break
 		}
@@ -296,7 +296,7 @@ func TestMakeRandomBinaryPtrComparison(t *testing.T) {
 	GenerateAllTypesEnv(NewRngSess(testAmbientSession, 2), opts, probs, env)
 	_ = env.FindPointerType(GetIntTypeSess(testAmbientSession), true)
 	vs.Types = env
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	fi := func() *Invocation {
 		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		c.Types = env
@@ -330,7 +330,7 @@ func TestMakeRandomInvocationPropagatesFactChanged(t *testing.T) {
 	opts := Defaults()
 	opts.MaxFuncs = 5
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
 	list := &FunctionList{}
 	caller := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession), IsBuilt: true}

@@ -614,7 +614,7 @@ func BuildUserInvocation(
 			return fi
 		}
 		// FunctionInvocationUser.cpp:261 — check_and_set_cast (lang_cpp)
-		arg.CheckAndSetCastOpts(ty, opts)
+		arg.CheckAndSetCastOptsSess(sessFromCG(cg), ty, opts)
 		// residual ERROR sticky — no invent param past CheckAndSetCast residual hole
 		if hasErrCG(cg) {
 			fi.Failed = true
@@ -843,7 +843,7 @@ func BuildInvocationAndFunction(
 			return fi
 		}
 		// FunctionInvocationUser.cpp:190 — check_and_set_cast (lang_cpp)
-		arg.CheckAndSetCastOpts(ty, opts)
+		arg.CheckAndSetCastOptsSess(sessFromCG(cg), ty, opts)
 		// residual ERROR sticky — no invent param past CheckAndSetCast residual hole
 		if hasErrCG(cg) {
 			fi.Failed = true

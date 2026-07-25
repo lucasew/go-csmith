@@ -29,7 +29,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 
 	checked := 0
 	for seed := uint64(1); seed < 40; seed++ {

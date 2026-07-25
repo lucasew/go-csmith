@@ -11,7 +11,7 @@ func TestMathNoTmpBinaryOutput(t *testing.T) {
 	opts.MathNoTmp = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}

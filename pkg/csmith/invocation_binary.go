@@ -266,7 +266,7 @@ func (fi *Invocation) CompatibleVarSess(s *Session, v *Variable, expandStruct bo
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := fi.Args[0].CompatibleWithVar(v, expandStruct)
+	ok := fi.Args[0].CompatibleWithVarSess(s, v, expandStruct)
 	// residual ERROR sticky — no invent compatible true past CompatibleWithVar residual hole
 	if sessHasError(s) {
 		return false

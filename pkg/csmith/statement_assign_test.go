@@ -37,7 +37,7 @@ func TestMakeRandomAssignAllocatesStmID(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	for seed := uint64(1); seed < 40; seed++ {
 		c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-		st := MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
+		st := MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession))
 		if !stmtOK(st) {
 			continue
 		}
@@ -53,7 +53,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// seed globals for selection
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	_ = vs.GenerateNewGlobal(AccessWrite, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
@@ -122,7 +122,7 @@ func TestMakeRandomAssignQferForcesExact(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// should not panic; may fail to find var and return empty assign
-	st := MakeRandomAssignQfer(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), &q)
+	st := MakeRandomAssignQfer(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession), &q)
 	// global option restored conceptually (opts is by-value); package default unchanged
 	if opts.MatchExactQualifiers {
 		t.Fatal("caller opts mutated")
@@ -167,12 +167,12 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	opts := Defaults()
 	ClearErrorSess(testAmbientSession)
 	// assign: nil cg
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), nil, GetIntTypeSess(testAmbientSession))) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), nil, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("nil cg assign")
 	}
 	// array op: nil vs sticky
 	ClearErrorSess(testAmbientSession)
-	if st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTables(opts), NewStatementThresholdTable(opts), nil); st.Kind != 0 || stmtOK(st) {
+	if st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil); st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("nil arrayop invent %#v", st)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -186,7 +186,7 @@ func TestMakeRandomAssignArrayOpGotoNullptrEmpty(t *testing.T) {
 	f.Stack = []*Block{blk}
 	f.Blocks = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession) // no FM
-	st := MakeRandomGoto(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, blk)
+	st := MakeRandomGoto(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, blk)
 	if st.Kind != 0 || stmtOK(st) {
 		t.Fatalf("goto without FM invent %#v", st)
 	}
@@ -319,7 +319,7 @@ func TestMakeRandomAssignRestoresMatchExactQualifiersOnEarlyReturn(t *testing.T)
 	// Use Valid path then corrupt: call with StrictFloat and nil typ so SelectLType runs,
 	// then force HasError during strict float by… hard to hit GetType residual.
 	// Unit the defer contract: after any MakeRandomAssignQfer with qf, process flag restored.
-	_ = MakeRandomAssignQfer(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession), &q)
+	_ = MakeRandomAssignQfer(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession), &q)
 	if ProcessOptionsSess(testAmbientSession).MatchExactQualifiers {
 		t.Fatal("MatchExactQualifiers must restore to false after MakeRandomAssignQfer with qf")
 	}

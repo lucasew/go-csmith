@@ -18,7 +18,7 @@ func TestItemizedIVAsIndexExpressionOutput(t *testing.T) {
 		t.Fatal("itemize", GetErrorSess(testAmbientSession))
 	}
 	e := &Expression{Term: TermVariable, Var: &item.Variable, ExprType: GetIntTypeSess(testAmbientSession)}
-	got := e.Output()
+	got := e.OutputSess(testAmbientSession)
 	if got != "g_106[4]" {
 		t.Fatalf("ExpressionVariable of itemized IV: got %q want g_106[4] err=%v", got, GetErrorSess(testAmbientSession))
 	}

@@ -175,7 +175,7 @@ func TestMakeRandomArrayOpNotEmpty(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
 	blk := &Block{Func: f}

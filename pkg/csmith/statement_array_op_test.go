@@ -40,7 +40,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	// Count AllocStmID consumed by multi-dim array-init
 	currentSession().NextStmID = 200
 	before := currentSession().NextStmID
-	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 7), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 7), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if HasErrorSess(testAmbientSession) {
 		t.Fatalf("MakeRandomArrayInit sticky: %v", GetErrorSess(testAmbientSession))
 	}

@@ -208,7 +208,7 @@ func TestLhsIndirectLevel(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	eBroken := &Expression{Term: TermVariable, Var: &Variable{Name: "y"}}
-	if _, ok := eBroken.IndirectLevelComplete(); ok {
+	if _, ok := eBroken.IndirectLevelCompleteSess(testAmbientSession); ok {
 		t.Fatal("expr incomplete type must fail closed")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -242,7 +242,7 @@ func TestExpressionVariableDerefOutput(t *testing.T) {
 	p := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
 	v := CreateVariableQferSess(testAmbientSession, "g_1", p, NewCVQualifiers([]bool{false}, []bool{false}))
 	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
-	out := e.Output()
+	out := e.OutputSess(testAmbientSession)
 	if out != "(*g_1)" {
 		t.Fatalf("%q", out)
 	}
@@ -252,7 +252,7 @@ func TestExpressionVariableAddrOutput(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	// ind = 0 - 1 = -1
-	out := e.Output()
+	out := e.OutputSess(testAmbientSession)
 	if out != "&g_1" {
 		t.Fatalf("%q", out)
 	}
@@ -263,10 +263,10 @@ func TestExpressionVariableMultiLevelAddrFailClosed(t *testing.T) {
 	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))}
 	// ind = 0 - 2 = -2
-	if e.IndirectLevel() != -2 {
-		t.Fatalf("indir %d", e.IndirectLevel())
+	if e.IndirectLevelSess(testAmbientSession) != -2 {
+		t.Fatalf("indir %d", e.IndirectLevelSess(testAmbientSession))
 	}
-	if out := e.Output(); out != "" {
+	if out := e.OutputSess(testAmbientSession); out != "" {
 		t.Fatalf("multi-level & must fail closed, got %q", out)
 	}
 }

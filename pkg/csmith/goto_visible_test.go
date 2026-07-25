@@ -168,7 +168,7 @@ func TestGotoCreatesCFGEdge(t *testing.T) {
 	for seed := uint64(1); seed < 40; seed++ {
 		fm.CFGEdges = nil
 		blk.Stmts = []Stmt{prior}
-		st := MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, blk)
+		st := MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, blk)
 		if st.GotoBack && len(fm.CFGEdges) > 0 {
 			e := fm.CFGEdges[0]
 			if e.BackLink && e.DestStmID == prior.StmID {
@@ -229,7 +229,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	for seedN := uint64(1); seedN < 40; seedN++ {
 		ClearErrorSess(testAmbientSession)
 		cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, seed)
-		st := MakeRandomGoto(NewRngSess(testAmbientSession, seedN), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
+		st := MakeRandomGoto(NewRngSess(testAmbientSession, seedN), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, b2)
 		if st.Expr == nil {
 			continue
 		}
@@ -246,7 +246,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	// sticky ERROR after flipcoin → fail closed (no cond invent)
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	st2 := MakeRandomGoto(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b2)
+	st2 := MakeRandomGoto(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, b2)
 	if st2.Expr != nil {
 		t.Fatal("sticky error must not invent goto condition")
 	}

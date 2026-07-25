@@ -55,9 +55,9 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 				t.Fatal(out)
 			}
 			// UseVar of IV still works via nested expression
-			if !ie.UseVar(iv) {
+			if !ie.UseVarSess(testAmbientSession, iv) {
 				// UseVar on func may not recurse — check Args
-				if len(ie.Invoke.Args) > 0 && ie.Invoke.Args[0] != nil && ie.Invoke.Args[0].UseVar(iv) {
+				if len(ie.Invoke.Args) > 0 && ie.Invoke.Args[0] != nil && ie.Invoke.Args[0].UseVarSess(testAmbientSession, iv) {
 					// ok
 				} else {
 					t.Log("UseVar IV optional on binary")
@@ -279,7 +279,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable, fieldIV}
 	vs.AllVars = []*Variable{&av.Variable, fieldIV}
 	blk.LocalVars = []*Variable{fieldIV}
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	st := MakeRandomArrayOp(NewRngSess(testAmbientSession, 5), opts, probs, vs, tables, stmtTab, &cg)
 	if stmtOK(st) {

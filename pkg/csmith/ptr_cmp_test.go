@@ -26,7 +26,7 @@ func TestMakeRandomBinaryPtrComparisonFlags(t *testing.T) {
 		cg2.Types = env
 		eff2 := EmptyEffect()
 		cg2.EffectAccum = &eff2
-		fi = MakeRandomBinaryPtrComparison(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg2, env)
+		fi = MakeRandomBinaryPtrComparison(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &cg2, env)
 		if fi != nil {
 			break
 		}
@@ -90,7 +90,7 @@ func TestMakeRandomBinaryPtrComparisonFlagOrderAndEqPolarity(t *testing.T) {
 		ClearErrorSess(testAmbientSession)
 		cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, nil))
 		cg.Types = env
-		fi := MakeRandomBinaryPtrComparison(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg, env)
+		fi := MakeRandomBinaryPtrComparison(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &cg, env)
 		if fi == nil {
 			continue
 		}
@@ -128,7 +128,7 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	for seed := uint64(1); seed < 100; seed++ {
-		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))
+		fi := MakeRandomBinaryInvocation(NewRngSess(testAmbientSession, seed), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))
 		if fi != nil && fi.PtrCmp {
 			if fi.Binary != "==" && fi.Binary != "!=" {
 				t.Fatal(fi.Binary)
@@ -158,7 +158,7 @@ func TestPtrCmpCastGetTypeResidualNoInventShell(t *testing.T) {
 	opts.LangCPP = true
 	// Type-nil left GetType residual
 	left := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
-	lt := left.GetType()
+	lt := left.GetTypeSess(testAmbientSession)
 	if lt != nil || !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil left GetType must residual sticky nil")
 	}
@@ -166,7 +166,7 @@ func TestPtrCmpCastGetTypeResidualNoInventShell(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// CheckAndSetCast residual on incomplete right after live left type
 	rightHole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_r"}}
-	rightHole.CheckAndSetCastOpts(PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), opts)
+	rightHole.CheckAndSetCastOptsSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), opts)
 	if rightHole.CastType != nil {
 		t.Fatal("GetTypeUncast residual must not invent CastType on right")
 	}

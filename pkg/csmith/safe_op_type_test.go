@@ -22,7 +22,7 @@ func TestMakeRandomBinaryUsesFlagOperandTypes(t *testing.T) {
 	opts.SafeMath = true
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	// find an arithmetic safe op invocation
 	var fi *Invocation
 	for seed := uint64(1); seed < 80; seed++ {

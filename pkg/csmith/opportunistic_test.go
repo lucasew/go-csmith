@@ -323,7 +323,7 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 		ClearErrorSess(testAmbientSession) // compatible-check fail sticks ErrCompatibleCheck per try
 		st := func() Stmt {
 			c := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-			return MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &c, GetIntTypeSess(testAmbientSession))
+			return MakeRandomAssign(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &c, GetIntTypeSess(testAmbientSession))
 		}()
 		if st.Kind != StmtAssign {
 			t.Fatal(st.Kind)
@@ -384,17 +384,17 @@ func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(testAmbientSession)}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
-	if !e.CompatibleWithVar(v, false) {
+	if !e.CompatibleWithVarSess(testAmbientSession, v, false) {
 		t.Fatal("unary minus of v compatible with v")
 	}
 	other := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntTypeSess(testAmbientSession), true, false)
-	if e.CompatibleWithVar(other, false) {
+	if e.CompatibleWithVarSess(testAmbientSession, other, false) {
 		t.Fatal("not other")
 	}
 	// binary always false
 	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ev}}
 	e2 := &Expression{Term: TermFunction, Invoke: fi2}
-	if e2.CompatibleWithVar(v, false) {
+	if e2.CompatibleWithVarSess(testAmbientSession, v, false) {
 		t.Fatal("binary not compatible")
 	}
 }

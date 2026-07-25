@@ -414,7 +414,7 @@ func MakeRandomAssignQfer(
 
 	// RHS cast to L type when needed (StatementAssign.cpp:207–208 — lang_cpp)
 	if rhs != nil && typ != nil {
-		rhs.CheckAndSetCastOpts(typ, opts)
+		rhs.CheckAndSetCastOptsSess(sessFromCG(cg), typ, opts)
 		// residual ERROR sticky — no invent Assign past CheckAndSetCast residual hole
 		if hasErrCG(cg) {
 			return Stmt{}

@@ -9,7 +9,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	// assign-only so arms write
 	tab := &ThresholdTable{}
@@ -152,7 +152,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	cg.Types = vs.Types
 	f.Stack = []*Block{{Func: f}}
 	// sticky error after condition would abort; set after a successful path component
-	st := MakeRandomIf(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	// may succeed with empty blocks (max size 0)
 	if HasErrorSess(testAmbientSession) {
 		if st != nil {
@@ -161,7 +161,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	st2 := MakeRandomIf(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st2 := MakeRandomIf(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if st2 != nil {
 		t.Fatal("ERROR_GUARD after flip path: want nil")
 	}
@@ -378,7 +378,7 @@ func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	// StatementIf.cpp always has RNG + CGContext sticky; no invent if shell
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), nil); st != nil {
+	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil); st != nil {
 		t.Fatal("nil RNG+cg")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -386,7 +386,7 @@ func TestMakeRandomIfNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg); st != nil {
+	if st := MakeRandomIf(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg); st != nil {
 		t.Fatal("nil RNG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -418,7 +418,7 @@ func TestMakeRandomIfIncompleteThenInFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	cg.Types = &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}
-	st := MakeRandomIf(NewRngSess(testAmbientSession, 1), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomIf(NewRngSess(testAmbientSession, 1), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
 	}
@@ -434,7 +434,7 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	// assign-only arms so generation writes/reads globals into shared accum
 	tab := &ThresholdTable{}
@@ -494,7 +494,7 @@ func TestMakeRandomForIncompleteEffectAccumFailClosed(t *testing.T) {
 	_ = vs.GenerateNewGlobal(AccessWrite, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 1))
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
-	if MakeRandomFor(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomFor(NewRngSess(testAmbientSession, 2), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
 	}
 	// nil return is the invent ban; SetError when iteration path reaches accum check

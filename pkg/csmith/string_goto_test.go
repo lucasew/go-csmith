@@ -303,7 +303,7 @@ func TestMakeRandomGotoInitSkippedIncompleteFailClosed(t *testing.T) {
 		// reset blocks each time (forward path mutates)
 		outer.Stmts = []Stmt{{Kind: StmtAssign, StmID: 10}}
 		inner.Stmts = []Stmt{{Kind: StmtAssign, StmID: 20}}
-		st := MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, inner)
+		st := MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, inner)
 		if st.Kind == StmtGoto {
 			// if Collect was incomplete, must have failed closed
 			// hole on outer LocalVars when dest is outer and src is inner:

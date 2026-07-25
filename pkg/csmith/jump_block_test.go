@@ -185,7 +185,7 @@ func TestGotoUsesFindGoodJumpBlock(t *testing.T) {
 	}
 	var st Stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		st = MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, b1)
+		st = MakeRandomGoto(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, b1)
 		if st.GotoBack || (st.Label == "" && !stmtOK(st)) {
 			// success back-edge or fair null after forward insert
 			if st.GotoBack {

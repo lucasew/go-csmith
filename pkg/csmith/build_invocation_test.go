@@ -12,7 +12,7 @@ func TestBuildInvocationAndFunctionNilType(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	list := &FunctionList{}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, nil, nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, nil, nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil return type must fail without soft invent")
 	}
@@ -29,7 +29,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	callee := &Function{Name: "func_x", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true}
 	list := &FunctionList{Funcs: []*Function{callee}}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	fi := BuildUserInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, callee)
+	fi := BuildUserInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("nil RNG must fail closed user invoke")
 	}
@@ -37,7 +37,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 		t.Fatal("nil RNG BuildUserInvocation must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+	fi2 := BuildInvocationAndFunction(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("nil RNG must fail closed build+function")
 	}
@@ -46,7 +46,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// callee / cg hard IR sticky Failed
-	fi3 := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, nil)
+	fi3 := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, nil)
 	if fi3 == nil || !fi3.Failed {
 		t.Fatal("nil callee must fail closed")
 	}
@@ -57,7 +57,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	// Param hole sticky Failed
 	callee2 := &Function{Name: "func_y", ReturnType: GetIntTypeSess(testAmbientSession), BuildState: BuildBuilt, IsBuilt: true,
 		Param: []*Variable{nil}}
-	fi4 := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, callee2)
+	fi4 := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, callee2)
 	if fi4 == nil || !fi4.Failed {
 		t.Fatal("nil Param hole must fail closed")
 	}
@@ -66,7 +66,7 @@ func TestBuildUserInvocationNoInventWithoutRNG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// MakeRandomInvocation nil r/cg sticky Failed
-	fi5 := MakeRandomInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil, false)
+	fi5 := MakeRandomInvocation(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, GetIntTypeSess(testAmbientSession), nil, false)
 	if fi5 == nil || !fi5.Failed {
 		t.Fatal("nil RNG MakeRandomInvocation must fail closed")
 	}
@@ -84,7 +84,7 @@ func TestBuildInvocationAndFunctionParamsBeforeBody(t *testing.T) {
 	// encourage multi-param signatures
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	list := &FunctionList{}
 	// seed globals for args / body
@@ -165,7 +165,7 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 		blk := &Block{Func: caller}
 		caller.Stack = []*Block{blk}
 		cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, caller))
-		fi = BuildUserInvocation(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, nil, callee)
+		fi = BuildUserInvocation(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, nil, callee)
 		if fi != nil && !fi.Failed && len(fi.Args) == 2 {
 			break
 		}
@@ -199,7 +199,7 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	caller := &Function{Name: "func_1"}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	// nil vs forces ExpressionVariable fail regardless of term choice
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTables(opts), &cg, nil, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, NewExprTablesSess(testAmbientSession, opts), &cg, nil, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("want Failed on null param")
 	}
@@ -226,7 +226,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	}
 	// same-package clear paired FM (signature always pairs; strip for fail-closed path)
 	f.factMgr = nil
-	f.GenerateBody(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
+	f.GenerateBody(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), EmptyCGContext().WithSession(testAmbientSession))
 	if f.Body != nil {
 		t.Fatal("nil paired FM must fail closed body")
 	}
@@ -238,7 +238,7 @@ func TestBuildInvocationAndFunctionNilPairedFMSticky(t *testing.T) {
 	inc := IncompleteEffect()
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectAccum = &inc
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg2, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete ambient BuildInvocationAndFunction must Failed")
 	}
@@ -295,7 +295,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list)
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg = cg.WithFactMgr(fm)
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, callee)
 	if fi == nil || !fi.Failed {
 		t.Fatal("incomplete AccumEffContext must fail closed BuildUserInvocation")
 	}
@@ -318,7 +318,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, caller2)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(caller2, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list2).WithFactMgr(fm2)
-	fi2 := BuildUserInvocation(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, list2, callee2)
+	fi2 := BuildUserInvocation(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg2, list2, callee2)
 	if fi2 == nil || !fi2.Failed {
 		t.Fatal("incomplete GlobalFacts must fail closed BuildUserInvocation")
 	}
@@ -402,7 +402,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	cg.CurrBlk = outer
 	cg.EffectAccum = &eff
 	cg.EffectStm = EmptyEffect()
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 11), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 11), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, callee)
 	if fi == nil || fi.Failed {
 		t.Fatalf("gen revisit with stale CurrBlk must succeed; Failed=%v err=%v", fi != nil && fi.Failed, HasErrorSess(testAmbientSession))
 	}
@@ -441,7 +441,7 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 	cg.EffectStm = EmptyEffect()
 	// Mark a write on EffectStm as if RHS gen ran
 	cg.EffectStm = cg.EffectStm.WriteVarSess(testAmbientSession, rhsDummy.Var)
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, list, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, list, callee)
 	if fi == nil {
 		t.Fatal("BuildUserInvocation returned nil")
 	}
@@ -474,7 +474,7 @@ func TestBuildInvocationEffectHandoverIncompleteFailClosed(t *testing.T) {
 	cg.Types = vs.Types
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg = cg.WithFactMgr(fm)
-	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
+	fi := BuildInvocationAndFunction(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, list, GetIntTypeSess(testAmbientSession), nil)
 	if fi != nil && !fi.Failed {
 		// may return Failed or nil; must not invent clean success under incomplete ambient
 		t.Fatal("incomplete caller EffectContext must fail closed BuildInvocationAndFunction")
@@ -531,7 +531,7 @@ func TestBuildUserInvocationNoRevisitStaticEffect(t *testing.T) {
 	accum := EmptyEffect()
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
 	cg.EffectAccum = &accum
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, callee)
 	if fi.Failed {
 		t.Fatal("failed")
 	}
@@ -569,7 +569,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.Funcs = list
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, callee)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, callee)
 	if fi == nil {
 		t.Fatal("nil")
 	}
@@ -600,7 +600,7 @@ func TestBuildUserInvocationSkipsFirstFunctionRevisit(t *testing.T) {
 	blk := &Block{Func: caller}
 	caller.Stack = []*Block{blk}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
-	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, list, first)
+	fi := BuildUserInvocation(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, list, first)
 	if fi.Failed {
 		t.Fatalf("first should not fail revisit err=%v", HasErrorSess(testAmbientSession))
 	}

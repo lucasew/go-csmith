@@ -163,7 +163,7 @@ func TestMakeRandomForEmitsHeader(t *testing.T) {
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 2))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	st := MakeRandomFor(NewRngSess(testAmbientSession, 9), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 9), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if st == nil || st.Loop == nil {
 		t.Fatal("nil for")
 	}

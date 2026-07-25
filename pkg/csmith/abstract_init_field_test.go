@@ -53,7 +53,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 
 	ptrType := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EShort))
 	init := &Expression{Term: TermVariable, Var: f3, ExprType: ptrType}
-	if n, ok := init.IndirectLevelComplete(); !ok || n != -1 {
+	if n, ok := init.IndirectLevelCompleteSess(testAmbientSession); !ok || n != -1 {
 		t.Fatalf("want address-of -1 got n=%d ok=%v", n, ok)
 	}
 	p := CreateVariableScalarsSess(testAmbientSession, "l_1226", ptrType, false, false)

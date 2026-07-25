@@ -137,7 +137,7 @@ func MakeRandomReturn(
 		return Stmt{}
 	}
 	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
-	ev.CheckAndSetCastOpts(ret, opts)
+	ev.CheckAndSetCastOptsSess(sessFromCG(cg), ret, opts)
 	// residual ERROR sticky — no invent Return stmt past CheckAndSetCast residual hole
 	if hasErrCG(cg) {
 		return Stmt{}

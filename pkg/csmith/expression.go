@@ -60,10 +60,6 @@ func IncompleteExpressions() []*Expression {
 // ExpressionVariable.cpp:288–291 — var.compatible(v);
 // ExpressionFuncall.cpp:206–207 — invoke.compatible(v) (unary operand only);
 // default / other terms false.
-func (e *Expression) CompatibleWithVar(v *Variable, expandStruct bool) bool {
-	return e.CompatibleWithVarSess(testAmbientSession, v, expandStruct)
-}
-
 func (e *Expression) CompatibleWithVarSess(s *Session, v *Variable, expandStruct bool) bool {
 	// Constant.cpp:489 / ExpressionVariable.cpp:289 — assert(v)
 	// Expression always live; sticky incomplete — fail closed false
@@ -127,10 +123,6 @@ func (e *Expression) CompatibleWithVarSess(s *Session, v *Variable, expandStruct
 // ExpressionFuncall.cpp:210–212 — always false for Expression*.
 // Incomplete Variable/Lhs shells fail closed sticky false (no invent soft-skip nil Var).}
 
-func (e *Expression) CompatibleWithExpr(other *Expression, expandStruct bool) bool {
-	return e.CompatibleWithExprSess(testAmbientSession, other, expandStruct)
-}
-
 func (e *Expression) CompatibleWithExprSess(s *Session, other *Expression, expandStruct bool) bool {
 	// ExpressionVariable.cpp:277 — assert(exp); nil is broken IR sticky
 	if e == nil || other == nil {
@@ -171,20 +163,12 @@ func (e *Expression) CompatibleWithExprSess(s *Session, other *Expression, expan
 // GetComplexity mirrors Expression::get_complexity via ExpressionComplexity.
 // Incomplete IR sticky -1 (no invent leaf 0 past holes).}
 
-func (e *Expression) GetComplexity() int {
-	return e.GetComplexitySess(testAmbientSession)
-}
-
 // GetComplexitySess is GetComplexity with explicit session residual sticky.
 func (e *Expression) GetComplexitySess(s *Session) int {
 	return ExpressionComplexitySess(s, e)
 }
 
 // GetInvoke mirrors Expression::get_invoke — non-nil only for TermFunction.
-func (e *Expression) GetInvoke() *Invocation {
-	return e.GetInvokeSess(testAmbientSession)
-}
-
 // GetInvokeSess is GetInvoke with explicit session residual sticky.
 func (e *Expression) GetInvokeSess(s *Session) *Invocation {
 	if e == nil {
@@ -203,10 +187,6 @@ func (e *Expression) GetInvokeSess(s *Session) *Invocation {
 
 // Clone mirrors Expression::clone for Constant / Variable / Lhs leaves.
 // Compound terms fail closed sticky nil (no invent shallow shell without deep copy).
-func (e *Expression) Clone() *Expression {
-	return e.CloneSess(testAmbientSession)
-}
-
 func (e *Expression) CloneSess(s *Session) *Expression {
 	if e == nil {
 		sessNoteError(s, ErrGeneric)
@@ -241,10 +221,6 @@ func (e *Expression) CloneSess(s *Session) *Expression {
 // (tests / call sites that already decided a cast may be needed).
 // Expression.cpp:221–225 — get_type().needs_cast(desired) → cast_type = desired.}
 
-func (e *Expression) CheckAndSetCast(desired *Type) {
-	e.CheckAndSetCastSess(testAmbientSession, desired)
-}
-
 // CheckAndSetCastSess is CheckAndSetCast with explicit session residual sticky.
 func (e *Expression) CheckAndSetCastSess(s *Session, desired *Type) {
 	e.checkAndSetCastCoreSess(s, desired)
@@ -252,20 +228,12 @@ func (e *Expression) CheckAndSetCastSess(s *Session, desired *Type) {
 
 // CheckAndSetCastOpts mirrors Expression::check_and_set_cast fully.
 // Expression.cpp:221–225 — only when CGOptions::lang_cpp().
-func (e *Expression) CheckAndSetCastOpts(desired *Type, opts Options) {
-	e.CheckAndSetCastOptsSess(testAmbientSession, desired, opts)
-}
-
 // CheckAndSetCastOptsSess is CheckAndSetCastOpts with explicit session residual sticky.
 func (e *Expression) CheckAndSetCastOptsSess(s *Session, desired *Type, opts Options) {
 	if !opts.LangCPP {
 		return
 	}
 	e.checkAndSetCastCoreSess(s, desired)
-}
-
-func (e *Expression) checkAndSetCastCore(desired *Type) {
-	e.checkAndSetCastCoreSess(testAmbientSession, desired)
 }
 
 func (e *Expression) checkAndSetCastCoreSess(s *Session, desired *Type) {
@@ -304,10 +272,6 @@ func (e *Expression) checkAndSetCastCoreSess(s *Session, desired *Type) {
 
 // GetTypeUncast is get_type ignoring cast_type (for check_and_set_cast).
 // Incomplete IR fails closed nil (no invent ExprType shell without live invoke/assign/rhs).
-func (e *Expression) GetTypeUncast() *Type {
-	return e.GetTypeUncastSess(testAmbientSession)
-}
-
 func (e *Expression) GetTypeUncastSess(s *Session) *Type {
 	// Expression always live for get_type; sticky no invent type shell without it
 	if e == nil {
@@ -399,8 +363,9 @@ func (e *Expression) GetTypeUncastSess(s *Session) *Type {
 // Incomplete expr IR returns 0 for the bit; callers that must not invent bare
 // level-0 / non-address-of use IndirectLevelComplete.}
 
-func (e *Expression) IndirectLevel() int {
-	n, ok := e.IndirectLevelComplete()
+// IndirectLevelSess is IndirectLevel with explicit residual sticky bag.
+func (e *Expression) IndirectLevelSess(s *Session) int {
+	n, ok := e.IndirectLevelCompleteSess(s)
 	if !ok {
 		return 0
 	}
@@ -410,10 +375,6 @@ func (e *Expression) IndirectLevel() int {
 // IndirectLevelComplete is get_indirect_level with ok=false on incomplete expr IR
 // (no invent treat broken Variable/type as level 0 for transfer/visit/overlap).
 // Incomplete shell sticky (callers that only use IndirectLevel still surface ERROR).
-func (e *Expression) IndirectLevelComplete() (n int, ok bool) {
-	return e.IndirectLevelCompleteSess(testAmbientSession)
-}
-
 func (e *Expression) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 	// Expression Variable/Lhs always live with type; sticky incomplete no invent level 0
 	if e == nil || e.Var == nil || e.Var.Type == nil {
@@ -446,10 +407,6 @@ func (e *Expression) IndirectLevelCompleteSess(s *Session) (n int, ok bool) {
 // ExpressionAssign — LHS type; Constant / Variable as typed.
 // Incomplete IR fails closed nil (no invent type shell / panic on nil CommaRHS).}
 
-func (e *Expression) GetType() *Type {
-	return e.GetTypeSess(testAmbientSession)
-}
-
 func (e *Expression) GetTypeSess(s *Session) *Type {
 	// Expression always live for get_type; sticky no invent type shell without it
 	if e == nil {
@@ -470,10 +427,6 @@ func (e *Expression) GetTypeSess(s *Session) *Type {
 // GetQualifiers mirrors Expression::get_qualifiers.
 // ExpressionVariable.cpp:194–196; ExpressionAssign.cpp:85–86;
 // ExpressionFuncall.cpp:187–188; ExpressionComma / Constant default empty.}
-
-func (e *Expression) GetQualifiers() CVQualifiers {
-	return e.GetQualifiersSess(testAmbientSession)
-}
 
 func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 	// Expression always live; sticky no invent empty quals shell without it
@@ -562,10 +515,6 @@ func (e *Expression) GetQualifiersSess(s *Session) CVQualifiers {
 // Expression.h: equals default false; Constant; ExpressionFuncall via invoke.
 // Incomplete IR fails closed false (no invent fold / panic on nil CommaRHS/Assign.Expr).}
 
-func (e *Expression) EqualsInt(num int) bool {
-	return e.EqualsIntSess(testAmbientSession, num)
-}
-
 func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 	// Expression always live for fold; sticky no invent "not equal" past missing shell
 	if e == nil {
@@ -638,10 +587,6 @@ func (e *Expression) EqualsIntSess(s *Session, num int) bool {
 // Expression.h:139 — default false; Constant: !equals(num).
 // Incomplete Expression / Constant shell sticky false (no invent fold past holes).}
 
-func (e *Expression) NotEquals(num int) bool {
-	return e.NotEqualsSess(testAmbientSession, num)
-}
-
 func (e *Expression) NotEqualsSess(s *Session, num int) bool {
 	// Expression always live for fold; sticky no invent "equals" past missing shell
 	if e == nil {
@@ -669,10 +614,6 @@ func (e *Expression) NotEqualsSess(s *Session, num int) bool {
 // Expression.h default false; Constant.cpp:501–502.
 // Incomplete Expression / Constant shell sticky false (no invent fold past holes).}
 
-func (e *Expression) LessThan(num int) bool {
-	return e.LessThanSess(testAmbientSession, num)
-}
-
 func (e *Expression) LessThanSess(s *Session, num int) bool {
 	// Expression always live for fold; sticky no invent compare past missing shell
 	if e == nil {
@@ -699,10 +640,6 @@ func (e *Expression) LessThanSess(s *Session, num int) bool {
 // Is0Or1 mirrors Expression::is_0_or_1.
 // ExpressionFuncall → invoke; ExpressionComma → rhs; ExpressionAssign → simple+rhs.
 // Incomplete IR sticky false (no invent 0/1 fold / soft re-pick past holes).}
-
-func (e *Expression) Is0Or1() bool {
-	return e.Is0Or1Sess(testAmbientSession)
-}
 
 func (e *Expression) Is0Or1Sess(s *Session) bool {
 	// Expression always live for fold; sticky no invent "not 0or1" past missing shell
@@ -765,10 +702,6 @@ func (e *Expression) Is0Or1Sess(s *Session) bool {
 // Incomplete IR fails closed sticky true (uses v) — no invent conflict-free non-use
 // / soft re-pick past holes.}
 
-func (e *Expression) UseVar(v *Variable) bool {
-	return e.UseVarSess(testAmbientSession, v)
-}
-
 func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 	// Expression + subject always live; sticky incomplete — fail closed as uses
 	// (no invent conflict-free non-use / soft re-pick past hole)
@@ -804,7 +737,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 				sessNoteError(s, ErrGeneric)
 				return true
 			}
-			if a.UseVar(v) {
+			if a.UseVarSess(s, v) {
 				// residual ERROR sticky — no invent use-true past nested UseVar hole
 				if sessHasError(s) {
 					return true
@@ -823,7 +756,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		if e.CommaLHS.UseVar(v) {
+		if e.CommaLHS.UseVarSess(s, v) {
 			// residual ERROR sticky — no invent use-true past LHS UseVar hole
 			if sessHasError(s) {
 				return true
@@ -834,7 +767,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 		if sessHasError(s) {
 			return true
 		}
-		if e.CommaRHS.UseVar(v) {
+		if e.CommaRHS.UseVarSess(s, v) {
 			if sessHasError(s) {
 				return true
 			}
@@ -896,7 +829,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 			sessNoteError(s, ErrGeneric)
 			return true
 		}
-		ok := e.Assign.Expr.UseVar(v)
+		ok := e.Assign.Expr.UseVarSess(s, v)
 		// residual ERROR sticky — no invent not-use soft-skip past RHS UseVar hole
 		if sessHasError(s) {
 			return true
@@ -931,10 +864,6 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 // Expression.cpp:120–124.
 // Expression always live; sticky empty via Output (no invent soft-skip past hole).}
 
-func (e *Expression) ToString() string {
-	return e.ToStringSess(testAmbientSession)
-}
-
 // ToStringSess is ToString with explicit session residual sticky.
 func (e *Expression) ToStringSess(s *Session) string {
 	out := e.OutputOptsSess(s, sessOpts(s))
@@ -953,11 +882,6 @@ type ExprTables struct {
 
 // NewExprTables mirrors Expression::InitProbabilityTables for given options.
 // Expression.cpp:68–96.
-func NewExprTables(opts Options) *ExprTables {
-	// Construction path: residual bag unused (table always live; AddEntry only stickies nil).
-	return NewExprTablesSess(testAmbientSession, opts)
-}
-
 // NewExprTablesSess builds expr/param tables with explicit residual sticky bag.
 func NewExprTablesSess(s *Session, opts Options) *ExprTables {
 	t := &ExprTables{}
@@ -989,29 +913,25 @@ func NewExprTablesSess(s *Session, opts Options) *ExprTables {
 // Mirrors Expression::InitProbabilityTables (Expression.cpp:93–96).
 // Non-Sess InitProbabilityTables deleted — pass testAmbientSession from tests.
 func InitProbabilityTablesSess(s *Session, opts Options) *ExprTables {
-	t := NewExprTables(opts)
+	t := NewExprTablesSess(s, opts)
 	SetProcessExprTablesSess(s, t)
 	return t
 }
 
 // InitExprProbabilityTable rebuilds only the expr DistributionTable half.
 // Expression.cpp InitExprProbabilityTable path via NewExprTables.
-func InitExprProbabilityTable(opts Options) DistributionTable {
-	return NewExprTables(opts).Expr
+func InitExprProbabilityTableSess(s *Session, opts Options) DistributionTable {
+	return NewExprTablesSess(s, opts).Expr
 }
 
-// InitParamProbabilityTable rebuilds only the param DistributionTable half.
-func InitParamProbabilityTable(opts Options) DistributionTable {
-	return NewExprTables(opts).Param
+// InitParamProbabilityTableSess rebuilds only the param DistributionTable half.
+func InitParamProbabilityTableSess(s *Session, opts Options) DistributionTable {
+	return NewExprTablesSess(s, opts).Param
 }
 
 // ExpressionTypeProbability mirrors ExpressionTypeProbability.
 // Expression.cpp:103–112 — PartialExpander force eFunction when invoke expand;
 // else rnd_upto(filter.max, filter); lookup → eTermType.
-func ExpressionTypeProbability(r *Rng, filter *VectorFilter) TermType {
-	return ExpressionTypeProbabilitySess(testAmbientSession, r, filter)
-}
-
 // ExpressionTypeProbabilitySess is ExpressionTypeProbability with explicit session residual sticky.
 func ExpressionTypeProbabilitySess(s *Session, r *Rng, filter *VectorFilter) TermType {
 	// Expression.cpp:104–105 — PartialExpander::direct_expand_check(eInvoke)
@@ -1029,10 +949,6 @@ func ExpressionTypeProbabilitySess(s *Session, r *Rng, filter *VectorFilter) Ter
 
 // PickTermType builds default filters for Expression::make_random when tt==MAX.
 // Expression.cpp:160–179 (subset: no_func, no_const, depth).
-func PickTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
-	return PickTermTypeSess(testAmbientSession, r, tables, opts, typ, noFunc, noConst, exprDepth)
-}
-
 func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ *Type, noFunc, noConst bool, exprDepth int) TermType {
 	// Expression::InitProbabilityTables always live; ambient tables if arg nil
 	if tables == nil {
@@ -1095,10 +1011,6 @@ func PickTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ 
 
 // PickParamTermType mirrors Expression::make_random_param term selection.
 // Expression.cpp:244–260 — paramTable + always filter Constant.}
-
-func PickParamTermType(r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
-	return PickParamTermTypeSess(testAmbientSession, r, tables, opts, typ, exprDepth)
-}
 
 func PickParamTermTypeSess(s *Session, r *Rng, tables *ExprTables, opts Options, typ *Type, exprDepth int) TermType {
 	// Expression::InitProbabilityTables always live; ambient tables if arg nil
@@ -1215,10 +1127,6 @@ func MakeRandomParam(
 // Expression always live; sticky true (no invent not-bump soft-skip depth past hole).
 // Incomplete Function IR (nil Invoke / non-std without User) sticky true — C++ would
 // crash on get_invoke()/get_func(); no invent not-bump past holes for siblings.
-func BumpsExprDepth(e *Expression) bool {
-	return BumpsExprDepthSess(testAmbientSession, e)
-}
-
 func BumpsExprDepthSess(s *Session, e *Expression) bool {
 	if e == nil {
 		sessNoteError(s, ErrGeneric)
@@ -1802,20 +1710,12 @@ func makeExpressionVariableFlags(
 // Output is a minimal C fragment (Expression::Output + optional cast).
 // Expression.cpp:227–232 output_cast — "(type) " prefix when cast_type set.
 // Ambient ProcessOptions bridge; emit paths prefer OutputSess / OutputOptsSess.
-func (e *Expression) Output() string {
-	return e.OutputSess(testAmbientSession)
-}
-
 // OutputSess is Output with Options/sticky from an explicit session bag.
 func (e *Expression) OutputSess(s *Session) string {
 	return e.OutputOptsSess(s, sessOpts(s))
 }
 
 // OutputOpts is Output with explicit session Options (const emit / access_once / lang_cpp).
-func (e *Expression) OutputOpts(opts Options) string {
-	return e.OutputOptsSess(testAmbientSession, opts)
-}
-
 // OutputOptsSess is OutputOpts with sticky errors on bag s.
 func (e *Expression) OutputOptsSess(s *Session, opts Options) string {
 	// Expression* always live at Output; sticky no invent empty token without it
@@ -1849,20 +1749,12 @@ func (e *Expression) OutputOptsSess(s *Session, opts Options) string {
 
 // IndentedOutput mirrors Expression::indented_output.
 // Expression.cpp:133–136 — output_tab(indent) + Output.
-func (e *Expression) IndentedOutput(indent int) string {
-	return e.IndentedOutputSess(testAmbientSession, indent)
-}
-
 // IndentedOutputSess is IndentedOutput with Options/sticky from an explicit session bag.
 func (e *Expression) IndentedOutputSess(s *Session, indent int) string {
 	return e.IndentedOutputOptsSess(s, indent, sessOpts(s))
 }
 
 // IndentedOutputOpts is IndentedOutput with explicit session Options.
-func (e *Expression) IndentedOutputOpts(indent int, opts Options) string {
-	return e.IndentedOutputOptsSess(testAmbientSession, indent, opts)
-}
-
 // IndentedOutputOptsSess is IndentedOutputOpts with sticky errors on bag s.
 func (e *Expression) IndentedOutputOptsSess(s *Session, indent int, opts Options) string {
 	out := e.OutputOptsSess(s, opts)
@@ -1873,16 +1765,8 @@ func (e *Expression) IndentedOutputOptsSess(s *Session, indent int, opts Options
 	return OutputTab(indent) + out
 }
 
-func (e *Expression) outputBody() string {
-	return e.outputBodySess(testAmbientSession)
-}
-
 func (e *Expression) outputBodySess(s *Session) string {
 	return e.outputBodyOptsSess(s, sessOpts(s))
-}
-
-func (e *Expression) outputBodyOpts(opts Options) string {
-	return e.outputBodyOptsSess(testAmbientSession, opts)
 }
 
 func (e *Expression) outputBodyOptsSess(s *Session, opts Options) string {

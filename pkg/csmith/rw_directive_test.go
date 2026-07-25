@@ -78,7 +78,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// reset sid for stable-ish ids
 	currentSession().NextStmID = 0
-	b := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil block")
 	}
@@ -93,7 +93,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	opts2 := Defaults()
 	opts2.StepHashByStmt = true
 	opts2.ComputeHash = false
-	b2 := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts2, NewProbabilities(opts2), vs, NewExprTables(opts2), NewStatementThresholdTable(opts2), &cg, false)
+	b2 := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts2, NewProbabilities(opts2), vs, NewExprTablesSess(testAmbientSession, opts2), NewStatementThresholdTable(opts2), &cg, false)
 	if b2 != nil && b2.EmitStepHash {
 		t.Fatal("must not invent EmitStepHash without ComputeHash")
 	}

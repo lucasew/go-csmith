@@ -145,8 +145,8 @@ func TestRhsToLhsTransferAddrOf(t *testing.T) {
 	// ExpressionVariable with ExprType = pointer means &g_t if var is int?
 	// IndirectLevel = var.level - exprType.level; int(0) - ptr(1) = -1 → address-of
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	if rhs.IndirectLevel() != -1 {
-		t.Fatalf("indir %d", rhs.IndirectLevel())
+	if rhs.IndirectLevelSess(testAmbientSession) != -1 {
+		t.Fatalf("indir %d", rhs.IndirectLevelSess(testAmbientSession))
 	}
 	facts := RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)
 	if len(facts) != 1 || facts[0].PointTo[0] != tgt {
@@ -457,8 +457,8 @@ func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntTypeSess(testAmbientSession), false, false)
 	// int var with ** type → IndirectLevel = 0-2 = -2
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))}
-	if rhs.IndirectLevel() != -2 {
-		t.Fatalf("want indir -2 got %d", rhs.IndirectLevel())
+	if rhs.IndirectLevelSess(testAmbientSession) != -2 {
+		t.Fatalf("want indir -2 got %d", rhs.IndirectLevelSess(testAmbientSession))
 	}
 	if FactsComplete(RhsToLhsTransferSess(testAmbientSession, nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level address-of must fail closed incomplete")

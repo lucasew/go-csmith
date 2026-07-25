@@ -72,7 +72,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomArrayInit(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if st.Kind != StmtArrayOp {
 		t.Fatal(st.Kind)
 	}

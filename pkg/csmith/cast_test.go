@@ -47,7 +47,7 @@ func TestExpressionCastOutput(t *testing.T) {
 		Con:      MakeIntSess(testAmbientSession, 0),
 		CastType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)),
 	}
-	out := e.Output()
+	out := e.OutputSess(testAmbientSession)
 	// Expression.cpp:228–231 — "(type) " with trailing space
 	if !strings.Contains(out, "int32_t*") || !strings.HasPrefix(out, "(") {
 		t.Fatal(out)
@@ -113,7 +113,7 @@ func TestCheckAndSetCast(t *testing.T) {
 	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), NewCVQualifiers([]bool{false}, []bool{false}))
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
 	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
-	e.CheckAndSetCast(want)
+	e.CheckAndSetCastSess(testAmbientSession, want)
 	if GetIntTypeSess(testAmbientSession).SizeInBytesSess(testAmbientSession) != GetSimpleTypeSess(testAmbientSession, EChar).SizeInBytesSess(testAmbientSession) {
 		if e.CastType == nil {
 			t.Fatal("expected cast")
@@ -121,20 +121,20 @@ func TestCheckAndSetCast(t *testing.T) {
 	}
 	// Expression + desired Type always live; sticky no invent skip-cast soft-success
 	ClearErrorSess(testAmbientSession)
-	(*Expression)(nil).CheckAndSetCast(want)
+	(*Expression)(nil).CheckAndSetCastSess(testAmbientSession, want)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Expression CheckAndSetCast must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	e2 := &Expression{Term: TermVariable, Var: v, ExprType: PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))}
-	e2.CheckAndSetCast(nil)
+	e2.CheckAndSetCastSess(testAmbientSession, nil)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil desired CheckAndSetCast must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete GetTypeUncast sticky (no invent soft-skip cast past Type-nil shell)
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole", Type: nil}}
-	hole.CheckAndSetCast(want)
+	hole.CheckAndSetCastSess(testAmbientSession, want)
 	if hole.CastType != nil {
 		t.Fatal("Type-nil var must not invent cast")
 	}
@@ -169,12 +169,12 @@ func TestCheckAndSetCastOptsLangCPP(t *testing.T) {
 	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
 	opts := Defaults()
 	opts.LangCPP = false
-	e.CheckAndSetCastOpts(want, opts)
+	e.CheckAndSetCastOptsSess(testAmbientSession, want, opts)
 	if e.CastType != nil {
 		t.Fatal("C mode must not set cast via check_and_set_cast")
 	}
 	opts.LangCPP = true
-	e.CheckAndSetCastOpts(want, opts)
+	e.CheckAndSetCastOptsSess(testAmbientSession, want, opts)
 	if e.CastType == nil && !PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)).BaseTypeSess(testAmbientSession).IsEquivalentSess(testAmbientSession, want.BaseTypeSess(testAmbientSession)) {
 		t.Fatal("lang_cpp should set cast for inequivalent pointer bases")
 	}
@@ -186,12 +186,12 @@ func TestCheckAndSetCastViaInvokeGetType(t *testing.T) {
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "+", Args: []*Expression{arg}}
 	e := &Expression{Term: TermFunction, Invoke: fi}
 	want := PointerToSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EChar))
-	e.CheckAndSetCast(want)
-	if e.GetTypeUncast() == nil {
+	e.CheckAndSetCastSess(testAmbientSession, want)
+	if e.GetTypeUncastSess(testAmbientSession) == nil {
 		t.Fatal("uncast type")
 	}
 	// + of pointer-typed constant still pointer type via unary get_type
-	if e.CastType == nil && e.GetTypeUncast().NeedsCastSess(testAmbientSession, want) {
+	if e.CastType == nil && e.GetTypeUncastSess(testAmbientSession).NeedsCastSess(testAmbientSession, want) {
 		t.Fatal("expected cast from invoke type")
 	}
 }

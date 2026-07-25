@@ -297,7 +297,7 @@ func TestInArrayLoopFromIVBounds(t *testing.T) {
 	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 10}
-	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
+	b := MakeRandomBlock(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil || !b.InArrayLoop {
 		t.Fatal("InArrayLoop", b)
 	}
@@ -910,7 +910,7 @@ func TestPostCreationAppendsReturn(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
 	b := MakeRandomBlock(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts),
-		NewExprTables(opts), NewStatementThresholdTable(opts), &cg, false)
+		NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg, false)
 	if b == nil {
 		t.Fatal("nil")
 	}
@@ -1376,7 +1376,7 @@ func TestAppendNestedLoopBumpsBlkDepthAroundFor(t *testing.T) {
 	cg.FM = NewFactMgrSess(testAmbientSession, f)
 
 	pre := cg.BlkDepth
-	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	// Whether for succeeds or null-fails, outer depth must restore (Statement.cpp:315–317).
 	if cg.BlkDepth != pre {
 		t.Fatalf("AppendNestedLoop must restore BlkDepth: got %d want %d", cg.BlkDepth, pre)
@@ -1409,7 +1409,7 @@ func TestAppendNestedLoopUsesMakeRandomForcedFor(t *testing.T) {
 	cg.ExprDepth = 7 // leftover from prior sibling assign
 
 	preBlk := cg.BlkDepth
-	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	_ = b.AppendNestedLoop(NewRngSess(testAmbientSession, 42), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if cg.BlkDepth != preBlk {
 		t.Fatalf("BlkDepth restore after make_random(eFor): got %d want %d", cg.BlkDepth, preBlk)
 	}
@@ -1434,18 +1434,18 @@ func TestAppendNestedLoopERRORGuard(t *testing.T) {
 	f.Stack = []*Block{b}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("sticky error must not append nested for")
 	}
 	ClearErrorSess(testAmbientSession)
 	// Block.cpp always has RNG for make_random(eFor)
-	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if b.AppendNestedLoop(nil, opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("nil RNG must not invent nested for")
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete ambient must not invent nested for past holes
 	cgInc := WithFunc(f, IncompleteEffect()).WithSession(testAmbientSession)
-	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), NewStatementThresholdTable(opts), &cgInc) != nil {
+	if b.AppendNestedLoop(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cgInc) != nil {
 		t.Fatal("incomplete EffectContext must fail closed AppendNestedLoop")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1471,7 +1471,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	}
 	f := &Function{Name: "f", ReturnType: GetIntTypeSess(testAmbientSession)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
-	got := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, st)
+	got := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, st)
 	if stmtOK(got) {
 		t.Fatal("const struct assign must fail closed")
 	}
@@ -1488,7 +1488,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 		t.Fatal("fixture Type-nil field must residual IsConstStructUnion sticky true")
 	}
 	ClearErrorSess(testAmbientSession)
-	got2 := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg, hole)
+	got2 := MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg, hole)
 	if stmtOK(got2) {
 		t.Fatal("IsConstStructUnion residual must fail closed assign")
 	}
@@ -1500,7 +1500,7 @@ func TestMakeRandomAssignRejectsConstStruct(t *testing.T) {
 	optsSV := Defaults()
 	optsSV.StrictVolatileRule = true
 	SetProcessAssignOpsTableSess(testAmbientSession, NewAssignOpsTable(optsSV))
-	got3 := MakeRandomAssign(NewRngSess(testAmbientSession, 1), optsSV, NewProbabilities(optsSV), NewVariableSelector(testAmbientSession, optsSV), NewExprTables(optsSV), &cg, hole)
+	got3 := MakeRandomAssign(NewRngSess(testAmbientSession, 1), optsSV, NewProbabilities(optsSV), NewVariableSelector(testAmbientSession, optsSV), NewExprTablesSess(testAmbientSession, optsSV), &cg, hole)
 	if stmtOK(got3) {
 		t.Fatal("IsVolatileStructUnion residual must fail closed assign")
 	}

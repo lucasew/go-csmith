@@ -530,7 +530,7 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 	// cast_type + body both required sticky
 	ClearErrorSess(testAmbientSession)
 	e := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1), CastType: &Type{isStruct: true}}
-	if out := e.Output(); out != "" {
+	if out := e.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("cast with incomplete type must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -538,7 +538,7 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	e2 := &Expression{Term: TermConstant, CastType: GetIntTypeSess(testAmbientSession)}
-	if out := e2.Output(); out != "" {
+	if out := e2.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("cast with empty body must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -547,7 +547,7 @@ func TestExpressionCastNoInventEmpty(t *testing.T) {
 	// Constant with empty Value — sticky no invent empty token
 	ClearErrorSess(testAmbientSession)
 	e3 := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession), Value: ""}}
-	if out := e3.Output(); out != "" {
+	if out := e3.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("empty Constant.Value must fail closed", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -562,7 +562,7 @@ func TestExpressionCommaNoInventEmptySide(t *testing.T) {
 	good := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
 	bad := &Expression{Term: TermConstant} // nil Con → empty Output sticky
 	e := &Expression{Term: TermCommaExpr, CommaLHS: bad, CommaRHS: good}
-	if out := e.Output(); out != "" {
+	if out := e.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("empty lhs Output must fail closed comma", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -570,7 +570,7 @@ func TestExpressionCommaNoInventEmptySide(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	e.CommaLHS, e.CommaRHS = good, bad
-	if out := e.Output(); out != "" {
+	if out := e.OutputSess(testAmbientSession); out != "" {
 		t.Fatal("empty rhs Output must fail closed comma", out)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -578,7 +578,7 @@ func TestExpressionCommaNoInventEmptySide(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	e.CommaLHS, e.CommaRHS = good, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
-	if out := e.Output(); out != "(1 , 2)" {
+	if out := e.OutputSess(testAmbientSession); out != "(1 , 2)" {
 		t.Fatal(out)
 	}
 	ClearErrorSess(testAmbientSession)

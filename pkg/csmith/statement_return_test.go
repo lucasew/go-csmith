@@ -10,7 +10,7 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRngSess(testAmbientSession, 2)
 	seedTypesForTest(r, opts, probs, vs, nil)
@@ -132,7 +132,7 @@ func TestCheckAndSetCastResidualNoInventReturnShell(t *testing.T) {
 	opts := Defaults()
 	opts.LangCPP = true
 	hole := &Expression{Term: TermVariable, Var: &Variable{Name: "g_hole"}}
-	hole.CheckAndSetCastOpts(GetIntTypeSess(testAmbientSession), opts)
+	hole.CheckAndSetCastOptsSess(testAmbientSession, GetIntTypeSess(testAmbientSession), opts)
 	if hole.CastType != nil {
 		t.Fatal("GetTypeUncast residual must not invent CastType")
 	}

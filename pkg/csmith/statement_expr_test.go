@@ -9,7 +9,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	r := NewRngSess(testAmbientSession, 2)
 	var list FunctionList
@@ -23,7 +23,7 @@ func TestMakeRandomExprStmtUserCall(t *testing.T) {
 			t.Fatalf("kind %v", st.Kind)
 		}
 		if st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
-			out := st.Expr.Output()
+			out := st.Expr.OutputSess(testAmbientSession)
 			if out == "" || out == "/*bad_call*/" || out == "/*invoke*/" {
 				t.Fatal(out)
 			}
@@ -91,7 +91,7 @@ func TestMakeRandomExprStmtRollbackOnFail(t *testing.T) {
 	preEff := eff.CloneSess(testAmbientSession)
 	preFacts := CloneFactSliceSess(testAmbientSession, fm.GlobalFacts)
 	// invoke may fail or succeed; if fail, empty Stmt + state restored
-	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTables(opts), &cg)
+	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), &cg)
 	if !stmtOK(st) {
 		// rollback path (nullptr factory)
 		if st.Kind != 0 {
@@ -200,7 +200,7 @@ func TestMakeRandomExprStmtSuccessHasInvoke(t *testing.T) {
 	cg.EffectAccum = &eff
 	// try several seeds for a successful invoke stmt
 	for seed := uint64(1); seed < 40; seed++ {
-		st := MakeRandomExprStmt(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg)
+		st := MakeRandomExprStmt(NewRngSess(testAmbientSession, seed), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg)
 		if st.Expr != nil && st.Expr.Invoke != nil && !st.Expr.Invoke.Failed {
 			// Statement.cpp:364–367 — Statement ctor always assigns stm_id
 			if st.StmID == 0 {

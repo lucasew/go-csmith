@@ -80,7 +80,7 @@ func CompatibleCheckExprsSess(s *Session, opts Options, a, b *Expression) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	if a.CompatibleWithExpr(b, opts.ExpandStruct) {
+	if a.CompatibleWithExprSess(s, b, opts.ExpandStruct) {
 		// residual ERROR sticky — no invent reject-true past CompatibleWithExpr residual hole
 		if sessHasError(s) {
 			return true
@@ -91,7 +91,7 @@ func CompatibleCheckExprsSess(s *Session, opts Options, a, b *Expression) bool {
 	if sessHasError(s) {
 		return true
 	}
-	if b.CompatibleWithExpr(a, opts.ExpandStruct) {
+	if b.CompatibleWithExprSess(s, a, opts.ExpandStruct) {
 		// residual ERROR sticky — no invent reject-true past reverse CompatibleWithExpr residual
 		if sessHasError(s) {
 			return true

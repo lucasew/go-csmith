@@ -417,7 +417,7 @@ func (l *Lhs) CompatibleExprSess(s *Session, exp *Expression, expandStruct bool)
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	return exp.CompatibleWithVar(l.Var, expandStruct)
+	return exp.CompatibleWithVarSess(s, l.Var, expandStruct)
 }
 
 // Output mirrors Lhs::Output — ExpressionVariable shape, optional VOL_LVAL wrap.

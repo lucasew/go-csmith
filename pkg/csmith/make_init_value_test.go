@@ -49,7 +49,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	if e == nil || e.Term != TermVariable {
 		t.Fatal("want address-of expression within seed scan")
 	}
-	out := e.Output()
+	out := e.OutputSess(testAmbientSession)
 	// ExpressionVariable with pointer want over int var → &g_i
 	if !strings.Contains(out, "&") {
 		t.Fatalf("want & in %q (var=%s)", out, e.Var.Name)

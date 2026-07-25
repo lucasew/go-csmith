@@ -13,7 +13,7 @@ func TestMakeFirstCreatesFactMgr(t *testing.T) {
 	m := NewFactMgrMapSess(testAmbientSession)
 	list := FunctionList{}
 	seedTypesForTest(NewRngSess(testAmbientSession, 2), opts, probs, vs, &list)
-	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), &list, m)
+	f := MakeFirst(NewRngSess(testAmbientSession, 2), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &list, m)
 	if f == nil {
 		t.Fatal("nil")
 	}
@@ -386,8 +386,8 @@ func TestAbstractFactForVarInitPointerArrayInitExprs(t *testing.T) {
 		Term: TermVariable, Var: tgt, ExprType: ptType,
 	}
 	// sanity: emit is &g_x, not inventable as Constant "0"
-	if !strings.Contains(addr.Output(), "g_x") || !strings.Contains(addr.Output(), "&") {
-		t.Fatalf("addr output %q", addr.Output())
+	if !strings.Contains(addr.OutputSess(testAmbientSession), "g_x") || !strings.Contains(addr.OutputSess(testAmbientSession), "&") {
+		t.Fatalf("addr output %q", addr.OutputSess(testAmbientSession))
 	}
 	parent := &ArrayVariable{
 		Variable: Variable{

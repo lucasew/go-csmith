@@ -16,7 +16,7 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	elem := PointerToSess(testAmbientSession, PointerToSess(testAmbientSession, i32))
 	// address-of l_118 as int32_t**
 	addr := &Expression{Term: TermVariable, Var: l118, ExprType: elem}
-	if n, ok := addr.IndirectLevelComplete(); !ok || n != -1 {
+	if n, ok := addr.IndirectLevelCompleteSess(testAmbientSession); !ok || n != -1 {
 		t.Fatalf("addr-of level want -1 got %d ok=%v", n, ok)
 	}
 	q := NewCVQualifiers([]bool{false}, []bool{false})

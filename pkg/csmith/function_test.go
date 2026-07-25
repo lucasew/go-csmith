@@ -81,7 +81,7 @@ func TestMakeFirstNoParamsHasBody(t *testing.T) {
 	opts := Defaults()
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(testAmbientSession, opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	var list FunctionList
 	r := NewRngSess(testAmbientSession, 2)
@@ -144,7 +144,7 @@ func TestMakeFirstReturnBreaksEarly(t *testing.T) {
 	// With enough seeds, some bodies end early on return
 	opts := Defaults()
 	probs := NewProbabilities(opts)
-	tables := NewExprTables(opts)
+	tables := NewExprTablesSess(testAmbientSession, opts)
 	stmtTab := NewStatementThresholdTable(opts)
 	foundEarly := false
 	for seed := uint64(1); seed < 50; seed++ {
@@ -200,10 +200,10 @@ func TestMakeRandomSignatureNoInventWithoutSession(t *testing.T) {
 		t.Fatal("nil probs must not invent signature")
 	}
 	// MakeFirst same contract
-	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
+	if MakeFirst(nil, opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil, nil) != nil {
 		t.Fatal("nil RNG must not invent first")
 	}
-	if MakeFirst(NewRngSess(testAmbientSession, 2), opts, nil, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 2), opts, nil, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil, nil) != nil {
 		t.Fatal("nil probs must not invent first")
 	}
 }
@@ -219,7 +219,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	// plant incomplete GlobalList hole
 	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntTypeSess(testAmbientSession), false, false)
 	vs.GlobalList = []*Variable{g, nil}
-	if MakeFirst(NewRngSess(testAmbientSession, 3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
+	if MakeFirst(NewRngSess(testAmbientSession, 3), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -229,7 +229,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	// MakeRandomFunction same seed gate
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.Types = vs.Types
-	if MakeRandomFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
+	if MakeRandomFunction(NewRngSess(testAmbientSession, 4), opts, probs, vs, &vs.Sym, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), cg, GetIntTypeSess(testAmbientSession), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeRandomFunction")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -255,7 +255,7 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	f.Stack = []*Block{{Func: f}}
 	// sticky error before make fails early
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	st := MakeRandomFor(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg)
+	st := MakeRandomFor(NewRngSess(testAmbientSession, 3), opts, probs, vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg)
 	if st != nil && st.Loop != nil && st.Then != nil {
 		t.Fatal("sticky error should not complete for")
 	}

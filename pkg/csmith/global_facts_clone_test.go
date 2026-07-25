@@ -14,7 +14,7 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	vs := NewVariableSelector(testAmbientSession, opts)
-	if MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomFor(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomFor")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -63,7 +63,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
 	vs := NewVariableSelector(testAmbientSession, opts)
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg, GetIntTypeSess(testAmbientSession))) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,7 +73,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg2, GetIntTypeSess(testAmbientSession))) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg2, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -83,7 +83,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 	// incomplete EffectStm must not invent assign under hole shell
 	cg3 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg3.EffectStm = IncompleteEffect()
-	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3, GetIntTypeSess(testAmbientSession))) {
+	if stmtOK(MakeRandomAssign(NewRngSess(testAmbientSession, 3), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg3, GetIntTypeSess(testAmbientSession))) {
 		t.Fatal("incomplete EffectStm must fail closed MakeRandomAssign")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -157,7 +157,7 @@ func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	vs := NewVariableSelector(testAmbientSession, opts)
 	// seed a global for expression selection
 	_ = vs.GenerateNewGlobal(AccessRead, cg, GetIntTypeSess(testAmbientSession), nil, NewRngSess(testAmbientSession, 3))
-	if MakeRandomIf(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomIf(NewRngSess(testAmbientSession, 4), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomIf func_1 path")
 	}
 	ClearErrorSess(testAmbientSession)
@@ -174,7 +174,7 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	vs := NewVariableSelector(testAmbientSession, opts)
-	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg)
+	st := MakeRandomExprStmt(NewRngSess(testAmbientSession, 5), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg)
 	if st.Kind != 0 || st.StmID != 0 {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeRandomExprStmt")
 	}
@@ -186,7 +186,7 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg3 := EmptyCGContext().WithSession(testAmbientSession)
 	cg3.EffectAccum = &inc
-	st3 := MakeRandomExprStmt(NewRngSess(testAmbientSession, 6), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg3)
+	st3 := MakeRandomExprStmt(NewRngSess(testAmbientSession, 6), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg3)
 	if st3.Kind != 0 || st3.StmID != 0 {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomExprStmt")
 	}
@@ -198,7 +198,7 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	cg4 := WithFunc(nil, IncompleteEffect()).WithSession(testAmbientSession)
 	eff4 := EmptyEffect()
 	cg4.EffectAccum = &eff4
-	st4 := MakeRandomExprStmt(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), vs, NewExprTables(opts), &cg4)
+	st4 := MakeRandomExprStmt(NewRngSess(testAmbientSession, 7), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), &cg4)
 	if st4.Kind != 0 || st4.StmID != 0 {
 		t.Fatal("incomplete EffectContext must fail closed MakeRandomExprStmt")
 	}
@@ -324,7 +324,7 @@ func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeRandomIf(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg) != nil {
+	if MakeRandomIf(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomIf")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -333,7 +333,7 @@ func TestMakeRandomIfForIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg2.EffectAccum = &inc
-	if MakeRandomFor(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), &cg2) != nil {
+	if MakeRandomFor(NewRngSess(testAmbientSession, 2), opts, NewProbabilities(opts), vs, NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTable(opts), &cg2) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeRandomFor")
 	}
 	if !HasErrorSess(testAmbientSession) {
