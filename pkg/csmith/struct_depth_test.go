@@ -114,9 +114,9 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 
 func TestVolRValEmit(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, true)
 	v.UseVolRVal = true
-	out := v.OutputC()
+	out := v.OutputCSess(testAmbientSession, false)
 	if out != "VOL_RVAL(g_1, int32_t)" {
 		t.Fatal(out)
 	}

@@ -20,9 +20,9 @@ func TestOrderedBinaryMergeMakeupUnionInitLast0(t *testing.T) {
 		{Name: "f2", Type: GetIntType(), BitWidth: -1},
 		{Name: "f3", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_ord", ut, false, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_ord", ut, false, false)
 	parent.Init = MakeInt(0) // union init abstract → last=0 (f0)
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	liveU := MakeFactUnion(parent, 3)
 	if liveU == nil {
 		t.Fatal("live")
@@ -71,9 +71,9 @@ func TestOrderedBinaryNilSnapshotStillMakeupMerge(t *testing.T) {
 		{Name: "f2", Type: GetIntType(), BitWidth: -1},
 		{Name: "f3", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_nil", ut, false, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_nil", ut, false, false)
 	parent.Init = MakeInt(0)
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	liveU := MakeFactUnion(parent, 3)
 	if liveU == nil {
 		t.Fatal("live")

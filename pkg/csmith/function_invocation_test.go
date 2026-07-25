@@ -69,7 +69,7 @@ func TestMakeRandomBinaryInvocationIncompleteEffectFailClosed(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
@@ -180,7 +180,7 @@ func TestMakeRandomBinaryInvocationMergesLhsEffect(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
@@ -281,7 +281,7 @@ func TestGenerateNewParentLocal(t *testing.T) {
 	r := NewRng(2)
 	blk := &Block{}
 	v := vs.GenerateNewParentLocal(blk, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
-	if v == nil || !v.IsLocal() || len(blk.LocalVars) != 1 {
+	if v == nil || !v.IsLocalSess(testAmbientSession) || len(blk.LocalVars) != 1 {
 		t.Fatalf("%+v", v)
 	}
 }

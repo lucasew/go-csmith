@@ -6,7 +6,7 @@ import (
 
 func TestSameFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	a := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	b := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	if !SameFacts(a, b) {
@@ -67,7 +67,7 @@ func TestSameFacts(t *testing.T) {
 
 func TestSubsetFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// wider set implies narrower
 	wide := []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, GarbagePtr})}
 	narrow := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -144,11 +144,11 @@ func TestSameFactVec(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_sfv", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_sfv", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	u0 := MakeFactUnion(parent, 0)
 	u1 := MakeFactUnion(parent, 1)
-	pvar := CreateVariableScalars("g_p_sfv", PointerTo(GetIntType()), false, false)
+	pvar := CreateVariableScalarsSess(testAmbientSession, "g_p_sfv", PointerTo(GetIntType()), false, false)
 	pt := []*FactPointTo{MakeFactPointTo(pvar, NullPtr)}
 	if !SameFactVec(pt, []*FactUnion{u0}, pt, []*FactUnion{MakeFactUnion(parent, 0)}) {
 		t.Fatal("same full vec")
@@ -167,8 +167,8 @@ func TestShortcutAnalysisSameFactVecUnionMismatch(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_scu", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_scu", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	entryU := MakeFactUnion(parent, 0)
 	liveU := MakeFactUnion(parent, 1)
 	if entryU == nil || liveU == nil {
@@ -206,8 +206,8 @@ func TestShortcutAnalysisInstallsOutUnions(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_sc", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_sc", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	entryU := MakeFactUnion(parent, 0)
 	outU := MakeFactUnion(parent, 1)
 	if entryU == nil || outU == nil {
@@ -244,8 +244,8 @@ func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_vin2", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_vin2", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	pre := MakeFactUnion(parent, 0)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.UnionFacts = []*FactUnion{pre}
@@ -265,7 +265,7 @@ func TestValidateAndUpdateFactsMapInKeepsPreUnions(t *testing.T) {
 }
 
 func TestShortcutAnalysisReuse(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 5, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -354,7 +354,7 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 
 func TestShortcutConflict(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_x", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 3}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	facts := []*FactPointTo{}
@@ -374,7 +374,7 @@ func TestShortcutConflict(t *testing.T) {
 
 func TestValidateAndUpdateFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(2)}, AssignOp: AssignSimple,
@@ -398,7 +398,7 @@ func TestValidateAndUpdateFacts(t *testing.T) {
 
 func TestValidateAndUpdateFactsMarksContainedGotos(t *testing.T) {
 	// Statement.cpp:580–595 — shortcut reuse marks gotos inside tree visited
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	gotoSt := Stmt{Kind: StmtGoto, StmID: 20, GotoDestStmID: 10}
 	// for-like compound with nested goto
 	loop := &Stmt{
@@ -465,7 +465,7 @@ func TestMarkContainedGotosVisitedCFGHoleNoPartial(t *testing.T) {
 
 func TestCGContextAddEffect(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -524,12 +524,12 @@ func TestContainsStmt(t *testing.T) {
 func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 	// Statement.cpp:609–626 — remove_rv_facts; map_visited even when visit fails
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
 	f.RV.Name = "func_1_rv"
-	otherRV := CreateVariableScalars("func_2_rv", GetIntType(), false, false)
+	otherRV := CreateVariableScalarsSess(testAmbientSession, "func_2_rv", GetIntType(), false, false)
 	otherRV.Name = "func_2_rv"
 	// mark as RVs via naming convention used by IsRV
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 42, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -574,7 +574,7 @@ func TestStmVisitFactsRemoveRVAndAlwaysVisited(t *testing.T) {
 
 func TestStmVisitFactsMarksVisitedOnFail(t *testing.T) {
 	// visit fail (write IV) still marks visited per C++ stm_visit_facts
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 77, LhsVar: iv, Lhs: &Lhs{Var: iv, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}, AssignOp: AssignSimple,
@@ -637,9 +637,9 @@ func TestContainsUnfixedGotoFindStmtResidualSticky(t *testing.T) {
 func TestContainsUnfixedGotoImply(t *testing.T) {
 	// Statement.cpp:797–800 — dest fact not imply jump_src → unfixed
 	f := &Function{Name: "f"}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	// dest in: p→{a}; jump src out: p→{a,b} — dest does not imply src (narrower dest
 	// imply wider src? Imply is other ⊆ this, so dest.Imply(src) means src ⊆ dest.
 	// C++: !f->imply(*jump_src_f) with f = dest in, jump_src = src out.
@@ -707,9 +707,9 @@ func TestContainsUnfixedGotoInboundFromOutside(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	// body: assign (label target) then later for that holds the goto
 	body := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 10, SourceLabel: "lbl"},
@@ -768,8 +768,8 @@ func TestContainsUnfixedGotoUnionImply(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	u := CreateVariableScalars("g_u", ut, false, false)
-	u.CreateFieldVars()
+	u := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
+	u.CreateFieldVarsSess(testAmbientSession)
 	body := &Block{Func: f, Stmts: []Stmt{
 		{Kind: StmtAssign, StmID: 10, SourceLabel: "lbl"},
 		{Kind: StmtGoto, StmID: 20, Label: "lbl", GotoDestStmID: 10},
@@ -831,7 +831,7 @@ func TestShortcutAnalysisBlockUnfixedGoto(t *testing.T) {
 func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 	// Fact* always live; incomplete working set sticky (no invent visit success)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 88, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -856,7 +856,7 @@ func TestStmVisitFactsIncompleteInputFailClosed(t *testing.T) {
 func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 	// incomplete pre-visit inputs sticky (no invent set_fact_in from cleaned clone)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -881,7 +881,7 @@ func TestValidateAndUpdateFactsIncompleteInputFailClosed(t *testing.T) {
 func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 	// Statement.cpp:559 — inputs = map_facts_out[this]
 	// C++ map[] default-inserts empty FactVec; missing key is not fail-closed None.
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -905,8 +905,8 @@ func TestShortcutAnalysisMissingOutIsEmpty(t *testing.T) {
 func TestShortcutAnalysisIncompleteOutFailClosed(t *testing.T) {
 	// nil fact hole in MapFactsOut — no invent clone-to-nil while ShortcutOK
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 8, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -948,7 +948,7 @@ func TestShortcutAnalysisBlockMissingOutIsEmpty(t *testing.T) {
 }
 
 func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	body := &Block{StmID: 70, Stmts: []Stmt{{Kind: StmtAssign, StmID: 71}}}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
@@ -969,7 +969,7 @@ func TestShortcutAnalysisBlockIncompleteOutFailClosed(t *testing.T) {
 func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 	// incomplete map_stm_effect / accum must not invent ShortcutOK
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -998,7 +998,7 @@ func TestShortcutAnalysisIncompleteEffectFailClosed(t *testing.T) {
 func TestStmVisitFactsIncompleteAccumFailClosed(t *testing.T) {
 	// incomplete EffectAccum must not invent StmVisitFacts true while recording map_accum
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 90, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,

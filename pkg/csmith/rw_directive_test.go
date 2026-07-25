@@ -6,8 +6,8 @@ import (
 )
 
 func TestIsNonReadableWritable(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	rw := &RWDirective{
 		NoReadVars:  []*Variable{a},
 		NoWriteVars: []*Variable{b},
@@ -27,7 +27,7 @@ func TestIsNonReadableMatchResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	hole := &Variable{Name: "g_hole"} // Type nil
-	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{hole, good}})
 	if !cg.IsNonReadable(good) {
 		t.Fatal("Match residual must fail closed nonreadable, not invent later readable skip")
@@ -39,7 +39,7 @@ func TestIsNonReadableMatchResidualSticky(t *testing.T) {
 }
 
 func TestIVBoundNonWritable(t *testing.T) {
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 10)
 	if !cg.IsNonWritable(iv) {
@@ -58,7 +58,7 @@ func TestIVBoundNonWritable(t *testing.T) {
 }
 
 func TestIsEligibleNonReadable(t *testing.T) {
-	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{v}})
 	if IsEligibleVar(v, 0, AccessRead, cg) {
 		t.Fatal("no read")
@@ -74,7 +74,7 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	// reset sid for stable-ish ids
 	currentSession().NextStmID = 0

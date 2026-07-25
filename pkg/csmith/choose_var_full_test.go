@@ -6,8 +6,8 @@ import (
 )
 
 func TestChooseVarFullInvalidVars(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	// invalid_vars contains a → only b
 	got := ChooseVarFull(NewRng(2), []*Variable{a, b}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, []*Variable{a}, false, false, false)
@@ -17,9 +17,9 @@ func TestChooseVarFullInvalidVars(t *testing.T) {
 }
 
 func TestChooseVarFullNoBitfield(t *testing.T) {
-	bf := CreateVariableScalars("g_bf", GetIntType(), false, false)
+	bf := CreateVariableScalarsSess(testAmbientSession, "g_bf", GetIntType(), false, false)
 	bf.IsBitfield = true
-	ok := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	ok := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
 	got := ChooseVarFull(NewRng(3), []*Variable{bf, ok}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, true, false, false)
 	if got != ok {
@@ -36,11 +36,11 @@ func TestChooseVarFullNoUnion(t *testing.T) {
 			{Name: "f1", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 1 {
 		t.Fatal("need fields")
 	}
-	plain := CreateVariableScalars("g_p", GetIntType(), false, false)
+	plain := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), false, false)
 	// expand would surface union fields; noUnion must reject them
 	got := ChooseVarFull(NewRng(5), []*Variable{uv, plain}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, false, true)
@@ -57,7 +57,7 @@ func TestChooseVarFullNoExpandKeepsStruct(t *testing.T) {
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	// no expand + want int → struct itself does not match int
 	got := ChooseVarFull(NewRng(1), []*Variable{sv}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, true, false)
@@ -77,8 +77,8 @@ func TestChooseVarFullAmbientResidualSticky(t *testing.T) {
 	// Soft invent was soft-continue choose then pick later good. Fair: sticky fail closed whole choose.
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	SetErrorSess(testAmbientSession, ErrGeneric)
 	if ChooseVarFull(NewRng(2), []*Variable{a, b}, AccessRead, EmptyCGContext().WithSession(testAmbientSession),
 		GetIntType(), nil, MatchFlexible, nil, false, false, false) != nil {
@@ -99,15 +99,15 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 			{Name: "f1", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	// nil facts → hash all (HashOutput path)
-	all := uv.HashOutput()
+	all := uv.HashOutputSess(testAmbientSession)
 	if !strings.Contains(all, "g_u.f0") || !strings.Contains(all, "g_u.f1") {
 		t.Fatal(all)
 	}
 	// last write f0 only
 	facts := []*FactUnion{MakeFactUnion(uv, 0)}
-	out := uv.HashOutputWithUnionFacts(facts)
+	out := uv.HashOutputWithUnionFactsSess(testAmbientSession, facts)
 	if !strings.Contains(out, "g_u.f0") {
 		t.Fatal("want f0", out)
 	}
@@ -117,7 +117,7 @@ func TestHashOutputWithUnionFactsSkipsUnread(t *testing.T) {
 	// incomplete UnionFacts residual: soft invent was soft-skip unreadable then partial hash.
 	// Fair: sticky fail closed empty whole hash.
 	ClearErrorSess(testAmbientSession)
-	if s := uv.HashOutputWithUnionFacts(IncompleteUnionFactSlice()); s != "" {
+	if s := uv.HashOutputWithUnionFactsSess(testAmbientSession, IncompleteUnionFactSlice()); s != "" {
 		t.Fatal("incomplete UnionFacts HashOutput must fail closed empty", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -137,8 +137,8 @@ func TestRecordPointerAvailForDeref(t *testing.T) {
 
 func TestChooseVarFromOKPreferDeref(t *testing.T) {
 	// VariableSelector.cpp:459–471 — among ok with size>1, prefer higher indirection
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
-	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	pv := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	opts := Defaults()
 	// multiple seeds: always prefer pointer when both match want int
 	for seed := uint64(1); seed < 20; seed++ {
@@ -151,8 +151,8 @@ func TestChooseVarFromOKPreferDeref(t *testing.T) {
 
 func TestChooseVarFromOKPreferAddressOf(t *testing.T) {
 	// VariableSelector.cpp:484–514 — want pointer, prefer lower-indirection (take address)
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
-	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	pv := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	want := PointerTo(GetIntType())
 	opts := Defaults()
 	for seed := uint64(1); seed < 20; seed++ {
@@ -172,12 +172,12 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 1 {
 		t.Fatal("fields")
 	}
 	f0 := uv.FieldVars[0]
-	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	pv := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	want := PointerTo(GetIntType())
 	opts := Defaults()
 	opts.TakeUnionFieldAddr = false
@@ -198,7 +198,7 @@ func TestChooseVarFromOKNoUnionFieldAddr(t *testing.T) {
 
 func TestChooseVarFromOKSingleNoBias(t *testing.T) {
 	// size==1 skips bias paths
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	got := chooseVarFromOK(NewRng(1), GetIntType(), []*Variable{iv}, Defaults())
 	if got != iv {
 		t.Fatal(got)
@@ -212,7 +212,7 @@ func TestChooseVarFromOKIsInsideUnionFieldResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
-	pv := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	pv := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	want := PointerTo(GetIntType())
 	opts := Defaults()
 	opts.TakeUnionFieldAddr = false

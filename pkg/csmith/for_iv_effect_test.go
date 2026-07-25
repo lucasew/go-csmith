@@ -26,8 +26,8 @@ func TestMakeIterationEffectStmReadsAndWritesIV(t *testing.T) {
 		{Name: "f7", Type: GetIntType(), BitWidth: -1},
 		{Name: "f8", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_s", st, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", st, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) < 9 {
 		t.Fatal("need f8")
 	}

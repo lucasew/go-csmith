@@ -20,7 +20,7 @@ func TestEagerCreateGlobalStruct(t *testing.T) {
 	v := vs.EagerCreateGlobalStruct(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), &q, NewRng(5), MatchFlexible)
 	// may fail if no int fields
 	if v != nil && v.Type != nil {
-		if !GetIntType().Match(v.Type, MatchFlexible) {
+		if !GetIntType().MatchSess(testAmbientSession, v.Type, MatchFlexible) {
 			t.Log("matched", v.Type.CName())
 		}
 	}
@@ -45,8 +45,8 @@ func TestSelectGlobalExpandStructPath(t *testing.T) {
 }
 
 func TestMergeEffectsMergesReads(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().ReadVarSess(testAmbientSession, b)
 	m := MergeEffectsSess(testAmbientSession, e1, e2)
@@ -89,7 +89,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
-	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("no fields")
 	}
@@ -149,7 +149,7 @@ func TestExpandStructUnionVars(t *testing.T) {
 	// Fair: sticky IncompleteVariables whole expand.
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	child := &Variable{Name: "g_arr.f0", Type: GetIntType(), FieldVarOf: shell}
-	good := CreateVariableScalars("g_1", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if VariablesComplete(ExpandStructUnionVars([]*Variable{child, good}, GetIntType())) {
 		t.Fatal("IsVirtual ancestry residual must fail closed incomplete, not invent later good")
 	}
@@ -180,7 +180,7 @@ func TestEagerCreateLocalStruct(t *testing.T) {
 	if len(blk.LocalVars) == 0 {
 		t.Fatal("no local created")
 	}
-	if v != nil && v.Type != nil && !GetIntType().Match(v.Type, MatchFlexible) {
+	if v != nil && v.Type != nil && !GetIntType().MatchSess(testAmbientSession, v.Type, MatchFlexible) {
 		t.Log("field", v.Name, v.Type.CName())
 	}
 }

@@ -6,8 +6,8 @@ import (
 )
 
 func TestOutputValueDumpSimple(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	out := v.OutputValueDump("checksum ", 1, nil)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	out := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil)
 	// int may be %d or %lld depending on platform SizeInBytes
 	if !strings.Contains(out, "checksum g_1 = %") || !strings.Contains(out, ", g_1);") {
 		t.Fatal(out)
@@ -21,10 +21,10 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	v := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	f0 := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: v}
 	v.FieldVars = []*Variable{nil, f0}
-	if s := v.OutputValueDump("checksum ", 1, nil); s != "" {
+	if s := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil); s != "" {
 		t.Fatal("nil FieldVars hole must fail closed whole dump, not soft-skip", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -35,13 +35,13 @@ func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "a", Type: GetIntType(), BitWidth: -1},
 	}}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if uv == nil {
 		t.Fatal("create union")
 	}
 	uv.FieldVars = []*Variable{nil}
 	facts := []*FactUnion{MakeFactUnion(uv, 0)}
-	if s := uv.OutputValueDump("c ", 1, facts); s != "" {
+	if s := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, facts); s != "" {
 		t.Fatal("nil union FieldVars hole must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -59,8 +59,8 @@ func TestOutputValueDumpStructFields(t *testing.T) {
 			{Name: "f1", Type: GetSimpleType(EUInt), BitWidth: -1},
 		},
 	}
-	v := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
-	out := v.OutputValueDump("checksum ", 1, nil)
+	v := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	out := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil)
 	if !strings.Contains(out, "g_s.f0") || !strings.Contains(out, "g_s.f1") {
 		t.Fatal(out)
 	}
@@ -78,13 +78,13 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 			{Name: "f1", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	// no facts → nothing readable
-	if s := uv.OutputValueDump("c ", 1, nil); s != "" {
+	if s := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, nil); s != "" {
 		t.Fatal("empty facts should dump no union fields", s)
 	}
 	facts := []*FactUnion{MakeFactUnion(uv, 0)}
-	out := uv.OutputValueDump("c ", 1, facts)
+	out := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, facts)
 	if !strings.Contains(out, "g_u.f0") {
 		t.Fatal(out)
 	}
@@ -94,7 +94,7 @@ func TestOutputValueDumpUnionReadable(t *testing.T) {
 	// incomplete UnionFacts residual: soft invent was soft-skip unreadable then partial dump.
 	// Fair: sticky fail closed empty whole dump.
 	ClearErrorSess(testAmbientSession)
-	if s := uv.OutputValueDump("c ", 1, IncompleteUnionFactSlice()); s != "" {
+	if s := uv.OutputValueDumpSess(testAmbientSession, "c ", 1, IncompleteUnionFactSlice()); s != "" {
 		t.Fatal("incomplete UnionFacts OutputValueDump must fail closed empty", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -113,14 +113,14 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 		Sizes: []int{2},
 	}
 	av.AsArray = av
-	out := av.Variable.OutputValueDump("c ", 1, nil)
+	out := av.Variable.OutputValueDumpSess(testAmbientSession, "c ", 1, nil)
 	if !strings.Contains(out, "g_a[0]") || !strings.Contains(out, "g_a[1]") {
 		t.Fatal(out)
 	}
 	// IsArray without AsArray soft invent was scalar printf path
 	ClearErrorSess(testAmbientSession)
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if shell.OutputValueDump("c ", 1, nil) != "" {
+	if shell.OutputValueDumpSess(testAmbientSession, "c ", 1, nil) != "" {
 		t.Fatal("IsArray without AsArray OutputValueDump must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -132,14 +132,14 @@ func TestOutputValueDumpArrayExpand(t *testing.T) {
 func TestOutputValueDumpTypeNilSticky(t *testing.T) {
 	// Variable + Type always live at dump; sticky no invent empty dump past Type-nil shell
 	ClearErrorSess(testAmbientSession)
-	if (&Variable{Name: "g_broken"}).OutputValueDump("c ", 0, nil) != "" {
+	if (&Variable{Name: "g_broken"}).OutputValueDumpSess(testAmbientSession, "c ", 0, nil) != "" {
 		t.Fatal("Type-nil OutputValueDump must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Type-nil OutputValueDump must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if outputValueDumpArray(&Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil) != "" {
+	if outputValueDumpArraySess(testAmbientSession, &Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil) != "" {
 		t.Fatal("Type-nil outputValueDumpArray must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -174,7 +174,7 @@ func TestOutputValueDumpArrayPrintfDirectiveResidualSticky(t *testing.T) {
 	// Force residual from PrintfDirective path: nil Type field already sticky earlier.
 	// Use Type-nil field Variable which stickies before PrintfDirective.
 	f0.Type = nil
-	if av.Variable.OutputValueDump("c ", 1, nil) != "" {
+	if av.Variable.OutputValueDumpSess(testAmbientSession, "c ", 1, nil) != "" {
 		t.Fatal("Type-nil field must fail closed array dump, not invent later field")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -218,7 +218,7 @@ func TestBlindCheckGlobalMain(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	g.GenerateAllTypes()
 	// seed simple global
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	g.VS.GlobalList = []*Variable{v}
 	g.GenerateFunctions()
 	main := g.OutputMain()

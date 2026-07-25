@@ -7,8 +7,8 @@ import (
 
 func TestAddExternalEffectWithCallers(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
 	// other has global + local write
@@ -62,7 +62,7 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 	// fair: StackScanComplete false → OOS true sticky
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p, nil}
 	body := &Block{Func: f, LocalVars: nil}
 	if f.IsVarVisible(p, body) {
@@ -98,7 +98,7 @@ func TestIsVarOOSIncompleteStackFailClosed(t *testing.T) {
 func TestAddVisibleEffectUsesChain(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "func_1"}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	if loc == nil {
 		t.Fatal("loc")
 	}
@@ -117,8 +117,8 @@ func TestAddVisibleEffectUsesChain(t *testing.T) {
 }
 
 func TestOutputVariableList(t *testing.T) {
-	a := CreateVariableScalars("g_b", GetIntType(), true, false)
-	b := CreateVariableScalars("g_a", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
 	out := OutputVariableList([]*Variable{a, b}, "  ", true)
 	// Variable.cpp:858–860 — vector order (no invent name-sort)
 	ia := strings.Index(out, "g_a")
@@ -164,7 +164,7 @@ func TestOutputVariableList(t *testing.T) {
 }
 
 func TestOutputGlobalVariables(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	out := OutputGlobalVariables([]*Variable{v})
 	if !strings.Contains(out, "GLOBAL VARIABLES") || !strings.Contains(out, "g_1") {
 		t.Fatal(out)

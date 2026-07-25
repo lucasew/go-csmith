@@ -39,8 +39,8 @@ func TestChooseVarFullUsesProcessMatchExact(t *testing.T) {
 	po.MatchExactQualifiers = true
 	SetProcessOptionsSess(testAmbientSession, po)
 
-	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
-	plain := CreateVariableScalars("g_p", GetIntType(), false, false)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	plain := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), false, false)
 	// const qfer wants exact match — volatile var should fail
 	q := NewCVQualifiers([]bool{true}, []bool{false})
 	cg := EmptyCGContext().WithSession(testAmbientSession)
@@ -118,14 +118,14 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 			nil,
 		},
 	}
-	if VariablesComplete(sv.FindPointerFields()) {
+	if VariablesComplete(sv.FindPointerFieldsSess(testAmbientSession)) {
 		t.Fatal("nil FieldVars hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil FieldVars FindPointerFields must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if VariablesComplete(((*Variable)(nil)).FindPointerFields()) {
+	if VariablesComplete(((*Variable)(nil)).FindPointerFieldsSess(testAmbientSession)) {
 		t.Fatal("nil subject FindPointerFields must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -141,7 +141,7 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 			{Name: "s2.p", Type: PointerTo(GetIntType())},
 		},
 	}
-	gotTy := tyNil.FindPointerFields()
+	gotTy := tyNil.FindPointerFieldsSess(testAmbientSession)
 	if VariablesComplete(gotTy) {
 		t.Fatal("Type-nil field must fail closed incomplete, not soft-skip complete", gotTy)
 	}
@@ -163,7 +163,7 @@ func TestFindPointerFieldsNilHole(t *testing.T) {
 		},
 	}
 	// nestHole Type is aggregate - IsAggregate true, recurse FindPointerFields hits Type-nil field
-	gotNest := outer.FindPointerFields()
+	gotNest := outer.FindPointerFieldsSess(testAmbientSession)
 	if VariablesComplete(gotNest) {
 		t.Fatal("nested residual FindPointerFields must fail closed incomplete", gotNest)
 	}
@@ -180,8 +180,8 @@ func TestFindPointerFields(t *testing.T) {
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	// inject a pointer field if none
-	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
-	ptrs := sv.FindPointerFields()
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	ptrs := sv.FindPointerFieldsSess(testAmbientSession)
 	// may be empty for random struct
 	_ = ptrs
 	// manual: struct with pointer field
@@ -190,7 +190,7 @@ func TestFindPointerFields(t *testing.T) {
 	parent := &Variable{Name: "g_u", Type: &Type{isStruct: true, StructName: "S"}}
 	pf := &Variable{Name: "g_u.f0", Type: pt, FieldVarOf: parent}
 	parent.FieldVars = []*Variable{pf}
-	got := parent.FindPointerFields()
+	got := parent.FindPointerFieldsSess(testAmbientSession)
 	if len(got) != 1 || got[0] != pf {
 		t.Fatal(got)
 	}
@@ -201,7 +201,7 @@ func TestAbstractFactAggregatePointerFields(t *testing.T) {
 	parent := &Variable{Name: "g_s", Type: &Type{isStruct: true}}
 	pf := &Variable{Name: "g_s.f0", Type: pt, FieldVarOf: parent}
 	parent.FieldVars = []*Variable{pf}
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	// address-of style: indirect -1 on tgt would need expr; use null const
 	rhs = &Expression{Term: TermConstant, Con: &Constant{Type: pt, Value: "0"}}
@@ -219,7 +219,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 	// missing body in must not invent keep prior GlobalFacts
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtAssign}}}
 	forSt := &Stmt{Kind: StmtFor, StmID: 9, Then: body}
@@ -243,7 +243,7 @@ func TestPostLoopAnalysisMissingBodyInFailClosed(t *testing.T) {
 func TestPostLoopAnalysisIncompleteBodyInFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	body := &Block{StmID: 11, Stmts: []Stmt{{Kind: StmtAssign}}}
 	fm.MapFactsIn = map[int][]*FactPointTo{
@@ -261,8 +261,8 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	// merge_jump_facts always; incomplete break out fails closed
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
 	body := &Block{StmID: 12, BreakStmIDs: []int{22}, Stmts: []Stmt{{Kind: StmtAssign}}}
 	fm.SetMapFactsIn(12, pre)
@@ -276,7 +276,7 @@ func TestPostLoopAnalysisIncompleteBreakOutFailClosed(t *testing.T) {
 	}
 	// incomplete first break must not invent continue-merge later complete break
 	// via FactsComplete(nil)==true after wipe
-	c := CreateVariableScalars("g_c", GetIntType(), false, false)
+	c := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), false, false)
 	body2 := &Block{StmID: 13, BreakStmIDs: []int{30, 31}, Stmts: []Stmt{{Kind: StmtAssign}}}
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.SetMapFactsIn(13, pre)
@@ -295,8 +295,8 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 	// incomplete map_facts_in[body] must not invent RestoreFacts(pre) on must_return
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
 	body := &Block{StmID: 14, Stmts: []Stmt{{Kind: StmtReturn}}}
 	fm.MapFactsIn = map[int][]*FactPointTo{
@@ -313,8 +313,8 @@ func TestPostLoopAnalysisIncompleteBodyInNoMustReturnRestore(t *testing.T) {
 func TestPostLoopAnalysisMustReturn(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	body := &Block{StmID: 10, Stmts: []Stmt{{Kind: StmtReturn}}}
@@ -331,8 +331,8 @@ func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 	// MustReturn residual soft invent was soft-continue break-merge invent complete GlobalFacts.
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
 	// complete map_facts_in so we reach MustReturn
 	body := &Block{
@@ -354,9 +354,9 @@ func TestPostLoopAnalysisMustReturnResidualSticky(t *testing.T) {
 func TestPostLoopAnalysisBreakMerge(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, a)}
 	body := &Block{
 		StmID:       10,

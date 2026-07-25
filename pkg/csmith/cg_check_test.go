@@ -8,7 +8,7 @@ func TestCheckReadVarBasic(t *testing.T) {
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &eff
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if !cg.CheckReadVar(v, nil) {
 		t.Fatal("read ok")
 	}
@@ -18,7 +18,7 @@ func TestCheckReadVarBasic(t *testing.T) {
 }
 
 func TestCheckReadVarNonReadable(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{v}})
 	if cg.CheckReadVar(v, nil) {
 		t.Fatal("should reject")
@@ -26,7 +26,7 @@ func TestCheckReadVarNonReadable(t *testing.T) {
 }
 
 func TestCheckWriteVarConst(t *testing.T) {
-	v := CreateVariableScalars("g_c", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if cg.CheckWriteVar(v, nil) {
 		t.Fatal("const write")
@@ -43,12 +43,12 @@ func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
 		Sizes: []int{2},
 	}
 	parent.AsArray = parent
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	item := parent.ItemizeConstIndices([]int{0}, nil)
 	if item == nil {
 		t.Fatal("itemize")
 	}
-	item.CreateFieldVars()
+	item.CreateFieldVarsSess(testAmbientSession)
 	if len(item.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
@@ -72,7 +72,7 @@ func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
 	// force path on incomplete EffectStm must SetError (no invent silent grow)
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectStm = IncompleteEffect()
-	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
 	cg2.WriteVar(v)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("WriteVar incomplete EffectStm must SetError")
@@ -88,7 +88,7 @@ func TestCheckWriteVarIncompleteCollectiveFailClosed(t *testing.T) {
 }
 
 func TestCheckWriteVarIVBound(t *testing.T) {
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(iv, 10)
 	if cg.CheckWriteVar(iv, nil) {
@@ -97,7 +97,7 @@ func TestCheckWriteVarIVBound(t *testing.T) {
 }
 
 func TestCheckReadVarVolatileNeedsSEFree(t *testing.T) {
-	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
 	// non-SE-free context rejects volatile read
 	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)
 	if cg.CheckReadVar(v, nil) {
@@ -111,7 +111,7 @@ func TestCheckReadVarVolatileNeedsSEFree(t *testing.T) {
 }
 
 func TestCheckWriteVarPartialConflict(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	eff := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	cg := WithEffectContext(eff).WithSession(testAmbientSession)
 	if cg.CheckWriteVar(v, nil) {
@@ -127,7 +127,7 @@ func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 	// CGOptions has dead_pointer_dereference_prob only (no dual DanglingPtrDerefProb invent)
 	prev := ProcessOptionsSess(testAmbientSession)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// default dead prob 0 → dangling reject
@@ -146,7 +146,7 @@ func TestCheckReadVarDanglingUsesProcessDeadProb(t *testing.T) {
 }
 
 func TestVisitFactsLhsScalar(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
@@ -160,7 +160,7 @@ func TestVisitFactsLhsScalar(t *testing.T) {
 }
 
 func TestVisitFactsExpressionVariableAddrBitfield(t *testing.T) {
-	v := CreateVariableScalars("g_bf", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_bf", GetIntType(), false, false)
 	v.IsBitfield = true
 	// address-of bitfield: ExprType pointer → ind -1
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
@@ -190,7 +190,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsValidPtr residual soft invent was soft-continue visit invent success.
 	// Fair: sticky false. deref>0 + incomplete facts.
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	lhsPtr := &Lhs{Var: p, Type: GetIntType()} // *p
 	cgPtr := EmptyCGContext().WithSession(testAmbientSession)
 	cgPtr.EffectStm = EmptyEffect()
@@ -208,7 +208,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	cgMod := EmptyCGContext().WithSession(testAmbientSession)
 	cgMod.EffectStm = IncompleteEffect()
 	cgMod.FM = NewFactMgrSess(testAmbientSession, nil)
-	cgMod.FM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, CreateVariableScalars("g_t", GetIntType(), false, false))}
+	cgMod.FM.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false))}
 	if cgMod.VisitFactsLhs(lhsPtr, Defaults()) {
 		t.Fatal("PtrModified residual VisitFactsLhs must fail closed false")
 	}
@@ -217,7 +217,7 @@ func TestVisitFactsLhsNoInventIncomplete(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete EffectStm/accum sticky via CheckWriteVar
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	cg2 := EmptyCGContext().WithSession(testAmbientSession)
 	cg2.EffectStm = IncompleteEffect()
@@ -245,7 +245,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 	opts := Defaults()
 	opts.NullPointerDerefProb = 0
 	opts.DeadPointerDerefProb = 0
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -260,7 +260,7 @@ func TestReadPointedNullRejected(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// CheckReadVar residual soft invent was soft-continue later pointees invent success.
 	// Fair: sticky false. pointee with incomplete EffectStm stickies CheckReadVar residual.
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	fm2 := NewFactMgrSess(testAmbientSession, nil)
 	fm2.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	cg2 := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm2)
@@ -280,8 +280,8 @@ func TestAccessDerefVolatile(t *testing.T) {
 	// strict rule: volatile after deref clears SE-free
 	// IsVolatiles layout: index len-deref-1; for deref=1 need volatiles[0]=true
 	q := NewCVQualifiers([]bool{false, false}, []bool{true, false})
-	v := CreateVariableQfer("g_p", PointerTo(GetIntType()), q)
-	if !v.IsVolatileAfterDeref(1) {
+	v := CreateVariableQferSess(testAmbientSession, "g_p", PointerTo(GetIntType()), q)
+	if !v.IsVolatileAfterDerefSess(testAmbientSession, 1) {
 		t.Fatal("qfer layout")
 	}
 	e := EmptyEffect()
@@ -318,7 +318,7 @@ func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.StrictVolatileRule = true
-	v := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	cg := WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)
 	if cg.CheckDerefVolatile(v, 1, opts) {
 		t.Fatal("incomplete ambient must fail closed CheckDerefVolatile")
@@ -341,7 +341,7 @@ func TestCheckDerefVolatileIncompleteFailClosed(t *testing.T) {
 func TestCheckReadWriteVarIncompleteStmFailClosed(t *testing.T) {
 	// incomplete EffectStm sticky (no invent CheckRead/WriteVar / soft re-pick)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectStm = IncompleteEffect()
 	if cg.CheckReadVar(v, nil) {
@@ -461,7 +461,7 @@ func TestReadIndicesVarRecordsRead(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:      []int{4},
@@ -526,7 +526,7 @@ func TestVisitIndicesEffectContext(t *testing.T) {
 		Sizes:    []int{3},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}},
 		Sizes:      []int{3},
@@ -594,7 +594,7 @@ func TestExtendCallChainNilHoleFailClosed(t *testing.T) {
 func TestAddVisibleEffectAtNilCallChainHoleFailClosed(t *testing.T) {
 	// incomplete call_chain must not invent partial external merge
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	e := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
@@ -618,7 +618,7 @@ func TestNoteWriteIncompleteAccumFailClosed(t *testing.T) {
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	inc := IncompleteEffect()
 	cg.EffectAccum = &inc
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg.NoteWrite(g)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("NoteWrite incomplete accum must SetError")
@@ -715,7 +715,7 @@ func TestAddEffectIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectStm = IncompleteEffect()
-	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
 	cg.AddEffect(EmptyEffect().WriteVarSess(testAmbientSession, v), false)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("AddEffect incomplete stm must SetError")

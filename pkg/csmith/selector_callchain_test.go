@@ -6,21 +6,21 @@ import (
 )
 
 func TestMatchVarName(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
-	if v.MatchVarName("g_1") != v {
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	if v.MatchVarNameSess(testAmbientSession, "g_1") != v {
 		t.Fatal("self")
 	}
 	// struct field
 	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType()}}}
-	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
 	f0 := sv.FieldVars[0]
-	if sv.MatchVarName(f0.Name) != f0 {
+	if sv.MatchVarNameSess(testAmbientSession, f0.Name) != f0 {
 		t.Fatal("field", f0.Name)
 	}
-	if v.MatchVarName("nope") != nil {
+	if v.MatchVarNameSess(testAmbientSession, "nope") != nil {
 		t.Fatal("miss")
 	}
 }
@@ -28,7 +28,7 @@ func TestMatchVarName(t *testing.T) {
 func TestFindVarByName(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
-	v := CreateVariableScalars("g_x", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, v)
 	if vs.FindVarByName("g_x") != v {
 		t.Fatal("find")
@@ -66,14 +66,14 @@ func TestFindVarByName(t *testing.T) {
 
 func TestIsSeenName(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if !IsSeenName([]string{"g_a"}, "g_a[0]") {
+	if !IsSeenNameSess(testAmbientSession, []string{"g_a"}, "g_a[0]") {
 		t.Fatal("seen")
 	}
-	if IsSeenName([]string{"g_a"}, "g_b[0]") {
+	if IsSeenNameSess(testAmbientSession, []string{"g_a"}, "g_b[0]") {
 		t.Fatal("not")
 	}
 	// empty name sticky (no invent not-seen soft-miss past incomplete subject)
-	if IsSeenName([]string{"g_a"}, "") {
+	if IsSeenNameSess(testAmbientSession, []string{"g_a"}, "") {
 		t.Fatal("empty name must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -81,7 +81,7 @@ func TestIsSeenName(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty seen entry sticky (no invent is-seen via bare "[" prefix)
-	if IsSeenName([]string{""}, "g_a[0]") {
+	if IsSeenNameSess(testAmbientSession, []string{""}, "g_a[0]") {
 		t.Fatal("empty seen entry must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -97,7 +97,7 @@ func TestItemizeArrayWithIV(t *testing.T) {
 	if av == nil {
 		t.Fatal("create")
 	}
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	// need dim 1 array with size > 0
@@ -135,7 +135,7 @@ func TestItemizeArrayTooFewIV(t *testing.T) {
 	av.AsArray = av
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// only one IV for 2 dims
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
 		t.Fatal("expect nil")
@@ -174,7 +174,7 @@ func TestOutputCallChain(t *testing.T) {
 
 func TestVariableSelectorDoFinalization(t *testing.T) {
 	vs := NewVariableSelector(Defaults())
-	vs.AllVars = []*Variable{CreateVariableScalars("g_1", GetIntType(), true, false)}
+	vs.AllVars = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)}
 	vs.GlobalList = vs.AllVars
 	vs.DoFinalization()
 	if len(vs.AllVars) != 0 || len(vs.GlobalList) != 0 {
@@ -191,7 +191,7 @@ func TestVariableSelectorDoFinalization(t *testing.T) {
 
 func TestMatchVarNameNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*Variable)(nil).MatchVarName("g_1") != nil {
+	if (*Variable)(nil).MatchVarNameSess(testAmbientSession, "g_1") != nil {
 		t.Fatal("nil Variable MatchVarName must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -199,8 +199,8 @@ func TestMatchVarNameNilSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// empty query soft miss
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	if v.MatchVarName("") != nil {
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	if v.MatchVarNameSess(testAmbientSession, "") != nil {
 		t.Fatal("empty name MatchVarName must soft miss")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -210,7 +210,7 @@ func TestMatchVarNameNilSticky(t *testing.T) {
 	// IsArray without AsArray soft invent was bare-name OutputC match on array path
 	// (Name identity is complete; query non-exact name hits array Output branch)
 	shell := &Variable{Name: "g_b", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	if shell.MatchVarName("g_b[0]") != nil {
+	if shell.MatchVarNameSess(testAmbientSession, "g_b[0]") != nil {
 		t.Fatal("IsArray without AsArray array-output MatchVarName must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

@@ -30,7 +30,7 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	// pre-create int global to take address of
 	qInt := NewCVQualifiers([]bool{false}, []bool{false})
-	iv := CreateVariableQfer("g_i", GetIntType(), qInt)
+	iv := CreateVariableQferSess(testAmbientSession, "g_i", GetIntType(), qInt)
 	iv.Init = MakeInt(0)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, iv)
@@ -59,10 +59,10 @@ func TestMakeInitValuePointerAddressOf(t *testing.T) {
 func TestOutputDefInitExprResidualSticky(t *testing.T) {
 	// InitExpr.Output residual soft invent was soft-continue invent complete def.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	v.Init = nil
 	v.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil residual
-	if s := v.OutputDef(false); s != "" {
+	if s := v.OutputDefFullSess(testAmbientSession, false, false, false, nil); s != "" {
 		t.Fatal("InitExpr Output residual must fail closed OutputDef", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -73,12 +73,12 @@ func TestOutputDefInitExprResidualSticky(t *testing.T) {
 
 func TestApplyInitExprOutputDef(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	pt := PointerTo(GetIntType())
 	// pointer qfer depth = indirect_level+1 (SanityCheck / CVQualifiers.cpp)
-	pv := CreateVariableQfer("g_p", pt, NewCVQualifiers([]bool{false, false}, []bool{false, false}))
+	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false, false}, []bool{false, false}))
 	applyInitExpr(pv, &Expression{Term: TermVariable, Var: iv, ExprType: pt})
-	def := pv.OutputDef(false)
+	def := pv.OutputDefFullSess(testAmbientSession, false, false, false, nil)
 	if !strings.Contains(def, "g_p") || !strings.Contains(def, "&") {
 		t.Fatal(def)
 	}
@@ -129,7 +129,7 @@ func TestGetAllArrayVars(t *testing.T) {
 	}
 	av.AsArray = av
 	a := &av.Variable
-	s := CreateVariableScalars("g_s", GetIntType(), false, false)
+	s := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{a, s}
 	got := vs.GetAllArrayVars()
 	if len(got) != 1 || got[0] != a {

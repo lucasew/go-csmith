@@ -11,7 +11,7 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	i32 := GetIntType()
 	// pointee local: int32_t* shell
-	l118 := CreateVariableScalars("l_118", PointerTo(i32), false, false)
+	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerTo(i32), false, false)
 	// element type int32_t**
 	elem := PointerTo(PointerTo(i32))
 	// address-of l_118 as int32_t**
@@ -49,7 +49,7 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 	// must point at l_118 collective
 	found := false
 	for _, p := range pt[0].PointTo {
-		if p == l118 || p == l118.GetCollective() {
+		if p == l118 || p == l118.GetCollectiveSess(testAmbientSession) {
 			found = true
 		}
 	}
@@ -63,7 +63,7 @@ func TestAbstractFactForVarInitPrimaryThenAltsNotDead(t *testing.T) {
 func TestAbstractFactForVarInitNilPrimaryInitExprsOnly(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	i32 := GetIntType()
-	l118 := CreateVariableScalars("l_118", PointerTo(i32), false, false)
+	l118 := CreateVariableScalarsSess(testAmbientSession, "l_118", PointerTo(i32), false, false)
 	elem := PointerTo(PointerTo(i32))
 	addr := &Expression{Term: TermVariable, Var: l118, ExprType: elem}
 	av := &ArrayVariable{

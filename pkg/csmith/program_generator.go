@@ -444,7 +444,7 @@ func (g *ProgramGenerator) hashFuncDefReady() bool {
 		g.noteErr(ErrGeneric)
 		return false
 	}
-	dimen := GetMaxArrayDimension(g.VS.GlobalList)
+	dimen := GetMaxArrayDimensionSess(g.Sess, g.VS.GlobalList)
 	if dimen < 0 {
 		// incomplete array sizes sticky
 		if !g.hasErr() {
@@ -1005,7 +1005,7 @@ func (g *ProgramGenerator) OutputHashFuncDef() string {
 	}
 	// OutputMgr.cpp:213–218 — GetMaxArrayDimension + get_new_ctrl_vars + OutputArrayCtrlVars
 	// prepare ctrl decl first; no invent partial function shell on incomplete ctrl IR
-	dimen := GetMaxArrayDimension(g.VS.GlobalList)
+	dimen := GetMaxArrayDimensionSess(g.Sess, g.VS.GlobalList)
 	var ctrlDecl string
 	if dimen > 0 {
 		ctrl := GetNewCtrlVarsSess(g.Sess, g.Opts)

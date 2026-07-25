@@ -18,8 +18,8 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// multi-cand without RNG sticky — no invent vars[0]
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	if ChooseOKVar(nil, []*Variable{a, b}) != nil {
 		t.Fatal("nil RNG multi ChooseOKVar must fail closed")
 	}
@@ -36,9 +36,9 @@ func TestChooseOKVarItemizeFailClosed(t *testing.T) {
 func TestChooseOKVarSoleAndUpto(t *testing.T) {
 	// VariableSelector::choose_ok_var
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_1", GetSimpleType(EInt), false, false)
-	b := CreateVariableScalars("g_2", GetSimpleType(EInt), false, false)
-	c := CreateVariableScalars("g_3", GetSimpleType(EInt), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_1", GetSimpleType(EInt), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_2", GetSimpleType(EInt), false, false)
+	c := CreateVariableScalarsSess(testAmbientSession, "g_3", GetSimpleType(EInt), false, false)
 
 	if ChooseOKVar(NewRng(2), nil) != nil {
 		t.Fatal("empty")
@@ -70,7 +70,7 @@ func TestChooseOKVarMatchTypeNilSticky(t *testing.T) {
 	// Fair: sticky fail closed whole ChooseOKVarMatch.
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	good := CreateVariableScalars("g_1", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	hole := &Variable{Name: "g_hole", Type: nil}
 	if ChooseOKVarMatch(NewRng(1), []*Variable{hole, good}, GetIntType(), MatchFlexible, false) != nil {
 		t.Fatal("Type-nil candidate must fail closed ChooseOKVarMatch, not invent later good")
@@ -184,7 +184,7 @@ func TestMaxGlobalsFailClosed(t *testing.T) {
 	// CreateRandomArray: asGlobal = GlobalVariables && flipcoin(25); may pick local
 	// empty stack + GlobalVariables false for local fail; with GlobalVariables and at max
 	for seed := uint64(1); seed < 40; seed++ {
-		if av := vs2.CreateRandomArray(NewRng(seed), EmptyCGContext().WithSession(testAmbientSession)); av != nil && av.IsGlobal() {
+		if av := vs2.CreateRandomArray(NewRng(seed), EmptyCGContext().WithSession(testAmbientSession)); av != nil && av.IsGlobalSess(testAmbientSession) {
 			t.Fatal("CreateRandomArray global at MaxGlobals must fail closed", av.Name)
 		}
 	}
@@ -274,16 +274,16 @@ func TestSelectGlobalChoosesExisting(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	a := CreateVariableQfer("g_1", GetSimpleType(EInt), q)
+	a := CreateVariableQferSess(testAmbientSession, "g_1", GetSimpleType(EInt), q)
 	// non-convertible pointer won't match int under Flexible
-	b := CreateVariableQfer("g_2", PointerTo(GetSimpleType(EInt)), q)
+	b := CreateVariableQferSess(testAmbientSession, "g_2", PointerTo(GetSimpleType(EInt)), q)
 	vs.GlobalList = []*Variable{a, b}
 	r := NewRng(2)
 	got := vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), &q, r)
 	// eFlexible: int matches a; *int is not convertible to int without deref path
 	// is_derivable: ptr_type==int for *int? this is int*, ptr_type is int, is_derivable(int)
 	// from *int: this==t false; is_convertable(*int) false; is_dereferenced_from(*int) true (int from *int)
-	// Wait — match is want.Match(var.Type): int.Match(*int, Flexible) = int.is_derivable(*int)
+	// Wait — match is want.MatchSess(testAmbientSession, var.Type): int.MatchSess(testAmbientSession, *int, Flexible) = int.is_derivable(*int)
 	// is_derivable(*int): this==t no; is_convertable no; is_dereferenced_from(*int) yes (int is deref of *int)
 	// So Flexible actually matches *int as source for int! That's eDereference-like via is_derivable.
 	// Upstream may then emit *g_2 via ExpressionVariable. Our SelectGlobal returns the var.
@@ -291,7 +291,7 @@ func TestSelectGlobalChoosesExisting(t *testing.T) {
 		t.Fatalf("should pick existing, got %v", got)
 	}
 	// only matching exact non-pointer when we use two ints
-	c := CreateVariableQfer("g_3", GetSimpleType(EInt), q)
+	c := CreateVariableQferSess(testAmbientSession, "g_3", GetSimpleType(EInt), q)
 	vs.GlobalList = []*Variable{a, c}
 	got = vs.SelectGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetSimpleType(EInt), &q, r)
 	if got != a && got != c {
@@ -303,8 +303,8 @@ func TestSelectGlobalMultiMatchUpto(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	a := CreateVariableQfer("g_1", GetSimpleType(EInt), q)
-	b := CreateVariableQfer("g_2", GetSimpleType(EInt), q)
+	a := CreateVariableQferSess(testAmbientSession, "g_1", GetSimpleType(EInt), q)
+	b := CreateVariableQferSess(testAmbientSession, "g_2", GetSimpleType(EInt), q)
 	vs.GlobalList = []*Variable{a, b}
 	r := NewRng(2)
 	// First upto(2) = 1959434203 % 2

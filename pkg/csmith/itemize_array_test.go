@@ -9,16 +9,16 @@ func TestIsPackedAggregateFieldVar(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S0", Packed: true, Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	parent := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(parent.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
 	f0 := parent.FieldVars[0]
-	if !f0.IsPackedAggregateFieldVar() {
+	if !f0.IsPackedAggregateFieldVarSess(testAmbientSession) {
 		t.Fatal("want packed field")
 	}
-	plain := CreateVariableScalars("g_i", GetIntType(), false, false)
-	if plain.IsPackedAggregateFieldVar() {
+	plain := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	if plain.IsPackedAggregateFieldVarSess(testAmbientSession) {
 		t.Fatal("scalar")
 	}
 }
@@ -34,7 +34,7 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	}
 	av.Sizes = []int{8}
 	av.ArraySizes = []int{8}
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	// scan seeds for offset form
@@ -80,7 +80,7 @@ func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: InvalidIVBound}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
@@ -98,7 +98,7 @@ func TestItemizeArrayNilIVKeyHole(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{nil: 0, iv: 0}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
@@ -119,7 +119,7 @@ func TestItemizeArrayIncompleteAmbientSticky(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	inc := IncompleteEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.EffectAccum = &inc
@@ -143,7 +143,7 @@ func TestItemizeArrayTypeNilSticky(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.IVBounds = map[*Variable]int{iv: 0}
 	if vs.ItemizeArray(NewRng(1), cg, av) != nil {
@@ -263,7 +263,7 @@ func TestMakeRandomArrayOpPackedResidualSticky(t *testing.T) {
 	// Type-nil parent field IV: packed sticky residual during IV filter
 	parent := &Variable{Name: "g_u"} // Type nil
 	fieldIV := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
-	goodIV := CreateVariableScalars("g_i", GetIntType(), false, false)
+	goodIV := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	vs.GlobalList = append(vs.GlobalList, fieldIV, goodIV)
 	vs.AllVars = append([]*Variable{&av.Variable}, fieldIV, goodIV)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -368,7 +368,7 @@ func TestItemizeIsAggregateResidualSticky(t *testing.T) {
 	v := &Variable{Name: "g_s", Type: &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}}
-	v.CreateFieldVars()
+	v.CreateFieldVarsSess(testAmbientSession)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("CreateFieldVars nil field Type must SetError sticky")
 	}

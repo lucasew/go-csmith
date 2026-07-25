@@ -147,7 +147,7 @@ func TestGoGeneratorNilFuncHoleFailClosed(t *testing.T) {
 	g := NewProgramGenerator(NewSession(opts))
 	built := &Function{Name: "func_1", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 1, Stmts: []Stmt{{Kind: StmtReturn, StmID: 2, Expr: &Expression{Term: TermConstant, Con: MakeInt(0)}}}},
-		RV:   CreateVariableScalars("func_1_rv", GetIntType(), false, false),
+		RV:   CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false),
 	}
 	// hasUser scan: hole first must fail closed (not invent hasUser from built after hole)
 	g.Funcs.Funcs = []*Function{nil, built}
@@ -190,7 +190,7 @@ func TestOutputFunctionsBodyResidualSticky(t *testing.T) {
 		Name: "func_ok", ReturnType: GetIntType(), IsBuilt: true, BuildState: BuildBuilt,
 		Body: &Block{StmID: 3, Stmts: []Stmt{{Kind: StmtReturn, StmID: 4,
 			Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}}},
-		RV: CreateVariableScalars("func_ok_rv", GetIntType(), false, false),
+		RV: CreateVariableScalarsSess(testAmbientSession, "func_ok_rv", GetIntType(), false, false),
 	}
 	g := NewProgramGenerator(NewSession(Defaults()))
 	g.Funcs.Funcs = []*Function{bad, good}

@@ -47,7 +47,7 @@ func TestWriteVarSetResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete base
-	out2 := IncompleteEffect().WriteVarSetSess(testAmbientSession, []*Variable{CreateVariableScalars("g_x", GetIntType(), false, false)})
+	out2 := IncompleteEffect().WriteVarSetSess(testAmbientSession, []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)})
 	if EffectComplete(out2) {
 		t.Fatal("incomplete base WriteVarSet must IncompleteEffect")
 	}
@@ -114,8 +114,8 @@ func TestAccessEnumAndEmptyEffect(t *testing.T) {
 func TestNonEmptyIntersectionMatch(t *testing.T) {
 	// Effect.cpp:56–69 — Variable::match (identity / aggregate field)
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	if NonEmptyIntersectionSess(testAmbientSession, []*Variable{a}, []*Variable{b}) {
 		t.Fatal("distinct scalars no intersect")
 	}

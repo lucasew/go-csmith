@@ -16,7 +16,7 @@ func TestCreateFieldVars(t *testing.T) {
 	if st == nil {
 		t.Fatal("MakeRandomStructType", HasErrorSess(testAmbientSession))
 	}
-	v := CreateVariableQfer("g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if v == nil || len(v.FieldVars) != len(st.Fields) {
 		t.Fatalf("fields %d want %d", len(v.FieldVars), len(st.Fields))
 	}
@@ -43,8 +43,8 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	}}
 	v := &Variable{Name: "g_bad", Type: st, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
 	ClearErrorSess(testAmbientSession)
-	v.CreateFieldVars()
-	if v.FieldVarsComplete() {
+	v.CreateFieldVarsSess(testAmbientSession)
+	if v.FieldVarsCompleteSess(testAmbientSession) {
 		t.Fatal("CreateFieldVars fail must IncompleteVariables, not empty-complete nil")
 	}
 	if VariablesComplete(v.FieldVars) {
@@ -55,8 +55,8 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Variable.cpp:338 assert aggregate sticky — no invent fields on scalar
-	scalar := CreateVariableScalars("g_i", GetIntType(), false, false)
-	scalar.CreateFieldVars()
+	scalar := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	scalar.CreateFieldVarsSess(testAmbientSession)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("non-aggregate CreateFieldVars must SetError sticky")
 	}
@@ -71,8 +71,8 @@ func TestCreateFieldVarsFailIncompleteNotEmptyComplete(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
 	nested := &Variable{Name: "g_top.inner", Type: st2, FieldVarOf: top, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	nested.CreateFieldVars()
-	if nested.FieldVarsComplete() {
+	nested.CreateFieldVarsSess(testAmbientSession)
+	if nested.FieldVarsCompleteSess(testAmbientSession) {
 		t.Fatal("Type-nil top CreateFieldVars must IncompleteVariables")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -85,17 +85,17 @@ func TestHasFieldVarNilHole(t *testing.T) {
 	parent := &Variable{Name: "s", Type: &Type{isStruct: true}}
 	child := &Variable{Name: "s.f0", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{nil, child}
-	if parent.FieldVarsComplete() {
+	if parent.FieldVarsCompleteSess(testAmbientSession) {
 		t.Fatal("FieldVars hole must be incomplete")
 	}
-	if parent.HasFieldVar(child) {
+	if parent.HasFieldVarSess(testAmbientSession, child) {
 		t.Fatal("nil FieldVars hole must fail closed (no invent skip to later)")
 	}
 	// nested HasFieldVar residual: soft invent was soft-continue later field invent not-has-field.
 	// Fair: sticky fail closed false (FieldVarsComplete false already). Covered above.
 	// MarkDeadVar / OOS must not invent leave field pointees live past hole
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, child)}
 	UpdateFactsForOOSVars([]*Variable{parent}, &facts)
 	if FactsComplete(facts) {
@@ -111,8 +111,8 @@ func TestFindReachableFrameVarsIncompleteStackFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsFrameVar false → empty frame set as complete
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -138,9 +138,9 @@ func TestFindReachableFrameVarsIsVisibleResidualSticky(t *testing.T) {
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	// second good pointee that would invent partial frame set after residual soft-skip
-	loc2 := CreateVariableScalars("l_2", GetIntType(), false, false)
+	loc2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntType(), false, false)
 	loc2.Name = "l_2"
 	facts := []*FactPointTo{MakeFactPointTo(p, loc), MakeFactPointTo(p, loc2)}
 	if VariablesComplete(cg.FindReachableFrameVars(facts)) {
@@ -159,14 +159,14 @@ func TestCollectExpandable(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(5), opts, probs, env, "S0")
-	v := CreateVariableQfer("g_2", st, NewCVQualifiers([]bool{false}, []bool{false}))
-	all := v.CollectExpandable()
+	v := CreateVariableQferSess(testAmbientSession, "g_2", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	all := v.CollectExpandableSess(testAmbientSession)
 	if len(all) < 1+len(st.Fields) {
 		t.Fatal(len(all))
 	}
 	// nil FieldVars hole fails closed sticky incomplete (not bare nil invent empty complete)
 	v.FieldVars = append(v.FieldVars, nil)
-	if VariablesComplete(v.CollectExpandable()) {
+	if VariablesComplete(v.CollectExpandableSess(testAmbientSession)) {
 		t.Fatal("nil field hole must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -174,7 +174,7 @@ func TestCollectExpandable(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// special Type-nil complete expand as self only
-	got := NullPtr.CollectExpandable()
+	got := NullPtr.CollectExpandableSess(testAmbientSession)
 	if !VariablesComplete(got) || len(got) != 1 || got[0] != NullPtr {
 		t.Fatal("special CollectExpandable must stay complete self-only", got)
 	}
@@ -183,7 +183,7 @@ func TestCollectExpandable(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-special Type-nil sticky IncompleteVariables (no invent expand pool past hole)
-	if VariablesComplete((&Variable{Name: "broken"}).CollectExpandable()) {
+	if VariablesComplete((&Variable{Name: "broken"}).CollectExpandableSess(testAmbientSession)) {
 		t.Fatal("Type-nil CollectExpandable must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -195,9 +195,9 @@ func TestCollectExpandable(t *testing.T) {
 	nestHole := &Variable{Name: "nest", Type: &Type{isStruct: true}, FieldVars: []*Variable{nil}}
 	outer := &Variable{
 		Name: "outer", Type: &Type{isStruct: true},
-		FieldVars: []*Variable{nestHole, CreateVariableScalars("g_ok", GetIntType(), false, false)},
+		FieldVars: []*Variable{nestHole, CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)},
 	}
-	if VariablesComplete(outer.CollectExpandable()) {
+	if VariablesComplete(outer.CollectExpandableSess(testAmbientSession)) {
 		t.Fatal("nested residual CollectExpandable must fail closed incomplete")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -213,9 +213,9 @@ func TestFieldVolatileOrFromParent(t *testing.T) {
 	GenerateAllTypesEnv(NewRng(1), opts, probs, env)
 	st := MakeRandomStructType(NewRng(2), opts, probs, env, "S0")
 	// parent volatile
-	v := CreateVariableQfer("g_3", st, NewCVQualifiers([]bool{false}, []bool{true}))
+	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiers([]bool{false}, []bool{true}))
 	for _, f := range v.FieldVars {
-		if !f.IsVolatile() {
+		if !f.IsVolatileSess(testAmbientSession) {
 			t.Fatalf("%s should inherit volatile", f.Name)
 		}
 	}

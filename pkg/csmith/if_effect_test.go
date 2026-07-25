@@ -21,7 +21,7 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// plant a known global
-	g1 := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	g1 := CreateVariableQferSess(testAmbientSession, "g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	vs.GlobalList = []*Variable{g1}
 	st := MakeRandomIf(NewRng(7), opts, probs, vs, tables, tab, &cg)
 	if st == nil || st.Then == nil || st.Else == nil {
@@ -38,8 +38,8 @@ func TestIfBranchesIsolateEffect(t *testing.T) {
 }
 
 func TestMergeEffectsUnion(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	e1 := EmptyEffect().WriteVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, b)
 	// Effect.cpp:write_var — non-volatile write keeps SE-free true
@@ -56,7 +56,7 @@ func TestMergeEffectsUnion(t *testing.T) {
 		t.Fatal("MergeEffects of non-vol writes must stay SE-free")
 	}
 	// volatile write clears SE-free on that arm → merge not SE-free
-	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
 	ev := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	if ev.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("volatile WriteVar must clear SE-free")
@@ -73,7 +73,7 @@ func TestMergeEffectsUnion(t *testing.T) {
 func TestMergeEffectsIncompleteFailClosed(t *testing.T) {
 	// incomplete arm must not invent pure/empty-complete merge success — sticky
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	ok := EmptyEffect().WriteVarSess(testAmbientSession, a)
 	m := MergeEffectsSess(testAmbientSession, ok, IncompleteEffect())
 	if EffectComplete(m) {
@@ -145,7 +145,7 @@ func TestMakeRandomIfERRORGuardAfterBranches(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -173,7 +173,7 @@ func TestMakeRandomIfElseFromThenMapFactsIn(t *testing.T) {
 	// missing then-in must not invent pre-branch GlobalFacts for else
 	// Unit: plant missing MapFactsIn after then would have set it — contract of assign
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	prior := MakeFactPointTo(p, GarbagePtr)
 	fm.GlobalFacts = []*FactPointTo{prior}
 	// missing MapFactsIn[5]
@@ -217,8 +217,8 @@ func TestAssignGlobalFactsFromMapInRewindsUnionWrite(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) < 2 {
 		t.Fatal("need union fields")
 	}
@@ -266,8 +266,8 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
-	inner := CreateVariableScalars("g_inner", GetIntType(), false, false)
+	outer := CreateVariableScalarsSess(testAmbientSession, "g_outer", GetIntType(), false, false)
+	inner := CreateVariableScalarsSess(testAmbientSession, "g_inner", GetIntType(), false, false)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, fn)
 	// then: read g_inner via return expr (visit records CheckReadVar)
@@ -290,7 +290,7 @@ func TestVisitFactsStatementIfSharesEffectAccum(t *testing.T) {
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()},
 		Then: thenBlk, Else: elseBlk,
 	}
-	fn.RV = CreateVariableScalars("g_rv", GetIntType(), false, false)
+	fn.RV = CreateVariableScalarsSess(testAmbientSession, "g_rv", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.CurrentFunc = fn
 	// parent accum already observed g_outer (as if prior statements in the block)
@@ -326,8 +326,8 @@ func TestVisitFactsStatementIfRewindsUnionBeforeElse(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_uv", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_uv", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) < 1 {
 		t.Fatal("need field")
 	}
@@ -446,8 +446,8 @@ func TestMakeRandomIfSharesCGContextWithParent(t *testing.T) {
 	parent := &Block{Func: f}
 	f.Stack = []*Block{parent}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	pre := CreateVariableScalars("pre_if_rd", GetIntType(), true, false)
-	g1 := CreateVariableScalars("g_if_arm", GetIntType(), true, false)
+	pre := CreateVariableScalarsSess(testAmbientSession, "pre_if_rd", GetIntType(), true, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_if_arm", GetIntType(), true, false)
 	vs.GlobalList = append(vs.GlobalList, g1)
 	accum := EmptyEffect().ReadVarSess(testAmbientSession, pre)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

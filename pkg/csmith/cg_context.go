@@ -218,7 +218,7 @@ func (c CGContext) FindVariableScope(v *Variable) int {
 			sessNoteError(cgSess(&c), ErrGeneric)
 			return ScopeInactive
 		}
-		if p.Match(v) {
+		if p.MatchSess(cgSess(&c), v) {
 			// residual ERROR sticky — no invent param-scope true past Match hole
 			if sessHasError(cgSess(&c)) {
 				return ScopeInactive
@@ -627,7 +627,7 @@ func (c CGContext) IsNonReadable(v *Variable) bool {
 			sessNoteError(cgSess(&c), ErrGeneric)
 			return true
 		}
-		if nr.Match(v) {
+		if nr.MatchSess(cgSess(&c), v) {
 			// residual ERROR sticky — no invent nonreadable true past Match hole
 			if sessHasError(cgSess(&c)) {
 				return true

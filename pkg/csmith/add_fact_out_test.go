@@ -7,7 +7,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// fair: incomplete stack → sticky IncompleteFactSlice (not invent empty-complete skip)
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalars("l_1", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", PointerTo(GetIntType()), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc, nil}}
 	f.Body = body
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -21,7 +21,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// later appends must not invent cleaned facts onto incomplete map
-	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(gp, NullPtr))
 	if FactsComplete(fm.MapFactsOut[3]) {
 		t.Fatal("append after incomplete must stay incomplete", fm.MapFactsOut[3])
@@ -49,7 +49,7 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 	// Type-nil subject IsGlobal residual is nil-only; use incomplete Blocks for goto dest.
 	// Goto dest parent resolve residual: incomplete Func Blocks hole sticky.
 	f3 := &Function{Name: "f3"}
-	gp3 := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	gp3 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
 	body3 := &Block{Func: f3}
 	f3.Body = body3
 	f3.Blocks = []*Block{body3, nil}
@@ -68,18 +68,18 @@ func TestAddFactOutIncompleteStackFailClosed(t *testing.T) {
 
 func TestAddFactOutVisible(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	body := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Blocks = []*Block{body}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
 	fm.AddFactOut(st, body, MakeFactPointTo(
-		CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false),
+		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false),
 		NullPtr,
 	))
 	// use global pointer fact
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.AddFactOut(st, body, MakeFactPointTo(p, NullPtr))
 	if len(fm.MapFactsOut[5]) != 2 {
 		// first call also used a fresh p - ok
@@ -92,7 +92,7 @@ func TestAddFactOutVisible(t *testing.T) {
 	fm.AddFactOut(ret, body, MakeFactPointTo(
 		// local as subject — need pointer local
 		func() *Variable {
-			lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+			lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 			lp.Name = "l_p"
 			return lp
 		}(),
@@ -114,7 +114,7 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	outer := &Block{Func: f}
 	inner := &Block{Func: f, Parent: outer}
-	loc := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 	loc.Name = "l_p"
 	inner.LocalVars = []*Variable{loc}
 	f.Blocks = []*Block{outer, inner}
@@ -130,7 +130,7 @@ func TestAddFactOutGotoDestVisibility(t *testing.T) {
 		t.Fatal("local invisible at dest should drop", fm.MapFactsOut[9])
 	}
 	// global pointer still recorded
-	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.AddFactOut(st, inner, MakeFactPointTo(gp, NullPtr))
 	if len(fm.MapFactsOut[9]) != 1 {
 		t.Fatal("global at dest", fm.MapFactsOut[9])
@@ -213,7 +213,7 @@ func TestArrayIsVariant(t *testing.T) {
 	}
 	// mixed IndexExprs vs Indices-only must not invent dual-path match
 	ClearErrorSess(testAmbientSession)
-	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalars("i", GetIntType(), false, false), ExprType: GetIntType()}}
+	a.IndexExprs = []*Expression{{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false), ExprType: GetIntType()}}
 	b.IndexExprs = nil
 	b.Indices = []string{"i"}
 	if a.IsVariant(&b.Variable) {
@@ -238,7 +238,7 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	l237 := CreateVariableScalars("l_237", ut, false, false)
+	l237 := CreateVariableScalarsSess(testAmbientSession, "l_237", ut, false, false)
 	nested := &Block{Func: f, Parent: body, Looping: false, StmID: 27, LocalVars: []*Variable{l237}}
 	// continue lives deeper under nested
 	contParent := &Block{Func: f, Parent: nested, Looping: false, StmID: 31}
@@ -265,7 +265,7 @@ func TestAddFactOutUnionContinueDropsNestedLoopLocal(t *testing.T) {
 		t.Fatalf("continue map_out must drop nested loop-local union l_237, got %v", outU)
 	}
 	// global union still accepted
-	gU := CreateVariableScalars("g_u", ut, true, false)
+	gU := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, true, false)
 	fm.AddFactOutUnion(cont, contParent, MakeFactUnion(gU, 0))
 	if FindRelatedUnion(fm.GetMapUnionFactsOut(39), gU) == nil {
 		t.Fatal("continue map_out must keep global union subject")

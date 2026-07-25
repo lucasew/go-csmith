@@ -4,8 +4,8 @@ import "testing"
 
 func TestWriteVarNonVolatileKeepsSEFree(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g8 := CreateVariableScalars("g_8", GetIntType(), false, false)
-	if g8.IsVolatile() {
+	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntType(), false, false)
+	if g8.IsVolatileSess(testAmbientSession) {
 		t.Fatal("g_8 must not be volatile")
 	}
 	e := EmptyEffect().WriteVarSess(testAmbientSession, g8)
@@ -30,7 +30,7 @@ func TestWriteVarNonVolatileKeepsSEFree(t *testing.T) {
 func TestZeroAccumEffContextAddExternal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	var zero Effect // Go zero — not C++ Effect()
-	g8 := CreateVariableScalars("g_8", GetIntType(), false, false)
+	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntType(), false, false)
 	ctx := EmptyEffect().WriteVarSess(testAmbientSession, g8)
 	if !ctx.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("non-vol write context must be SE-free")
@@ -55,8 +55,8 @@ func TestZeroAccumEffContextAddExternal(t *testing.T) {
 
 func TestAddExternalEffectGlobalWriteKeepsSEFree(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g8 := CreateVariableScalars("g_8", GetIntType(), false, false)
-	if !g8.IsGlobal() {
+	g8 := CreateVariableScalarsSess(testAmbientSession, "g_8", GetIntType(), false, false)
+	if !g8.IsGlobalSess(testAmbientSession) {
 		t.Fatal("g_8 name must be IsGlobal")
 	}
 	ctx := EmptyEffect().WriteVarSess(testAmbientSession, g8)

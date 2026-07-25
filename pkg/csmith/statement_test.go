@@ -96,7 +96,7 @@ func TestStmtOKBlockRequiresThen(t *testing.T) {
 
 func TestStmtOKIncompleteForIfAssignFailClosed(t *testing.T) {
 	// no invent usable shells from partial IR
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	if stmtOK(Stmt{Kind: StmtFor, Loop: &LoopControl{IV: iv}}) {
 		t.Fatal("for IV-only must fail stmtOK")
 	}

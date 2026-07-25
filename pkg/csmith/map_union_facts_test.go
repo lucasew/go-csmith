@@ -15,7 +15,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	if ut == nil || !ut.IsUnion() {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if uv == nil || len(uv.FieldVars) < 1 {
 		t.Skip("fields")
 	}
@@ -27,7 +27,7 @@ func TestMapFactsInPairsUnionWrite(t *testing.T) {
 	if bodyU == nil {
 		t.Fatal("MakeFactUnion body", HasErrorSess(testAmbientSession))
 	}
-	p := CreateVariableScalars("g_p", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), true, false)
 	pt := MakeFactPointTo(p, NullPtr)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{pt}
@@ -63,13 +63,13 @@ func TestRestoreFactsPairRewindsUnion(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if uv == nil {
 		t.Fatal("uv")
 	}
 	preU := MakeFactUnion(uv, 0)
 	liveU := MakeFactUnion(uv, FactUnionBottom)
-	p := CreateVariableScalars("g_p", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", GetIntType(), true, false)
 	prePT := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr)}
@@ -96,7 +96,7 @@ func TestMergeJumpUnionFactsMissingIsBottom(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	live := []*FactUnion{MakeFactUnion(uv, 0)}
 	if !mergeJumpUnionFacts(&live, []*FactUnion{}) {
 		t.Fatal("merge failed", HasErrorSess(testAmbientSession))
@@ -119,8 +119,8 @@ func TestForwardGotoMergeJumpUnionBottomAndMapOutInstall(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u_goto", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u_goto", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	// dest map_facts_in: last=0 (readable f0)
 	entryU := MakeFactUnion(parent, 0)
 	if entryU == nil {
@@ -173,8 +173,8 @@ func TestUpdateUnionFactsForDestCopiesNonRVOOSDrop(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_dest", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	g := CreateVariableScalars("g_u_dest", ut, false, false)
-	g.CreateFieldVars()
+	g := CreateVariableScalarsSess(testAmbientSession, "g_u_dest", ut, false, false)
+	g.CreateFieldVarsSess(testAmbientSession)
 	fn := &Function{Name: "f", ReturnType: GetIntType()}
 	body := &Block{Func: fn}
 	fn.Body = body
@@ -210,10 +210,10 @@ func TestSetMapFactsOutGotoDropsOOSUnionWrite(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_goto", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	g := CreateVariableScalars("g_keep", ut, false, false)
-	g.CreateFieldVars()
-	loc := CreateVariableScalars("l_arm", ut, false, false)
-	loc.CreateFieldVars()
+	g := CreateVariableScalarsSess(testAmbientSession, "g_keep", ut, false, false)
+	g.CreateFieldVarsSess(testAmbientSession)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_arm", ut, false, false)
+	loc.CreateFieldVarsSess(testAmbientSession)
 	fn := &Function{Name: "f_goto_u", ReturnType: GetIntType()}
 	// then-arm holds local; dest is body (sibling path) where local is OOS
 	body := &Block{Func: fn, StmID: AllocStmID()}
@@ -265,7 +265,7 @@ func TestSetMapFactsOutPairsUnionWrite(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	fu := MakeFactUnion(uv, 0)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{}

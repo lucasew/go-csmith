@@ -198,7 +198,7 @@ func (l *Lhs) IsVolatileSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	vol := l.Var.IsVolatileAfterDeref(n)
+	vol := l.Var.IsVolatileAfterDerefSess(s, n)
 	// residual ERROR sticky — no invent non-vol soft-skip past IsVolatileAfterDeref residual
 	if sessHasError(s) {
 		return true
@@ -400,7 +400,7 @@ func (l *Lhs) CompatibleVarSess(s *Session, v *Variable, expandStruct bool) bool
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := l.Var.Compatible(v, expandStruct)
+	ok := l.Var.CompatibleSess(s, v, expandStruct)
 	// residual ERROR sticky — no invent soft-compat past Compatible residual
 	if sessHasError(s) {
 		return false
@@ -536,7 +536,7 @@ func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts 
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		// base already from v.OutputC() above (includes itemized indices)
+		// base already from v.OutputCSess(cgSess(cg, false)) above (includes itemized indices)
 		if base == "" {
 			sessNoteError(s, ErrGeneric)
 			return ""
@@ -901,7 +901,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			return
 		}
 		// IsConst / IsVolatile residual only on nil (v already gated); complete path never stickies
-		if v.IsConst() {
+		if v.IsConstSess(cgSess(&cg)) {
 			// residual ERROR sticky — no invent soft-skip const past IsConst residual true
 			if sessHasError(cgSess(&cg)) {
 				incomplete = true
@@ -913,7 +913,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			incomplete = true
 			return
 		}
-		if compound && v.IsVolatile() {
+		if compound && v.IsVolatileSess(cgSess(&cg)) {
 			// residual ERROR sticky — no invent soft-skip vol past IsVolatile residual true
 			if sessHasError(cgSess(&cg)) {
 				incomplete = true
@@ -926,7 +926,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 			return
 		}
 		// expand fields for aggregates
-		exp := v.CollectExpandable()
+		exp := v.CollectExpandableSess(cgSess(&cg))
 		// residual ERROR sticky — no invent soft-expand past CollectExpandable residual
 		if sessHasError(cgSess(&cg)) {
 			incomplete = true
@@ -941,7 +941,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 				incomplete = true
 				return
 			}
-			if x.IsConst() {
+			if x.IsConstSess(cgSess(&cg)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past IsConst hole
 				if sessHasError(cgSess(&cg)) {
 					incomplete = true
@@ -957,7 +957,7 @@ func selectWritable(r *Rng, vs *VariableSelector, cg CGContext, typ *Type, compo
 				}
 				continue
 			}
-			if compound && x.IsVolatile() {
+			if compound && x.IsVolatileSess(cgSess(&cg)) {
 				// residual ERROR sticky — no invent soft-continue then pick later past IsVolatile hole
 				if sessHasError(cgSess(&cg)) {
 					incomplete = true

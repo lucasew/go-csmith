@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestMergePointeesOfPointer(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	// indirect 0 → just p itself? while(indirect-- > 0) so 0 means no steps → [p]
 	got0 := MergePointeesOfPointer(p, 0, facts)
@@ -19,9 +19,9 @@ func TestMergePointeesOfPointer(t *testing.T) {
 }
 
 func TestRhsTransferUsesMergePointees(t *testing.T) {
-	p1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
-	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerTo(GetIntType()), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	in := []*FactPointTo{MakeFactPointTo(p2, tgt)}
 	// p2 as pointer expr: level 1 - 1 = 0, merge(indirect+1)=1
 	rhs := &Expression{Term: TermVariable, Var: p2, ExprType: PointerTo(GetIntType())}
@@ -111,7 +111,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	old := []*FactPointTo{}
 	// pointer with const null init (CreateVariableScalars → Constant "0")
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	if p == nil || p.Init == nil {
 		t.Fatal("pointer init")
 	}
@@ -141,9 +141,9 @@ func TestMakeupNewVarFacts(t *testing.T) {
 		t.Fatal("dup")
 	}
 	// address-of init preserved
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	pt := PointerTo(GetIntType())
-	q := CreateVariableQfer("g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
+	q := CreateVariableQferSess(testAmbientSession, "g_q", pt, NewCVQualifiers([]bool{false}, []bool{false}))
 	q.InitExpr = &Expression{Term: TermVariable, Var: tgt, ExprType: pt}
 	old2 := []*FactPointTo{}
 	MakeupNewVarFacts(&old2, []*FactPointTo{MakeFactPointTo(q, GarbagePtr)})
@@ -152,7 +152,7 @@ func TestMakeupNewVarFacts(t *testing.T) {
 		t.Fatalf("want &g_t fact, got %+v", fq)
 	}
 	// nil hole fails closed sticky — no invent skip past hole to makeup later vars
-	r := CreateVariableScalars("g_r", PointerTo(GetIntType()), false, false)
+	r := CreateVariableScalarsSess(testAmbientSession, "g_r", PointerTo(GetIntType()), false, false)
 	old3 := []*FactPointTo{}
 	MakeupNewVarFacts(&old3, []*FactPointTo{nil, MakeFactPointTo(r, NullPtr)})
 	if FindRelatedPointTo(old3, r) != nil {
@@ -167,11 +167,11 @@ func TestMakeupNewVarFacts(t *testing.T) {
 func TestIsPointingToLocalsMultiLevel(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk.LocalVars = []*Variable{loc}
 	// p2 → p1 → loc
-	p1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
-	p2 := CreateVariableScalars("g_p2", PointerTo(PointerTo(GetIntType())), false, false)
+	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerTo(GetIntType()), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(PointerTo(GetIntType())), false, false)
 	facts := []*FactPointTo{
 		MakeFactPointTo(p1, loc),
 		MakeFactPointTo(p2, p1),

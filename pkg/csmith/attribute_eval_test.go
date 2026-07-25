@@ -306,8 +306,8 @@ func TestTypeAttrOnStructDecl(t *testing.T) {
 }
 
 func TestGetEvalToSubexpsComma(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	e := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()},
@@ -378,11 +378,11 @@ func TestHaveOverlappingFieldsUnion(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: uv}
 	f1 := &Variable{Name: "g_u.f1", Type: GetIntType(), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{f0, f1}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{f0, f1})}
 	// indirection: Var type *int, ExprType int → level 1
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
@@ -400,7 +400,7 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 	// soft invent: FindUnionPointees nil → len==0 → no overlap success
 	// fair: incomplete facts/pointees fail closed sticky as overlap
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	e1 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
 	e2 := &Expression{Term: TermVariable, Var: p, ExprType: GetIntType()}
 	holeFacts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
@@ -428,7 +428,7 @@ func TestHaveOverlappingFieldsIncompleteFailClosed(t *testing.T) {
 func TestFindUnionPointeesGetContainerUnionResidualSticky(t *testing.T) {
 	// GetContainerUnion residual soft invent was soft-continue later pointees invent empty unions.
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// Type-nil parent ancestry: GetContainerUnion stickies ERROR
 	parent := &Variable{Name: "g_hole"} // Type nil
 	fld := &Variable{Name: "g_hole.f0", Type: GetIntType(), FieldVarOf: parent}
@@ -463,11 +463,11 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
 	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
-	f.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
-	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, loc)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -481,7 +481,7 @@ func TestVisitFactsReturnDeadPtr(t *testing.T) {
 }
 
 func TestVisitFactsLhsCompoundRead(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType(), CompoundAssign: true}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()

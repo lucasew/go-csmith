@@ -79,7 +79,7 @@ func TestMakeRandomAssignCompoundPossible(t *testing.T) {
 }
 
 func TestAssignOutputIncr(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignPostIncr, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}}
 	out := (&Block{Stmts: []Stmt{st}}).Output(0)
 	if !strings.Contains(out, "g_1++") {
@@ -149,8 +149,8 @@ func TestMakeRandomAssignCompatibleCheckFails(t *testing.T) {
 func TestMakeRandomAssignUpdatesIndirectFacts(t *testing.T) {
 	// make_random update_fact_for_assign with full indir (same as Qfer path)
 	ppT := PointerTo(PointerTo(GetIntType()))
-	p := CreateVariableScalars("g_p", ppT, false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ppT, false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())}

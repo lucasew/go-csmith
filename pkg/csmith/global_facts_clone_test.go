@@ -8,7 +8,7 @@ func TestMakeRandomForIncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -24,10 +24,10 @@ func TestAppendReturnIncompleteGlobalFactsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
 	b := &Block{StmID: 1, Func: f}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -95,7 +95,7 @@ func TestMakeRandomAssignIncompleteFailClosed(t *testing.T) {
 func TestVisitFactsBinaryOrderedIncompleteGlobalFactsFailClosed(t *testing.T) {
 	// after-left snapshot incomplete fails closed (no invent cleaned merge)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -149,7 +149,7 @@ func TestMakeRandomIfFunc1IncompleteGlobalFactsFailClosed(t *testing.T) {
 	opts.MaxBlockDepth = 1
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -168,7 +168,7 @@ func TestMakeRandomExprStmtIncompleteGlobalFactsFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
@@ -216,7 +216,7 @@ func TestFindFixedPointIncompleteInputsFailClosed(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	in := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	_, _, _, ok := FindFixedPointBlock(b, in, &cg, Defaults(), false)
 	if ok {
@@ -233,7 +233,7 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 			{Term: TermConstant, Con: MakeInt(2)},
 		},
 	}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	if fi.VisitUnorderedParams(&facts, &cg, Defaults()) {
@@ -247,13 +247,13 @@ func TestVisitUnorderedParamsIncompleteFailClosed(t *testing.T) {
 
 func TestPostCreationAnalysisIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 3, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)

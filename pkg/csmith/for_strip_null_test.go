@@ -23,9 +23,9 @@ func TestPostCreationStripsLoopBodyAfterIfNullElseDeref(t *testing.T) {
 	i32 := GetIntType()
 	pt := PointerTo(i32)
 	ppt := PointerTo(pt)
-	g77 := CreateVariableScalars("g_77", pt, false, false)
-	g99 := CreateVariableScalars("g_99", ppt, false, false)
-	tgt := CreateVariableScalars("g_18", i32, false, false)
+	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", pt, false, false)
+	g99 := CreateVariableScalarsSess(testAmbientSession, "g_99", ppt, false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_18", i32, false, false)
 
 	f := &Function{Name: "f", ReturnType: i32}
 	fm := NewFactMgrSess(testAmbientSession, f)
@@ -108,11 +108,11 @@ func TestNestedMustReturnForDoesNotSelfBackStrip(t *testing.T) {
 	i32 := GetIntType()
 	pt := PointerTo(i32)
 	ppt := PointerTo(pt)
-	g77 := CreateVariableScalars("g_77", pt, false, false)
-	g99 := CreateVariableScalars("g_99", ppt, false, false)
-	tgt := CreateVariableScalars("g_18", i32, false, false)
+	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", pt, false, false)
+	g99 := CreateVariableScalarsSess(testAmbientSession, "g_99", ppt, false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_18", i32, false, false)
 
-	f := &Function{Name: "f", ReturnType: i32, RV: CreateVariableScalars("rv", i32, false, false)}
+	f := &Function{Name: "f", ReturnType: i32, RV: CreateVariableScalarsSess(testAmbientSession, "rv", i32, false, false)}
 	fm := NewFactMgrSess(testAmbientSession, f)
 
 	thenNull := Stmt{

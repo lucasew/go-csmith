@@ -21,7 +21,7 @@ func TestPermuteParamOrdersTwo(t *testing.T) {
 
 func TestRenewFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	RenewFacts(&facts, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	if !facts[0].IsDead() {
@@ -61,7 +61,7 @@ func TestRenewFacts(t *testing.T) {
 	// FactPointTo.h:65–68 is_related is var identity only — not Variable.Match.
 	// Soft invent Match could replace an aggregate fact when renewing a field and
 	// leave the field's garbage fact in place (dangling on later check_read_var).
-	parent := CreateVariableScalars("g_agg", GetIntType(), true, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_agg", GetIntType(), true, false)
 	// synthetic aggregate shell with field p for Match
 	parent.Type = &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1}}}
 	parent.FieldVars = []*Variable{p}
@@ -73,7 +73,7 @@ func TestRenewFacts(t *testing.T) {
 		MakeFactPointToSet(parent, []*Variable{NullPtr}), // unrelated aggregate subject
 		MakeFactPointToSet(p, []*Variable{GarbagePtr}),   // field pointer still dead
 	}
-	tgt := CreateVariableScalars("g_tgt", GetIntType(), true, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_tgt", GetIntType(), true, false)
 	nfField := MakeFactPointTo(p, tgt) // definitive p = &tgt
 	if !RenewFact(&factsX, nfField) {
 		t.Fatal("renew field by var identity must succeed")
@@ -100,7 +100,7 @@ func TestRenewFacts(t *testing.T) {
 
 func TestReturnFactRegistry(t *testing.T) {
 	InvocationReturnFactsDoFinalization()
-	fi := &Invocation{User: &Function{Name: "f", RV: CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)}}
+	fi := &Invocation{User: &Function{Name: "f", RV: CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)}}
 	f := MakeFactPointTo(fi.User.RV, NullPtr)
 	fi.SaveReturnFacts([]*FactPointTo{f})
 	got := GetReturnFactForInvocation(fi, fi.User.RV)
@@ -125,7 +125,7 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U_ret", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	rv := CreateVariableQfer("rv", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	rv := CreateVariableQferSess(testAmbientSession, "rv", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	f := &Function{Name: "func_u", ReturnType: ut, RV: rv}
 	fi := &Invocation{User: f}
 	uf := MakeFactUnion(rv, 0)
@@ -138,7 +138,7 @@ func TestSaveReturnUnionFactsRegistry(t *testing.T) {
 		t.Fatalf("registry must return eUnionWrite fact for rv, got %+v", got)
 	}
 	// transfer to param-like LHS uses registry, not ambient
-	param := CreateVariableQfer("p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	param := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: ut}
 	out := RhsToLhsTransferUnion(nil, nil, []*Variable{param}, rhs)
 	if !UnionFactsComplete(out) || len(out) != 1 || out[0].Var != param || out[0].LastWrittenFID != 0 {
@@ -152,7 +152,7 @@ func TestSaveReturnFactsIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
-	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
 	fi := &Invocation{User: &Function{Name: "f", RV: rv}}
 	good := MakeFactPointTo(rv, NullPtr)
 	fi.SaveReturnFacts([]*FactPointTo{nil, good})
@@ -225,7 +225,7 @@ func TestNeedsRevisit(t *testing.T) {
 		t.Fatal("fact")
 	}
 	f.FactChanged = false
-	f.ReferencedPtrs = []*Variable{CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)}
+	f.ReferencedPtrs = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)}
 	if !f.IsPointerReferenced() || !f.NeedsRevisit() {
 		t.Fatal("ptrs")
 	}
@@ -241,7 +241,7 @@ func TestGetQualifiers(t *testing.T) {
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("std Invoke GetQualifiers must not sticky")
 	}
-	rv := CreateVariableScalars("f_rv", GetIntType(), false, false)
+	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
 	rv.Qfer.SetConstSess(testAmbientSession, true, 0)
 	fi2 := &Invocation{User: &Function{RV: rv}}
 	if !fi2.GetQualifiers().IsConstSess(testAmbientSession) {
@@ -322,7 +322,7 @@ func TestVisitUnorderedParamsMergeIncompleteFailClosed(t *testing.T) {
 	// with two orders of constants — success baseline
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	a := &Expression{Term: TermConstant, Con: MakeInt(1)}
@@ -360,7 +360,7 @@ func TestVisitUnorderedParamsEmptyOrdersFailClosed(t *testing.T) {
 func TestFactChangedOnAssign(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.UpdateFactForAssign(p, 0, &Expression{Term: TermConstant, Con: MakeInt(0)})
 	if !f.FactChanged {
 		// may not change if no pointer abstract result — force with null assign
@@ -373,7 +373,7 @@ func TestFactChangedOnAssign(t *testing.T) {
 	// if no facts produced, set manually via second path
 	if !f.FactChanged {
 		// non-pointer assign doesn't set — use pointer lhs
-		p2 := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+		p2 := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
 		// init as pointer type already
 		_ = p2
 		// call with existing null merge
@@ -389,7 +389,7 @@ func TestFactChangedOnAssign(t *testing.T) {
 
 func TestRevisitUserInvocationSimple(t *testing.T) {
 	// StatementAssign always has live Lhs + Expression* (Constant make_int for ++/--)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	assign := Stmt{
 		Kind: StmtAssign, StmID: 101,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -401,7 +401,7 @@ func TestRevisitUserInvocationSimple(t *testing.T) {
 		Body:        &Block{StmID: 100, Stmts: []Stmt{assign}},
 		FactChanged: true,
 	}
-	callee.RV = CreateVariableScalars("func_x_rv", GetIntType(), false, false)
+	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_x_rv", GetIntType(), false, false)
 	// FunctionInvocationUser.cpp:311 — get_fact_mgr_for_func(func) is the callee FM
 	fm := callee.ensurePairedFactMgr()
 	callee.Body.Func = callee
@@ -435,7 +435,7 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 		Body:        &Block{StmID: 200, Stmts: nil},
 		FactChanged: true,
 	}
-	callee.RV = CreateVariableScalars("func_u_rv", GetIntType(), false, false)
+	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_u_rv", GetIntType(), false, false)
 	calFM := callee.ensurePairedFactMgr()
 	callee.Body.Func = callee
 	// Stale last-written field on callee from a prior visit (g_ prefix → IsGlobal)
@@ -443,7 +443,7 @@ func TestRevisitInstallsCallerUnionFacts(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	uParent := CreateVariableScalars("g_u", ut, false, false)
+	uParent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
 	stale := MakeFactUnion(uParent, 1) // last-written f1
 	calFM.UnionFacts = []*FactUnion{stale}
 
@@ -496,15 +496,15 @@ func TestRevisitOOSsParamUnions(t *testing.T) {
 	if ut == nil {
 		t.Skip("union")
 	}
-	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	p := CreateVariableQfer("p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableQferSess(testAmbientSession, "p_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	callee := &Function{
 		Name: "func_p", ReturnType: GetIntType(),
 		Body:        &Block{StmID: 300, Stmts: nil},
 		Param:       []*Variable{p},
 		FactChanged: true,
 	}
-	callee.RV = CreateVariableScalars("func_p_rv", GetIntType(), false, false)
+	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_p_rv", GetIntType(), false, false)
 	callee.Body.Func = callee
 	calFM := callee.ensurePairedFactMgr()
 	calFM.SetMapStmEffect(300, EmptyEffect())
@@ -549,7 +549,7 @@ func TestRevisitCallerUnionIncompleteFailClosed(t *testing.T) {
 		Name: "func_v", ReturnType: GetIntType(),
 		Body: &Block{StmID: 201, Stmts: nil},
 	}
-	callee.RV = CreateVariableScalars("func_v_rv", GetIntType(), false, false)
+	callee.RV = CreateVariableScalarsSess(testAmbientSession, "func_v_rv", GetIntType(), false, false)
 	calFM := callee.ensurePairedFactMgr()
 	callee.Body.Func = callee
 	calFM.SetMapStmEffect(201, EmptyEffect())
@@ -592,7 +592,7 @@ func TestNeedsRevisitIsPointerReferencedIncompleteSticky(t *testing.T) {
 
 func TestRenewFactNilFactsSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if RenewFact(nil, MakeFactPointTo(CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false), NullPtr)) {
+	if RenewFact(nil, MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false), NullPtr)) {
 		t.Fatal("nil facts RenewFact must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

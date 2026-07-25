@@ -168,8 +168,8 @@ func TestGenerateWithBuiltins(t *testing.T) {
 }
 
 func TestHasRaceWith(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, a)
 	if !e1.HasRaceWithSess(testAmbientSession, e2) {

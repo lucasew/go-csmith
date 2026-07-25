@@ -11,7 +11,7 @@ func TestAssignGenAccumIncludesStmReads(t *testing.T) {
 	vs := NewVariableSelectorProbs(opts, probs)
 	vs.Sess = testAmbientSession
 	for i := 0; i < 8; i++ {
-		g := CreateVariableScalars("g_"+string(rune('a'+i)), GetIntType(), false, false)
+		g := CreateVariableScalarsSess(testAmbientSession, "g_"+string(rune('a'+i)), GetIntType(), false, false)
 		if g != nil {
 			vs.GlobalList = append(vs.GlobalList, g)
 			vs.AllVars = append(vs.AllVars, g)

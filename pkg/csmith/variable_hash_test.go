@@ -7,14 +7,14 @@ import (
 
 func TestHashSimpleInt(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
-	out := v.HashOutput()
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	out := v.HashOutputSess(testAmbientSession)
 	if !strings.Contains(out, `transparent_crc(g_1, "g_1"`) {
 		t.Fatal(out)
 	}
 	// empty name sticky — no invent transparent_crc(,"")
 	anon := &Variable{Name: "", Type: GetIntType()}
-	if anon.HashOutput() != "" {
+	if anon.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("empty name must fail closed hash")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -24,8 +24,8 @@ func TestHashSimpleInt(t *testing.T) {
 }
 
 func TestHashPointerEmpty(t *testing.T) {
-	v := CreateVariableScalars("g_2", PointerTo(GetIntType()), false, false)
-	if v.HashOutput() != "" {
+	v := CreateVariableScalarsSess(testAmbientSession, "g_2", PointerTo(GetIntType()), false, false)
+	if v.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("pointers must not hash")
 	}
 }
@@ -39,8 +39,8 @@ func TestHashStructFields(t *testing.T) {
 			{Name: "f1", Type: GetSimpleType(EUInt), Qfer: NewCVQualifiers([]bool{false}, []bool{false}), BitWidth: -1},
 		},
 	}
-	v := CreateVariableQfer("g_3", st, NewCVQualifiers([]bool{false}, []bool{false}))
-	out := v.HashOutput()
+	v := CreateVariableQferSess(testAmbientSession, "g_3", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	out := v.HashOutputSess(testAmbientSession)
 	if !strings.Contains(out, "g_3.f0") || !strings.Contains(out, "g_3.f1") {
 		t.Fatal(out)
 	}
@@ -52,9 +52,9 @@ func TestHashStructFields(t *testing.T) {
 
 func TestHashArrayLoops(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	// ArrayVariable::hash uses get_last_ctrl_vars (no letter invent without pool)
-	_ = GetNewCtrlVars(Defaults())
+	_ = GetNewCtrlVarsSess(testAmbientSession, Defaults())
 	// live AsArray required (no invent hash-array expand from ArraySizes alone)
 	av := &ArrayVariable{
 		Variable: Variable{
@@ -67,7 +67,7 @@ func TestHashArrayLoops(t *testing.T) {
 		Sizes: []int{3},
 	}
 	av.AsArray = av
-	out := av.Variable.HashOutput()
+	out := av.Variable.HashOutputSess(testAmbientSession)
 	// Variable::new_ctrl_vars uses letter names i, j, k…
 	if !strings.Contains(out, "for (i = 0") || !strings.Contains(out, "g_4[i]") {
 		t.Fatal(out)
@@ -78,8 +78,8 @@ func TestHashArrayLoops(t *testing.T) {
 	}
 	// undersized ctrl sticky — no invent loops with empty index
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
-	if av.Variable.HashOutput() != "" {
+	CtrlVarsDoFinalizationSess(testAmbientSession)
+	if av.Variable.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("no last ctrl must fail closed array hash")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -88,24 +88,24 @@ func TestHashArrayLoops(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray sticky empty
 	shell := &Variable{Name: "g_5", Type: GetIntType(), IsArray: true, ArraySizes: []int{3}}
-	if shell.HashOutput() != "" {
+	if shell.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("IsArray without AsArray HashOutput must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("IsArray without AsArray HashOutput must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 }
 
 // ArrayVariable.cpp:722–723 — itemized (collective!=0) hash is a no-op.
 // GlobalList holds collective + itemized; only parent emits one loop nest.
 func TestHashArraySkipsItemizedCollective(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	_ = GetNewCtrlVars(opts)
+	_ = GetNewCtrlVarsSess(testAmbientSession, opts)
 	parent := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_62", Type: GetIntType(), IsArray: true, ArraySizes: []int{2, 3},
@@ -133,24 +133,24 @@ func TestHashArraySkipsItemizedCollective(t *testing.T) {
 		t.Fatal("missing multi-dim index printf", out)
 	}
 	// itemized alone must emit nothing
-	if item.Variable.HashOutput() != "" {
+	if item.Variable.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("itemized ArrayVariable::hash must no-op")
 	}
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("itemized no-op must not sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 }
 
 // ArrayVariable.cpp:742–744 — field_names empty after union exclusions → give up
 // before for-loops (no empty for+index shell). Seed 94: g_336[5] all unreadable.
 func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
-	_ = GetNewCtrlVars(opts)
+	_ = GetNewCtrlVarsSess(testAmbientSession, opts)
 	ut := &Type{
 		isUnion:    true,
 		StructName: "U2",
@@ -169,7 +169,7 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	av.AsArray = av
 	// BOTTOM last-write → no field readable (FactUnion.cpp / seed 94-style)
 	facts := []*FactUnion{MakeFactUnion(&av.Variable, FactUnionBottom)}
-	out := hashArrayVariable(&av.Variable, nil, facts)
+	out := hashArrayVariableSess(testAmbientSession, &av.Variable, nil, facts)
 	if out != "" {
 		t.Fatalf("empty field_names must skip hash entirely, got:\n%s", out)
 	}
@@ -177,13 +177,13 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 		t.Fatal("complete BOTTOM facts must not sticky", GetErrorSess(testAmbientSession))
 	}
 	// without facts (nil) still has type leaves → would hash both fields
-	all := hashArrayVariable(&av.Variable, nil, nil)
+	all := hashArrayVariableSess(testAmbientSession, &av.Variable, nil, nil)
 	if !strings.Contains(all, "for (i = 0") || !strings.Contains(all, "g_336[i].f0") {
 		t.Fatal("nil facts must hash all leaves", all)
 	}
 	// partial: only f0 readable → loops + f0 only
 	f0 := []*FactUnion{MakeFactUnion(&av.Variable, 0)}
-	part := hashArrayVariable(&av.Variable, nil, f0)
+	part := hashArrayVariableSess(testAmbientSession, &av.Variable, nil, f0)
 	if !strings.Contains(part, "g_336[i].f0") || strings.Contains(part, "g_336[i].f1") {
 		t.Fatal("want only f0", part)
 	}
@@ -191,16 +191,16 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 		t.Fatal("readable payload must still emit loops", part)
 	}
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 }
 
 func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	opts.HashValuePrintf = false
 	SetProcessOptionsSess(testAmbientSession, opts)
-	_ = GetNewCtrlVars(opts)
+	_ = GetNewCtrlVarsSess(testAmbientSession, opts)
 	av := &ArrayVariable{
 		Variable: Variable{
 			Name: "g_x", Type: GetIntType(), IsArray: true, ArraySizes: []int{2},
@@ -209,7 +209,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 		Sizes: []int{2},
 	}
 	av.AsArray = av
-	out := av.Variable.HashOutput()
+	out := av.Variable.HashOutputSess(testAmbientSession)
 	if strings.Contains(out, "print_hash_value) printf") {
 		t.Fatal("hash_value_printf false must omit index printf", out)
 	}
@@ -219,7 +219,7 @@ func TestHashArrayHashValuePrintfOff(t *testing.T) {
 	// restore process defaults for later tests
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 }
 
 func TestGenerateHashUsesFieldCrc(t *testing.T) {
@@ -251,7 +251,7 @@ func TestHashOutputIsAggregateResidualSticky(t *testing.T) {
 	// Type-nil already sticky at hashOutput entry.
 	ClearErrorSess(testAmbientSession)
 	v := &Variable{Name: "g_x", Type: nil}
-	if v.hashOutput(nil, nil) != "" {
+	if v.hashOutputSess(testAmbientSession, nil, nil) != "" {
 		t.Fatal("Type-nil hashOutput must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {

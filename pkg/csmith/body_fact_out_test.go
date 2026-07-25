@@ -9,12 +9,12 @@ import "testing"
 func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fn := &Function{Name: "func_x", ReturnType: GetIntType()}
-	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
 	if p == nil {
 		t.Fatal("param")
 	}
 	fn.Param = []*Variable{p}
-	g := CreateVariableScalars("g_1", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", PointerTo(GetIntType()), false, false)
 	if g == nil {
 		t.Fatal("global")
 	}
@@ -36,14 +36,14 @@ func TestSetMapFactsOutForBlockFunctionBodyRemovesParams(t *testing.T) {
 	}
 	// param subject dropped
 	for _, f := range out {
-		if f.Var == p || f.Var.Match(p) {
+		if f.Var == p || f.Var.MatchSess(testAmbientSession, p) {
 			t.Fatal("param subject must be removed from function-body map_facts_out", f)
 		}
 	}
 	// global remaining; param pointee → garbage
 	found := false
 	for _, f := range out {
-		if f.Var == g || f.Var.Match(g) {
+		if f.Var == g || f.Var.MatchSess(testAmbientSession, g) {
 			found = true
 			hasG := false
 			for _, pt := range f.PointTo {

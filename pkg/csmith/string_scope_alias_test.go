@@ -29,14 +29,14 @@ func TestGetSubstring(t *testing.T) {
 
 func TestFindVariableScope(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(g) != ScopeGlobalVar {
 		t.Fatal("global")
 	}
 	f := &Function{Name: "f"}
-	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
@@ -47,13 +47,13 @@ func TestFindVariableScope(t *testing.T) {
 		t.Fatal("local", cg.FindVariableScope(loc))
 	}
 	// on caller frame
-	callerBlk := &Block{LocalVars: []*Variable{CreateVariableScalars("l_c", GetIntType(), false, false)}}
+	callerBlk := &Block{LocalVars: []*Variable{CreateVariableScalarsSess(testAmbientSession, "l_c", GetIntType(), false, false)}}
 	cg.CallChain = []*Block{callerBlk}
 	lc := callerBlk.LocalVars[0]
 	if cg.FindVariableScope(lc) != ScopeInvisible {
 		t.Fatal("invisible", cg.FindVariableScope(lc))
 	}
-	if cg.FindVariableScope(CreateVariableScalars("l_x", GetIntType(), false, false)) != ScopeInactive {
+	if cg.FindVariableScope(CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntType(), false, false)) != ScopeInactive {
 		t.Fatal("inactive")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -103,8 +103,8 @@ func TestFindVariableScope(t *testing.T) {
 
 func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	ClearPointToAggregatesSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a), MakeFactPointTo(p, NullPtr)}
 	var ptrs []*Variable
 	var aliases [][]*Variable
@@ -116,7 +116,7 @@ func TestUpdatePtrAliasesAndAggregate(t *testing.T) {
 	}
 	// nil fact hole fails closed
 	// Type-nil non-special must fail closed (no invent soft-skip partial alias)
-	broken := CreateVariableScalars("g_broken", GetIntType(), false, false)
+	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), false, false)
 	broken.Type = nil
 	if UpdatePtrAliases([]*FactPointTo{MakeFactPointTo(broken, p)}, &ptrs, &aliases) {
 		t.Fatal("Type-nil subject must fail closed UpdatePtrAliases")

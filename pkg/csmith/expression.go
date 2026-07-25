@@ -79,7 +79,7 @@ func (e *Expression) CompatibleWithVarSess(s *Session, v *Variable, expandStruct
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Var.Compatible(v, expandStruct)
+		ok := e.Var.CompatibleSess(s, v, expandStruct)
 		// residual ERROR sticky — no invent compatible true past Compatible residual hole
 		if sessHasError(s) {
 			return false
@@ -103,7 +103,7 @@ func (e *Expression) CompatibleWithVarSess(s *Session, v *Variable, expandStruct
 			sessNoteError(s, ErrGeneric)
 			return false
 		}
-		ok := e.Var.Compatible(v, expandStruct)
+		ok := e.Var.CompatibleSess(s, v, expandStruct)
 		// residual ERROR sticky — no invent compatible true past Compatible residual hole
 		if sessHasError(s) {
 			return false
@@ -781,7 +781,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 		if e.Var == v {
 			return true
 		}
-		matched := e.Var.Match(v)
+		matched := e.Var.MatchSess(s, v)
 		// residual ERROR sticky — no invent not-use soft-skip past Match hole (restrictive uses)
 		if sessHasError(s) {
 			return true
@@ -849,7 +849,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 			if e.Assign.LhsVar == v {
 				return true
 			}
-			if e.Assign.LhsVar.Match(v) {
+			if e.Assign.LhsVar.MatchSess(s, v) {
 				// residual ERROR sticky — no invent use-true past Match hole
 				if sessHasError(s) {
 					return true
@@ -870,7 +870,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 			if e.Assign.Lhs.Var == v {
 				return true
 			}
-			if e.Assign.Lhs.Var.Match(v) {
+			if e.Assign.Lhs.Var.MatchSess(s, v) {
 				// residual ERROR sticky — no invent use-true past Match hole
 				if sessHasError(s) {
 					return true
@@ -906,7 +906,7 @@ func (e *Expression) UseVarSess(s *Session, v *Variable) bool {
 		if e.Var == v {
 			return true
 		}
-		matched := e.Var.Match(v)
+		matched := e.Var.MatchSess(s, v)
 		// residual ERROR sticky — no invent not-use soft-skip past Match hole
 		if sessHasError(s) {
 			return true
@@ -1590,7 +1590,7 @@ func makeExpressionVariableFlags(
 		// C++: var->type->is_dereferenced_from(type)  (want = type, take &)
 		// continue without dummy (ExpressionVariable.cpp:97–100)
 		if asParam {
-			isArg := v.IsArgument()
+			isArg := v.IsArgumentSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-continue past IsArgument residual
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {
@@ -1622,7 +1622,7 @@ func makeExpressionVariableFlags(
 		// ExpressionVariable.cpp:101–105 — !addr_taken_of_locals: forbid & local/arg
 		// continue without dummy
 		if !vs.Opts.AddrTakenOfLocals {
-			isArg := v.IsArgument()
+			isArg := v.IsArgumentSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-continue past IsArgument residual
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {
@@ -1631,7 +1631,7 @@ func makeExpressionVariableFlags(
 				cg.EffectStm = preStm
 				return nil
 			}
-			isLoc := v.IsLocal()
+			isLoc := v.IsLocalSess(cgSess(cg))
 			// residual ERROR sticky — no invent soft-continue past IsLocal residual
 			if sessHasError(cgSess(cg)) {
 				if cg.EffectAccum != nil {

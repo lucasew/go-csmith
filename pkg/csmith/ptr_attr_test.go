@@ -7,7 +7,7 @@ import (
 
 func TestPtrModifiedInRhs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	lhs := &Lhs{Var: p, Type: GetIntType()} // *p
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	// RHS wrote the pointer itself
@@ -43,14 +43,14 @@ func TestPtrModifiedInRhs(t *testing.T) {
 }
 
 func TestOutputDefWithAttrs(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	v.Init = MakeInt(0)
 	// force attrs with 100% boolean
 	ClearAttrGeneratorsSess(testAmbientSession)
 	currentSession().VarAttrGenerator = &AttributeGenerator{Attributes: []Attribute{
 		&BooleanAttribute{Name: "unused", Prob: 100},
 	}}
-	s := v.OutputDefFull(true, false, true, NewRng(1))
+	s := v.OutputDefFullSess(testAmbientSession, true, false, true, NewRng(1))
 	if !strings.Contains(s, "__attribute__((unused))") {
 		t.Fatal(s)
 	}

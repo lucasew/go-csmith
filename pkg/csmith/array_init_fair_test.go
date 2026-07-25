@@ -22,7 +22,7 @@ func TestArrayOpAggregateConstantTmp(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	av.AsArray = av
-	iv := CreateVariableScalars("g_1287.f3", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_1287.f3", GetIntType(), false, false)
 	if iv == nil {
 		t.Fatal("iv")
 	}
@@ -101,7 +101,7 @@ func TestMakeRandomArrayInitZeroIncrOne(t *testing.T) {
 	vs.GlobalNonvolatilesList = []*Variable{&av.Variable}
 	// seed IVs
 	for i := 0; i < 3; i++ {
-		iv := CreateVariableQfer("g_i"+string(rune('0'+i)), GetIntType(), q)
+		iv := CreateVariableQferSess(testAmbientSession, "g_i"+string(rune('0'+i)), GetIntType(), q)
 		vs.GlobalList = append(vs.GlobalList, iv)
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, iv)
 	}
@@ -177,7 +177,7 @@ func TestMakeRandomArrayInitRejectsFloatIV(t *testing.T) {
 	av.Sizes = []int{4}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	iv := CreateVariableQfer("g_iv", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntType(), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
@@ -202,7 +202,7 @@ func TestMakeRandomIfClearsEffectStm(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))
-	v := CreateVariableScalars("g_z", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
 	// FactMgr required when condition may build ExpressionAssign
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	cg.Types = vs.Types

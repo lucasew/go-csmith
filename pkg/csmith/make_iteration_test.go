@@ -13,7 +13,7 @@ func TestMakeIterationRequiresFactMgr(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if MakeIteration(NewRng(1), opts, NewProbabilities(opts), vs, &cg) != nil {
@@ -40,7 +40,7 @@ func TestMakeIterationInitVisitFailReturnsNil(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{iv}
 	vs.AllVars = []*Variable{iv}
 	vs.Opts = opts
@@ -64,7 +64,7 @@ func TestMakeIterationNonArrayKeepsInvalidBound(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
@@ -122,7 +122,7 @@ func TestMakeIterationBuildsIR(t *testing.T) {
 		t.Fatal(hdr)
 	}
 	// IV name appears in header
-	if !strings.Contains(hdr, lc.IV.Name) && !strings.Contains(hdr, lc.IV.OutputC()) {
+	if !strings.Contains(hdr, lc.IV.Name) && !strings.Contains(hdr, lc.IV.OutputCSess(testAmbientSession, false)) {
 		t.Fatal(hdr, lc.IV.Name)
 	}
 }
@@ -208,7 +208,7 @@ func TestMakeIterationMustUseArrayNilHoleFailClosed(t *testing.T) {
 	f.Stack = []*Block{blk}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// seed a loop-ctrl candidate so we reach must-use hole (not fail earlier on nil IV)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

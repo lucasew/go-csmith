@@ -982,7 +982,7 @@ func NonEmptyIntersectionSess(s *Session, va, vb []*Variable) bool {
 				sessNoteError(s, ErrGeneric)
 				return true
 			}
-			if a.Match(b) {
+			if a.MatchSess(s, b) {
 				if sessHasError(s) {
 					return true
 				}
@@ -991,7 +991,7 @@ func NonEmptyIntersectionSess(s *Session, va, vb []*Variable) bool {
 			if sessHasError(s) {
 				return true
 			}
-			if b.Match(a) {
+			if b.MatchSess(s, a) {
 				if sessHasError(s) {
 					return true
 				}

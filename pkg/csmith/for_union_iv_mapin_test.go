@@ -10,7 +10,7 @@ import "testing"
 func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
@@ -21,13 +21,13 @@ func TestForUnionFieldIVBodyMapInMatchesInitLastWrite(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	g88 := CreateVariableQfer("g_88", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	g88.CreateFieldVars()
+	g88 := CreateVariableQferSess(testAmbientSession, "g_88", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	g88.CreateFieldVarsSess(testAmbientSession)
 	if len(g88.FieldVars) < 2 {
 		t.Fatal("field_vars")
 	}
-	if g88.FieldVars[0].GetFieldID() != 0 || g88.FieldVars[1].GetFieldID() != 1 {
-		t.Fatalf("GetFieldID f0=%d f1=%d", g88.FieldVars[0].GetFieldID(), g88.FieldVars[1].GetFieldID())
+	if g88.FieldVars[0].GetFieldIDSess(testAmbientSession) != 0 || g88.FieldVars[1].GetFieldIDSess(testAmbientSession) != 1 {
+		t.Fatalf("GetFieldID f0=%d f1=%d", g88.FieldVars[0].GetFieldIDSess(testAmbientSession), g88.FieldVars[1].GetFieldIDSess(testAmbientSession))
 	}
 	// pre-init last_write f0 (abstract init of union)
 	f := &Function{Name: "func_t", ReturnType: GetIntType()}

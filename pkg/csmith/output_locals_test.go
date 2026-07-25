@@ -8,7 +8,7 @@ import (
 func TestLocalOutputDef(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{}
-	lv := CreateVariableScalars("l_1", GetIntType(), true, false)
+	lv := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), true, false)
 	lv.Init = MakeInt(2)
 	b.LocalVars = []*Variable{lv}
 	out := b.Output(0)
@@ -20,10 +20,10 @@ func TestLocalOutputDef(t *testing.T) {
 func TestBlockOutputDefResidualSticky(t *testing.T) {
 	// OutputDef residual soft invent was soft-continue later locals invent partial block.
 	ClearErrorSess(testAmbientSession)
-	good := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntType(), false, false)
 	good.Init = MakeInt(1)
 	// incomplete InitExpr residual OutputDef
-	bad := CreateVariableScalars("l_bad", GetIntType(), false, false)
+	bad := CreateVariableScalarsSess(testAmbientSession, "l_bad", GetIntType(), false, false)
 	bad.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "0"}} // Type-nil
 	b := &Block{LocalVars: []*Variable{good, bad}}
 	if s := b.Output(0); s != "" {
@@ -58,8 +58,8 @@ func TestBlockOutputInvokeResidualSticky(t *testing.T) {
 
 func TestFunctionParamQualified(t *testing.T) {
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), true, false)
-	p := CreateVariableScalars("p_1", GetIntType(), true, true)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), true, true)
 	f.Param = []*Variable{p}
 	decl := f.OutputForwardDecl()
 	if !strings.Contains(decl, "const") || !strings.Contains(decl, "p_1") {

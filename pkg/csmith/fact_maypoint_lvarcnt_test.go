@@ -8,8 +8,8 @@ import "testing"
 // Soft invent re-computed/forced lvarCnt==1 and wiped may-null (seed-363 g_73).
 func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g4 := CreateVariableScalars("g_4", GetIntType(), true, false)
-	g73 := CreateVariableScalars("g_73", PointerTo(GetIntType()), true, false)
+	g4 := CreateVariableScalarsSess(testAmbientSession, "g_4", GetIntType(), true, false)
+	g73 := CreateVariableScalarsSess(testAmbientSession, "g_73", PointerTo(GetIntType()), true, false)
 
 	// g_73 may-null before definitive-looking transfer fact {g_4}
 	facts := []*FactPointTo{
@@ -53,8 +53,8 @@ func TestApplyPointToAssignLvarCnt2MergesMayNull(t *testing.T) {
 func TestMergePointeesIncludesNullSpecial(t *testing.T) {
 	// FactPointTo.cpp:756–784 — specials skipped as *ptrs*; pointees may be null
 	ClearErrorSess(testAmbientSession)
-	g73 := CreateVariableScalars("g_73c", PointerTo(GetIntType()), true, false)
-	g72 := CreateVariableScalars("g_72c", PointerTo(PointerTo(GetIntType())), true, false)
+	g73 := CreateVariableScalarsSess(testAmbientSession, "g_73c", PointerTo(GetIntType()), true, false)
+	g72 := CreateVariableScalarsSess(testAmbientSession, "g_72c", PointerTo(PointerTo(GetIntType())), true, false)
 	factsIn := []*FactPointTo{
 		MakeFactPointToSet(g72, []*Variable{NullPtr, g73}),
 	}

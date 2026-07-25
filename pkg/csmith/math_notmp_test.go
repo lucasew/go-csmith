@@ -96,7 +96,7 @@ func TestNoteReadTracksGlobal(t *testing.T) {
 	// NoteRead does not update feffect (Function.cpp:657 finalizes from body map).
 	// CommentOutput uses insertion-order read_vars via OutputForComment.
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	g := CreateVariableQfer("g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	g := CreateVariableQferSess(testAmbientSession, "g_1", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	if g == nil {
 		t.Fatal("CreateVariableQfer nil", GetErrorSess(testAmbientSession))
 	}

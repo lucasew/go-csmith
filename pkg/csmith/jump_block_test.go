@@ -8,7 +8,7 @@ import (
 func TestHasInitSkippedVars(t *testing.T) {
 	outer := &Block{}
 	inner := &Block{Parent: outer}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	inner.LocalVars = []*Variable{loc}
 	// jump from outer into inner skips l_1
 	if !HasInitSkippedVars(outer, inner) {
@@ -114,12 +114,12 @@ func TestCollectInitSkippedVarsIsVisibleResidualSticky(t *testing.T) {
 
 func TestOutputPtrResetsArray(t *testing.T) {
 	// OutputMgr.cpp:326–340 — get_last_ctrl_vars + output_init(&zero); no invent "0"
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	// ArrayVariable.cpp:179 — pointer alt-inits need make_init_value; strict_const
 	// uses Constant::make_random so library test can omit VS/CGContext.
 	opts.StrictConstArrays = true
-	_ = GetNewCtrlVars(opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
+	_ = GetNewCtrlVarsSess(testAmbientSession, opts) // OutputMgr.cpp: get_last_ctrl_vars after array inits
 	av := CreateArrayVariable(NewRng(2), opts, NewProbabilities(opts), nil, nil, nil, "g_a", PointerTo(GetIntType()), MakeInt(0), NewCVQualifiers([]bool{false}, []bool{false}))
 	if av == nil {
 		t.Fatal("av")
@@ -148,12 +148,12 @@ func TestOutputPtrResetsArray(t *testing.T) {
 	if !strings.Contains(out2, "i = i + 1") {
 		t.Fatal(out2)
 	}
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 }
 
 func TestClearEffectStm(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalars("g_x", GetIntType(), false, false))
+	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false))
 	cg.ClearEffectStm()
 	if !cg.EffectStm.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("clear")

@@ -5,16 +5,16 @@ import "testing"
 func TestIsVarOnStack(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
 	outer := &Block{Func: f}
-	l := CreateVariableScalars("l_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	outer.LocalVars = []*Variable{l}
 	inner := &Block{Func: f, Parent: outer}
 	if !inner.IsVarOnStack(l) || !inner.IsVarOnStack(p) {
 		t.Fatal("stack")
 	}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if inner.IsVarOnStack(g) {
 		t.Fatal("global")
 	}
@@ -49,8 +49,8 @@ func TestChooseVisibleReadVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	// nil type sticky
 	if ChooseVisibleReadVar(NewRng(2), blk, []*Variable{a}, nil, nil) != nil {
 		t.Fatal("nil type must fail closed")
@@ -68,7 +68,7 @@ func TestChooseVisibleReadVar(t *testing.T) {
 		}
 	}
 	// local not on stack from empty block → only global
-	loc := CreateVariableScalars("l_x", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_x", GetIntType(), false, false)
 	got = ChooseVisibleReadVar(NewRng(2), blk, []*Variable{loc}, GetIntType(), nil)
 	if got != nil {
 		t.Fatal("local not on stack")
@@ -124,15 +124,15 @@ func TestEffectReadVarsInsertionOrder(t *testing.T) {
 	// Effect.cpp:get_read_vars — C++ vector insertion order, not name-sorted.
 	// choose_visible_read_var ok_vars index depends on this order.
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_z", GetIntType(), false, false)
-	b := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	e := EmptyEffect().ReadVarSess(testAmbientSession, a).ReadVarSess(testAmbientSession, b)
 	rs := e.ReadVarsSess(testAmbientSession)
 	if len(rs) != 2 || rs[0] != a || rs[1] != b {
 		t.Fatalf("want insertion order [g_z,g_a], got %v", rs)
 	}
 	// struct parent covers field — field not re-pushed (Effect.cpp:117–119 + is_read)
-	parent := CreateVariableScalars("g_s", GetIntType(), true, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), true, false)
 	// mark as struct for IsRead field inheritance
 	parent.Type = &Type{isStruct: true, StructName: "S", Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
@@ -204,7 +204,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	b1 := &Block{Func: f, Stmts: []Stmt{
@@ -223,7 +223,7 @@ func TestMakeRandomGotoERRORGuardAndEffectClear(t *testing.T) {
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	seed := CreateVariableScalars("g_z", GetIntType(), false, false)
+	seed := CreateVariableScalarsSess(testAmbientSession, "g_z", GetIntType(), false, false)
 	// try seeds until successful goto (Expr set) to assert effect_stm clear order
 	cleared := false
 	for seedN := uint64(1); seedN < 40; seedN++ {

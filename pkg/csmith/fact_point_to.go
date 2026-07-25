@@ -847,7 +847,7 @@ func RhsToLhsTransferSess(s *Session, facts []*FactPointTo, lvars []*Variable, r
 				sessNoteError(s, ErrGeneric)
 				return IncompleteFactSlice()
 			}
-		} else if fn.RV.Type.IsAggregateSess(s) {
+		} else if fn.RV.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft-transfer past IsAggregate residual true
 			if sessHasError(s) {
 				return IncompleteFactSlice()

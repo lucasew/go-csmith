@@ -10,11 +10,11 @@ import "testing"
 // for them (FactMgr.cpp:575–579; seed-7 for 640 / l_1402).
 func TestDropFactSubjectsByVarsKeepsEntryWithoutBodyLocals(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	outer := CreateVariableScalars("g_outer", GetIntType(), false, false)
-	bodyLoc := CreateVariableScalars("l_body", PointerTo(GetIntType()), false, false)
+	outer := CreateVariableScalarsSess(testAmbientSession, "g_outer", GetIntType(), false, false)
+	bodyLoc := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerTo(GetIntType()), false, false)
 	bodyLoc.InitExpr = &Expression{Term: TermVariable, Var: outer, ExprType: PointerTo(GetIntType())}
 	in := []*FactPointTo{
-		MakeFactPointTo(CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), outer),
+		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false), outer),
 		MakeFactPointTo(bodyLoc, outer),
 	}
 	locals := []*Variable{bodyLoc}
@@ -45,12 +45,12 @@ func TestPostLoopBreakMergeNoInventBodyLocal(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// for body with local l_body
 	body := &Block{StmID: 10, Func: f, Looping: true, BreakStmIDs: []int{20}}
-	g := CreateVariableScalars("g_x", GetIntType(), false, false)
-	lBody := CreateVariableScalars("l_body", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	lBody := CreateVariableScalarsSess(testAmbientSession, "l_body", PointerTo(GetIntType()), false, false)
 	lBody.InitExpr = &Expression{Term: TermVariable, Var: g, ExprType: PointerTo(GetIntType())}
 	body.LocalVars = []*Variable{lBody}
 	// polluted map_facts_in[body] incorrectly includes body local (bug shape)
-	gPtr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	gPtr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.MapFactsIn[body.StmID] = []*FactPointTo{
 		MakeFactPointTo(gPtr, g),
 		MakeFactPointTo(lBody, g),

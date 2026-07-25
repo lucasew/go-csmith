@@ -66,7 +66,7 @@ func TestMakeRandomSignatureParams(t *testing.T) {
 		t.Fatal("expected >=1 param")
 	}
 	for _, p := range f.Param {
-		if p == nil || !p.IsArgument() {
+		if p == nil || !p.IsArgumentSess(testAmbientSession) {
 			t.Fatalf("param %v", p)
 		}
 	}
@@ -217,7 +217,7 @@ func TestMakeFirstMakeRandomFunctionIncompleteGlobalListFailClosed(t *testing.T)
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	// plant incomplete GlobalList hole
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g, nil}
 	if MakeFirst(NewRng(3), opts, probs, vs, &vs.Sym, NewExprTables(opts), NewStatementThresholdTable(opts), nil, nil) != nil {
 		t.Fatal("incomplete GlobalList must fail closed MakeFirst")
@@ -247,7 +247,7 @@ func TestMakeRandomForERRORGuardAfterBody(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, probs, vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -268,7 +268,7 @@ func TestFunctionOutputNoSoftInventBodyOrRetConst(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{
 		Name: "func_x", ReturnType: GetIntType(),
-		RV:           CreateVariableScalars("func_x_rv", GetIntType(), false, false),
+		RV:           CreateVariableScalarsSess(testAmbientSession, "func_x_rv", GetIntType(), false, false),
 		DepthProtect: true,
 	}
 	out := f.Output()
@@ -387,7 +387,7 @@ func TestReturnTypeCAndParamListSticky(t *testing.T) {
 	// live RV path
 	f2 := &Function{
 		Name: "h", ReturnType: GetIntType(),
-		RV: CreateVariableScalars("rv", GetIntType(), false, false),
+		RV: CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false),
 	}
 	if s := f2.returnTypeC(); s == "" {
 		t.Fatal("live RV returnTypeC empty")

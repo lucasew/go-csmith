@@ -21,11 +21,11 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 	body := &Block{Func: f, StmID: 463}
 	f.Blocks = []*Block{body}
 	f.Stack = []*Block{body}
-	arr := CreateVariableScalars("l_1053", st, false, false)
+	arr := CreateVariableScalarsSess(testAmbientSession, "l_1053", st, false, false)
 	if arr == nil {
 		t.Fatalf("CreateVariableScalars nil err=%v", GetErrorSess(testAmbientSession))
 	}
-	arr.CreateFieldVars()
+	arr.CreateFieldVarsSess(testAmbientSession)
 	if len(arr.FieldVars) < 2 {
 		t.Fatalf("fields %d err=%v", len(arr.FieldVars), GetErrorSess(testAmbientSession))
 	}
@@ -51,7 +51,7 @@ func TestIsVarOOSLocalAggregateField(t *testing.T) {
 		t.Fatal(GetErrorSess(testAmbientSession))
 	}
 	// UpdateFactsForDest must not mark-dead pointers to the field
-	ptr := CreateVariableScalars("l_1226", PointerTo(GetSimpleType(EShort)), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "l_1226", PointerTo(GetSimpleType(EShort)), false, false)
 	factsIn := []*FactPointTo{MakeFactPointTo(ptr, field)}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)

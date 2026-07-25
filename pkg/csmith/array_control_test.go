@@ -97,7 +97,7 @@ func TestMakeIterationUsesMustUseArrays(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable}
 	vs.Arrays = []*ArrayVariable{av}
 	// add a loop ctrl candidate
-	iv := CreateVariableQfer("g_2", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_2", GetIntType(), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -127,7 +127,7 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 	av.ArraySizes = av.Sizes
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	iv := CreateVariableQfer("g_iv", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntType(), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -153,8 +153,8 @@ func TestArrayOpLoopPassesMustUse(t *testing.T) {
 
 func TestCombineVariableSets(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	got := CombineVariableSets([]*Variable{a}, []*Variable{a, b})
 	if len(got) != 2 {
 		t.Fatalf("%d", len(got))
@@ -226,7 +226,7 @@ func TestMakeRandomArrayLoopMustRW(t *testing.T) {
 		vs.GlobalList = append(vs.GlobalList, &av.Variable)
 		vs.GlobalNonvolatilesList = append(vs.GlobalNonvolatilesList, &av.Variable)
 	}
-	iv := CreateVariableQfer("g_iv", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "g_iv", GetIntType(), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -276,7 +276,7 @@ func TestMakeRandomForClearsEffectStm(t *testing.T) {
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessWrite, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f)), GetIntType(), nil, NewRng(2))
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f))
 	// pre-seed effect_stm as dirty
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, v)

@@ -10,14 +10,14 @@ func TestAddInterestedFactsGates(t *testing.T) {
 		t.Fatal("point only")
 	}
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
 	if FindRelatedPointTo(fm.GlobalFacts, p) == nil {
 		t.Fatal("want pt fact")
 	}
 	// union fact should not be created when disabled
 	ut := &Type{isUnion: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	fm.AddNewVarFact(uv)
 	if FindRelatedUnion(fm.UnionFacts, uv) != nil {
 		t.Fatal("union should be skipped")

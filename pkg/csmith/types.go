@@ -1787,7 +1787,7 @@ func HasLongLongFieldSess(s *Session, fields []StructField) bool {
 		} else if sessHasError(s) {
 			return true
 		}
-		if f.Type.IsAggregateSess(s) {
+		if f.Type.IsAggregate() {
 			// residual ERROR sticky — no invent soft has-longlong past IsAggregate residual
 			if sessHasError(s) {
 				return true

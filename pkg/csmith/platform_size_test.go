@@ -47,7 +47,7 @@ func TestFieldVarsMarkBitfield(t *testing.T) {
 		{Type: GetIntType(), BitWidth: 5, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 		{Type: GetIntType(), BitWidth: -1, Qfer: NewCVQualifiers([]bool{false}, []bool{false})},
 	}}
-	v := CreateVariableQfer("g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(v.FieldVars) != 2 {
 		t.Fatalf("fields %d", len(v.FieldVars))
 	}

@@ -48,9 +48,6 @@ type Variable struct {
 // Variable.cpp:678–686 — globals may get_prefixed_name; default RNG returns name as-is.
 // Variable always has live name for emit; empty Name sticky (no invent empty
 // identifier soft-skip past incomplete name shell; callers previously sticky only).
-func (v *Variable) GetActualName(prefixName bool) string {
-	return v.GetActualNameSess(testAmbientSession, prefixName)
-}
 
 func (v *Variable) GetActualNameSess(s *Session, prefixName bool) string {
 	// Variable* always live for name emit; sticky no invent empty identifier
@@ -87,27 +84,14 @@ func GetPrefixedName(name string, prefixName bool) string {
 	return name
 }
 
-// OutputDecl mirrors Variable::OutputDecl — static? + qualified type + name.
-// Variable.cpp:670–676.
-func (v *Variable) OutputDecl(forceStatic bool) string {
-	return v.OutputDeclOpts(forceStatic, false)
-}
-
-// OutputDeclOpts includes prefix_name option (ambient ProcessOptions for CV asserts).
-func (v *Variable) OutputDeclOpts(forceStatic, prefixName bool) string {
-	return v.OutputDeclSess(testAmbientSession, forceStatic, prefixName)
-}
-
-// OutputDeclSess is OutputDeclOpts with Options/sticky from an explicit session bag.
+// OutputDeclSess mirrors Variable::OutputDecl — static? + qualified type + name
+// with Options/sticky from an explicit session bag.
+// Non-Sess dual deleted — pass run bag or testAmbientSession explicitly.
 func (v *Variable) OutputDeclSess(s *Session, forceStatic, prefixName bool) string {
 	return v.OutputDeclWithSess(s, forceStatic, prefixName, sessOpts(s))
 }
 
-// OutputDeclWith is OutputDeclOpts with explicit session Options (const/volatile asserts).
-func (v *Variable) OutputDeclWith(forceStatic, prefixName bool, opts Options) string {
-	return v.OutputDeclWithSess(testAmbientSession, forceStatic, prefixName, opts)
-}
-
+// OutputDeclWithSess is OutputDecl with explicit session Options (const/volatile asserts).
 func (v *Variable) OutputDeclWithSess(s *Session, forceStatic, prefixName bool, opts Options) string {
 	// Variable* always live at OutputDecl; sticky no invent decl shell without it
 	if v == nil {
@@ -155,21 +139,11 @@ func (v *Variable) OutputDeclWithSess(s *Session, forceStatic, prefixName bool, 
 // OutputDef mirrors Variable::OutputDef — decl + init + ";" + optional volatile comment.
 // Variable.cpp:640–665.}
 
-func (v *Variable) OutputDef(forceStatic bool) string {
-	return v.OutputDefOpts(forceStatic, false)
-}
-
 // OutputDefOpts adds prefix_name and VOLATILE GLOBAL comment for volatile globals.
-func (v *Variable) OutputDefOpts(forceStatic, prefixName bool) string {
-	return v.OutputDefFull(forceStatic, prefixName, false, nil)
-}
 
 // OutputDefFull mirrors Variable::OutputDef with optional __attribute__.
 // Variable.cpp:640–665 — decl, attr_generator.Output, init, volatile comment.
 // IsArray without AsArray sticky empty (no invent scalar "int g_a = 0;" past array shell).
-func (v *Variable) OutputDefFull(forceStatic, prefixName, withAttrs bool, r *Rng) string {
-	return v.OutputDefFullSess(testAmbientSession, forceStatic, prefixName, withAttrs, r)
-}
 
 // OutputDefFullSess is OutputDefFull on an explicit session bag (var attrs).
 func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAttrs bool, r *Rng) string {
@@ -251,29 +225,17 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 	return b.String()
 }
 
-// OutputC mirrors Variable::Output — VOL_RVAL / ACCESS_ONCE / bare name.
+// OutputCSess mirrors Variable::Output — VOL_RVAL / ACCESS_ONCE / bare name
+// with Options/sticky from an explicit session bag.
 // Variable.cpp:689–700.
-func (v *Variable) OutputC() string {
-	return v.OutputCOpts(false)
-}
-
-// OutputCOpts is Output with prefix_name (ambient ProcessOptions for access_once).
-func (v *Variable) OutputCOpts(prefixName bool) string {
-	return v.OutputCSess(testAmbientSession, prefixName)
-}
-
-// OutputCSess is OutputCOpts with Options/sticky from an explicit session bag.
+// Non-Sess dual deleted — pass run bag or testAmbientSession explicitly.
 func (v *Variable) OutputCSess(s *Session, prefixName bool) string {
 	return v.OutputCOptsWithSess(s, prefixName, sessOpts(s))
 }
 
-// OutputCOptsWith is OutputCOpts with explicit session Options (access_once).
+// OutputCOptsWithSess is OutputC with explicit session Options (access_once).
 // ArrayVariable::Output overrides Variable::Output for itemized members
 // (ArrayVariable.cpp:539–571) — name + indices, no VOL_RVAL wrap.
-func (v *Variable) OutputCOptsWith(prefixName bool, opts Options) string {
-	return v.OutputCOptsWithSess(testAmbientSession, prefixName, opts)
-}
-
 func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options) string {
 	// Variable* always live at Output; sticky no invent empty C name without it
 	if v == nil {
@@ -344,16 +306,10 @@ func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options
 
 // OutputLhsC mirrors Lhs::Output — VOL_LVAL when wrap_volatiles.
 // Lhs.cpp:207–218.
-func (v *Variable) OutputLhsC() string {
-	return v.OutputLhsCOpts(false)
-}
 
 // OutputLhsCOpts is OutputLhs with prefix_name.
 // Itemized arrays use ArrayVariable::Output (indices) as LHS text.
 // Incomplete Variable sticky empty (no invent empty LHS soft-skip past hole).
-func (v *Variable) OutputLhsCOpts(prefixName bool) string {
-	return v.OutputLhsCOptsSess(testAmbientSession, prefixName)
-}
 
 func (v *Variable) OutputLhsCOptsSess(s *Session, prefixName bool) string {
 	// Variable always live at LHS emit; sticky incomplete no invent empty token
@@ -416,10 +372,6 @@ func (v *Variable) OutputLhsCOptsSess(s *Session, prefixName bool) string {
 // OutputAddrOf mirrors Variable::OutputAddrOf — always &actual_name (no VOL_RVAL).
 // Variable.cpp:707–710.}
 
-func (v *Variable) OutputAddrOf(prefixName bool) string {
-	return v.OutputAddrOfSess(testAmbientSession, prefixName)
-}
-
 func (v *Variable) OutputAddrOfSess(s *Session, prefixName bool) string {
 	// Variable* always live; sticky no invent "&0" for nil
 	if v == nil {
@@ -441,9 +393,6 @@ func (v *Variable) OutputAddrOfSess(s *Session, prefixName bool) string {
 
 // OutputForComment mirrors Variable::OutputForComment — bare actual name.
 // Variable.cpp:711–713.
-func (v *Variable) OutputForComment(prefixName bool) string {
-	return v.OutputForCommentSess(testAmbientSession, prefixName)
-}
 
 func (v *Variable) OutputForCommentSess(s *Session, prefixName bool) string {
 	// Variable* always live at comment emit; sticky no invent empty comment name
@@ -466,9 +415,6 @@ func (v *Variable) OutputForCommentSess(s *Session, prefixName bool) string {
 // OutputUpperBound mirrors Variable::OutputUpperBound — field path for bounds.
 // Variable.cpp:721–732; ArrayVariable.cpp:572–577 for arrays.
 // IsArray without AsArray sticky empty (no invent bare-name upper bound past shell).
-func (v *Variable) OutputUpperBound(prefixName bool) string {
-	return v.OutputUpperBoundSess(testAmbientSession, prefixName)
-}
 
 func (v *Variable) OutputUpperBoundSess(s *Session, prefixName bool) string {
 	// Variable* always live at bound emit; sticky no invent empty upper bound
@@ -492,7 +438,7 @@ func (v *Variable) OutputUpperBoundSess(s *Session, prefixName bool) string {
 	}
 	if v.FieldVarOf != nil {
 		// Variable.cpp:724–727 — assert(dot != npos); sticky no invent base-only without ".fN"
-		base := v.FieldVarOf.OutputUpperBound(prefixName)
+		base := v.FieldVarOf.OutputUpperBoundSess(s, prefixName)
 		// residual ERROR sticky — no invent soft-continue field path past parent residual
 		if sessHasError(s) {
 			return ""
@@ -525,10 +471,6 @@ func (v *Variable) OutputUpperBoundSess(s *Session, prefixName bool) string {
 // Incomplete Variable sticky empty (no invent empty bound soft-skip past hole).
 // IsArray without AsArray sticky empty (no invent bare-name lower bound past shell).}
 
-func (v *Variable) OutputLowerBound(prefixName bool) string {
-	return v.OutputLowerBoundSess(testAmbientSession, prefixName)
-}
-
 func (v *Variable) OutputLowerBoundSess(s *Session, prefixName bool) string {
 	// Variable always live at bound emit; sticky incomplete no invent empty token
 	if v == nil {
@@ -542,7 +484,7 @@ func (v *Variable) OutputLowerBoundSess(s *Session, prefixName bool) string {
 		return ""
 	}
 	if v.AsArray != nil {
-		out := v.AsArray.OutputLowerBound()
+		out := v.AsArray.OutputLowerBoundSess(s)
 		// residual ERROR sticky — no invent soft-empty lower past Array OutputLowerBound residual
 		if sessHasError(s) {
 			return ""
@@ -551,7 +493,7 @@ func (v *Variable) OutputLowerBoundSess(s *Session, prefixName bool) string {
 	}
 	if v.FieldVarOf != nil {
 		// Variable.cpp:737–740 — assert(dot != npos); sticky no invent base-only without ".fN"
-		base := v.FieldVarOf.OutputLowerBound(prefixName)
+		base := v.FieldVarOf.OutputLowerBoundSess(s, prefixName)
 		// residual ERROR sticky — no invent soft-continue field path past parent residual
 		if sessHasError(s) {
 			return ""
@@ -583,10 +525,6 @@ func (v *Variable) OutputLowerBoundSess(s *Session, prefixName bool) string {
 // Variable.cpp:747–767. maxDim is CGOptions::max_array_dimensions() as-is
 // (no soft invent maxDim=1 when option is 0 — empty loop / empty vector).}
 
-func NewCtrlVars(maxDim int, freshNames bool) []*Variable {
-	return NewCtrlVarsSess(testAmbientSession, maxDim, freshNames)
-}
-
 // NewCtrlVarsSess is NewCtrlVars on an explicit session bag.
 func NewCtrlVarsSess(s *Session, maxDim int, freshNames bool) []*Variable {
 	s = sessOrAmbient(s)
@@ -614,9 +552,6 @@ func NewCtrlVarsSess(s *Session, maxDim int, freshNames bool) []*Variable {
 }
 
 // GetNewCtrlVars mirrors Variable::get_new_ctrl_vars.
-func GetNewCtrlVars(opts Options) []*Variable {
-	return GetNewCtrlVarsSess(testAmbientSession, opts)
-}
 
 // GetNewCtrlVarsSess is GetNewCtrlVars on an explicit session bag.
 func GetNewCtrlVarsSess(s *Session, opts Options) []*Variable {
@@ -627,9 +562,6 @@ func GetNewCtrlVarsSess(s *Session, opts Options) []*Variable {
 // Variable.cpp:774–776. Returns nil if none allocated.
 // Incomplete last vector fails closed sticky IncompleteVariables (not bare nil invent
 // empty-complete ctrl set / soft re-pick array inits past hole).
-func GetLastCtrlVars() []*Variable {
-	return GetLastCtrlVarsSess(testAmbientSession)
-}
 
 // GetLastCtrlVarsSess is GetLastCtrlVars on an explicit session bag.
 func GetLastCtrlVarsSess(s *Session) []*Variable {
@@ -647,9 +579,6 @@ func GetLastCtrlVarsSess(s *Session) []*Variable {
 
 // CtrlVarsDoFinalization mirrors Variable::doFinalization for ctrl var pool.
 // Variable.cpp:779–786.
-func CtrlVarsDoFinalization() {
-	CtrlVarsDoFinalizationSess(testAmbientSession)
-}
 
 // CtrlVarsDoFinalizationSess clears ctrl-var pool on an explicit session bag.
 func CtrlVarsDoFinalizationSess(s *Session) {
@@ -661,9 +590,6 @@ func CtrlVarsDoFinalizationSess(s *Session) {
 // CtrlVarNames returns actual names of a ctrl-var slice.
 // Variable* always live; incomplete list fails closed sticky IncompleteLabelsSlice
 // (not bare nil invent empty-complete name list / soft re-pick past hole).
-func CtrlVarNames(ctrl []*Variable) []string {
-	return CtrlVarNamesSess(testAmbientSession, ctrl)
-}
 
 // CtrlVarNamesSess is CtrlVarNames with sticky errors on bag s.
 func CtrlVarNamesSess(s *Session, ctrl []*Variable) []string {
@@ -692,9 +618,6 @@ func CtrlVarNamesSess(s *Session, ctrl []*Variable) []string {
 // Variable.cpp:800–811 — assert(dimen <= ctrl_vars.size()); get_actual_name only.
 // Incomplete ctrl list fails closed sticky empty (no invent "int , j;" / empty-complete
 // decl for nil slots via soft return "").
-func OutputArrayCtrlVars(ctrl []*Variable, dimen int, indent string) string {
-	return OutputArrayCtrlVarsSess(testAmbientSession, ctrl, dimen, indent)
-}
 
 // OutputArrayCtrlVarsSess is OutputArrayCtrlVars with sticky errors on bag s.
 func OutputArrayCtrlVarsSess(s *Session, ctrl []*Variable, dimen int, indent string) string {
@@ -746,9 +669,6 @@ func OutputArrayCtrlVarsSess(s *Session, ctrl []*Variable, dimen int, indent str
 // Incomplete vars list fails closed sticky as -1 (no invent skip partial max /
 // soft re-pick zero-dim success past holes). Complete empty / no arrays → 0.
 // IsArray without AsArray sticky -1 (no invent dim from ArraySizes past broken shell).
-func GetMaxArrayDimension(vars []*Variable) int {
-	return GetMaxArrayDimensionSess(testAmbientSession, vars)
-}
 
 // GetMaxArrayDimensionSess is GetMaxArrayDimension with sticky errors on bag s.
 func GetMaxArrayDimensionSess(s *Session, vars []*Variable) int {
@@ -782,9 +702,6 @@ func GetMaxArrayDimensionSess(s *Session, vars []*Variable) int {
 // Variable.cpp:829–841 — allocate ctrl vars, declare, emit output_init.
 // Incomplete vars list (GetMaxArrayDimension -1) fails closed sticky empty
 // (no invent treat incomplete as zero-dim empty success).
-func OutputArrayInitializers(vars []*Variable, opts Options, indent string) string {
-	return OutputArrayInitializersSess(testAmbientSession, vars, opts, indent)
-}
 
 // OutputArrayInitializersSess is OutputArrayInitializers on an explicit session bag
 // (ctrl pool + residual sticky).
@@ -858,9 +775,6 @@ func OutputArrayInitializersSess(s *Session, vars []*Variable, opts Options, ind
 
 // CreateVariableQfer mirrors Variable::CreateVariable(name, type, init, qfer).
 // Variable.cpp:405–421 — caller supplies init (may be nil); expand aggregates.
-func CreateVariableQfer(name string, typ *Type, qfer CVQualifiers) *Variable {
-	return CreateVariableQferSess(testAmbientSession, name, typ, qfer)
-}
 
 // CreateVariableQferSess is CreateVariableQfer with sticky/field expand on bag s.
 func CreateVariableQferSess(s *Session, name string, typ *Type, qfer CVQualifiers) *Variable {
@@ -869,9 +783,6 @@ func CreateVariableQferSess(s *Session, name string, typ *Type, qfer CVQualifier
 
 // CreateVariableWithInit mirrors Variable::CreateVariable(name, type, init, qfer).
 // Variable.cpp:405–421.
-func CreateVariableWithInit(name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
-	return CreateVariableWithInitSess(testAmbientSession, name, typ, init, qfer)
-}
 
 func CreateVariableWithInitSess(s *Session, name string, typ *Type, init *Constant, qfer CVQualifiers) *Variable {
 	// Variable.cpp:412–414 — assert(type); assert simple != eVoid sticky
@@ -900,7 +811,7 @@ func CreateVariableWithInitSess(s *Session, name string, typ *Type, init *Consta
 		Qfer: qfer.Clone(),
 		Init: init,
 	}
-	if typ.IsAggregate() {
+	if typ.IsAggregateSess(s) {
 		// residual ERROR sticky — no invent soft-create past IsAggregate residual true
 		if sessHasError(s) {
 			return nil
@@ -921,10 +832,6 @@ func CreateVariableWithInitSess(s *Session, name string, typ *Type, init *Consta
 // Variable.cpp:395 Constant::make_random uses the process RNG stream.
 // Nil when session Rng unset — fail closed (no invent private advancing NewRng stream).}
 
-func createVarRng() *Rng {
-	return createVarRngSess(testAmbientSession)
-}
-
 // createVarRngSess is createVarRng on an explicit session bag.
 func createVarRngSess(s *Session) *Rng {
 	return sessRng(s)
@@ -934,9 +841,6 @@ func createVarRngSess(s *Session) *Rng {
 // Variable::CreateVariable(name, type, isConst, isVolatile, …) for a scalar.
 // Variable.cpp:368–402 — vectors of one bool each; init = Constant::make_random
 // unless outermost container is union (Variable.cpp:395).
-func CreateVariableScalars(name string, typ *Type, isConst, isVolatile bool) *Variable {
-	return CreateVariableScalarsSess(testAmbientSession, name, typ, isConst, isVolatile)
-}
 
 // CreateVariableScalarsSess is CreateVariableScalars on an explicit session bag.
 func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVolatile bool) *Variable {
@@ -985,7 +889,7 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 		Qfer: qfer,
 		Init: init,
 	}
-	if typ.IsAggregate() {
+	if typ.IsAggregateSess(s) {
 		v.CreateFieldVarsSess(s)
 	}
 	// Variable.cpp:401 — ERROR_GUARD_AND_DEL1 after create_field_vars
@@ -997,9 +901,6 @@ func CreateVariableScalarsSess(s *Session, name string, typ *Type, isConst, isVo
 
 // IsGlobal mirrors Variable::is_global — name prefix "g_" (or field of global).
 // Incomplete Variable sticky false (no invent not-global soft-skip past hole).
-func (v *Variable) IsGlobal() bool {
-	return v.IsGlobalSess(testAmbientSession)
-}
 
 func (v *Variable) IsGlobalSess(s *Session) bool {
 	// Variable always live; sticky incomplete no invent not-global soft-skip
@@ -1025,10 +926,6 @@ func (v *Variable) IsGlobalSess(s *Session) bool {
 // IsLocal mirrors Variable::is_local — name prefix "l_".
 // Incomplete Variable sticky false (no invent not-local soft-skip past hole).}
 
-func (v *Variable) IsLocal() bool {
-	return v.IsLocalSess(testAmbientSession)
-}
-
 func (v *Variable) IsLocalSess(s *Session) bool {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -1040,10 +937,6 @@ func (v *Variable) IsLocalSess(s *Session) bool {
 // IsArgument mirrors Variable::is_argument — name prefix "p_".
 // Incomplete Variable sticky false (no invent not-arg soft-skip past hole).}
 
-func (v *Variable) IsArgument() bool {
-	return v.IsArgumentSess(testAmbientSession)
-}
-
 func (v *Variable) IsArgumentSess(s *Session) bool {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -1054,9 +947,6 @@ func (v *Variable) IsArgumentSess(s *Session) bool {
 
 // IsRV mirrors Variable::is_rv — return dummy name ends with "_rv".
 // Incomplete Variable sticky false (no invent not-rv soft-skip past hole).
-func (v *Variable) IsRV() bool {
-	return v.IsRVSess(testAmbientSession)
-}
 
 func (v *Variable) IsRVSess(s *Session) bool {
 	if v == nil {
@@ -1072,9 +962,6 @@ func (v *Variable) IsRVSess(s *Session) bool {
 // IsTmpVar mirrors Variable::is_tmp_var — name prefix "t_".
 // Variable.cpp:512–514.
 // Incomplete Variable sticky false (no invent not-tmp soft-skip past hole).
-func (v *Variable) IsTmpVar() bool {
-	return v.IsTmpVarSess(testAmbientSession)
-}
 
 func (v *Variable) IsTmpVarSess(s *Session) bool {
 	if v == nil {
@@ -1087,9 +974,6 @@ func (v *Variable) IsTmpVarSess(s *Session) bool {
 // IsValidVolatile mirrors Variable::is_valid_volatile.
 // Variable.cpp:1061–1072 — union fields recurse; const null pointer init invalid.
 // Incomplete Variable/Type/init sticky false (no invent valid-volatile soft re-pick).
-func (v *Variable) IsValidVolatile() bool {
-	return v.IsValidVolatileSess(testAmbientSession)
-}
 
 func (v *Variable) IsValidVolatileSess(s *Session) bool {
 	// Variable always live; sticky incomplete no invent valid-vol soft-skip
@@ -1124,7 +1008,7 @@ func (v *Variable) IsValidVolatileSess(s *Session) bool {
 		if sessHasError(s) {
 			return false
 		}
-		ok := uv.IsValidVolatile()
+		ok := uv.IsValidVolatileSess(s)
 		// residual ERROR sticky — no invent valid soft-skip past nested IsValidVolatile hole
 		if sessHasError(s) {
 			return false
@@ -1190,10 +1074,6 @@ func (v *Variable) IsValidVolatileSess(s *Session) bool {
 // Incomplete Variable sticky false for nil shell; Type-nil ancestor sticky true
 // (restrictive — no invent not-packed soft-skip past incomplete parent type).}
 
-func (v *Variable) IsPackedAggregateFieldVar() bool {
-	return v.IsPackedAggregateFieldVarSess(testAmbientSession)
-}
-
 func (v *Variable) IsPackedAggregateFieldVarSess(s *Session) bool {
 	// Variable always live; sticky incomplete no invent not-packed soft-skip
 	if v == nil {
@@ -1217,9 +1097,6 @@ func (v *Variable) IsPackedAggregateFieldVarSess(s *Session) bool {
 // Variable.cpp:1240–1258 — packed struct field after a bitfield has unstable offset.
 // Incomplete parent FieldVars sticky true (restrictive — no invent not-packed
 // by soft-skipping FieldVars holes before this field).
-func (v *Variable) IsPackedAfterBitfield() bool {
-	return v.IsPackedAfterBitfieldSess(testAmbientSession)
-}
 
 func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 	// Variable always live; non-field complete false
@@ -1295,10 +1172,6 @@ func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 // Parent IsArray without AsArray sticky true (restrictive — no invent not-array-field
 // soft-skip past broken array parent shell).}
 
-func (v *Variable) IsArrayField() bool {
-	return v.IsArrayFieldSess(testAmbientSession)
-}
-
 func (v *Variable) IsArrayFieldSess(s *Session) bool {
 	// Variable.cpp:270–276 — if field_var_of recurse; else return isArray.
 	// Soft invent was return false when FieldVarOf==nil (missed top-level arrays).
@@ -1339,9 +1212,6 @@ func (v *Variable) IsArrayFieldSess(s *Session) bool {
 // ArrayVariable — sizes.size().
 // Incomplete Variable sticky 0 (no invent dim soft-skip past hole).
 // IsArray without AsArray sticky 0 (no invent dim from ArraySizes past broken shell).
-func (v *Variable) GetDimension() int {
-	return v.GetDimensionSess(testAmbientSession)
-}
 
 func (v *Variable) GetDimensionSess(s *Session) int {
 	// Variable always live; sticky incomplete no invent dim 0 soft-skip
@@ -1365,9 +1235,6 @@ func (v *Variable) GetDimensionSess(s *Session) int {
 // Variable.cpp:1205–1222 — name match, array Output text, or field recurse.
 // MatchVarName mirrors Variable::match_var_name — name or field path.
 // Variable* always live in FieldVars; nil hole fails closed (nil match).
-func (v *Variable) MatchVarName(vname string) *Variable {
-	return v.MatchVarNameSess(testAmbientSession, vname)
-}
 
 func (v *Variable) MatchVarNameSess(s *Session, vname string) *Variable {
 	// Variable* always live for name match; sticky no invent miss without it
@@ -1389,13 +1256,13 @@ func (v *Variable) MatchVarNameSess(s *Session, vname string) *Variable {
 		return nil
 	}
 	// array / array field: compare Output text
-	isAF := v.IsArrayField()
+	isAF := v.IsArrayFieldSess(s)
 	// residual ERROR sticky — no invent soft-match name past IsArrayField residual
 	if sessHasError(s) {
 		return nil
 	}
 	if v.IsArray || isAF {
-		out := v.OutputC()
+		out := v.OutputCSess(s, false)
 		// residual ERROR sticky — no invent soft-match name past OutputC residual
 		if sessHasError(s) {
 			return nil
@@ -1421,7 +1288,7 @@ func (v *Variable) MatchVarNameSess(s *Session, vname string) *Variable {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
-		m := f.MatchVarName(vname)
+		m := f.MatchVarNameSess(s, vname)
 		// residual ERROR sticky — no invent soft-continue field match past MatchVarName residual
 		if sessHasError(s) {
 			return nil
@@ -1437,10 +1304,6 @@ func (v *Variable) MatchVarNameSess(s *Session, vname string) *Variable {
 // Variable.cpp:1048–1058 — name starts with seen+"[".
 // Seen entries and subject name always live; empty entry invents prefix "[" and
 // empty name invents not-seen soft-miss — sticky false (no invent complete membership).}
-
-func IsSeenName(seen []string, name string) bool {
-	return IsSeenNameSess(testAmbientSession, seen, name)
-}
 
 func IsSeenNameSess(s *Session, seen []string, name string) bool {
 	if name == "" {
@@ -1463,9 +1326,6 @@ func IsSeenNameSess(s *Session, seen []string, name string) bool {
 
 // IsConst mirrors Variable::is_const → is_const_after_deref(0).
 // Variable.cpp:517 — qfer const OR type is_const_struct_union (not qfer-only).
-func (v *Variable) IsConst() bool {
-	return v.IsConstSess(testAmbientSession)
-}
 
 func (v *Variable) IsConstSess(s *Session) bool {
 	return v.IsConstAfterDerefSess(s, 0)
@@ -1477,20 +1337,12 @@ func (v *Variable) IsConstSess(s *Session) bool {
 // as non-vol: ReadVar/WriteVar kept side_effect_free; Expression chose Nonvoid
 // instead of NonvoidNonvolatile (seed2 first_div@9674 accepted volatile struct).}
 
-func (v *Variable) IsVolatile() bool {
-	return v.IsVolatileSess(testAmbientSession)
-}
-
 func (v *Variable) IsVolatileSess(s *Session) bool {
 	return v.IsVolatileAfterDerefSess(s, 0)
 }
 
 // IsFieldVar mirrors Variable::is_field_var.
 // Incomplete Variable sticky false (no invent not-field soft-skip past hole).}
-
-func (v *Variable) IsFieldVar() bool {
-	return v.IsFieldVarSess(testAmbientSession)
-}
 
 func (v *Variable) IsFieldVarSess(s *Session) bool {
 	if v == nil {
@@ -1503,9 +1355,6 @@ func (v *Variable) IsFieldVarSess(s *Session) bool {
 // IsVisible mirrors Variable::is_visible — global or is_visible_local.
 // Variable.h / usage in select_must_use_var.
 // Incomplete Variable sticky false (no invent not-visible soft-skip past hole).
-func (v *Variable) IsVisible(blk *Block) bool {
-	return v.IsVisibleSess(testAmbientSession, blk)
-}
 
 func (v *Variable) IsVisibleSess(s *Session, blk *Block) bool {
 	// Variable always live; sticky incomplete no invent not-visible soft-skip
@@ -1537,9 +1386,6 @@ func (v *Variable) IsVisibleSess(s *Session, blk *Block) bool {
 // ArrayVariable.cpp:419–429 — walk blk parents until array's parent block.
 // Variable* always live; nil FieldVarOf/Param/Local holes sticky false
 // (no invent not-visible soft-skip past holes).
-func (v *Variable) IsVisibleLocal(blk *Block) bool {
-	return v.IsVisibleLocalSess(testAmbientSession, blk)
-}
 
 func (v *Variable) IsVisibleLocalSess(s *Session, blk *Block) bool {
 	// Variable always live; sticky incomplete no invent not-visible soft-skip
@@ -1635,10 +1481,6 @@ func (v *Variable) IsVisibleLocalSess(s *Session, blk *Block) bool {
 // Variable.cpp:521–538.
 // Incomplete type / OOB peel sticky const (no invent non-const WRITE / soft re-pick).}
 
-func (v *Variable) IsConstAfterDeref(derefLevel int) bool {
-	return v.IsConstAfterDerefSess(testAmbientSession, derefLevel)
-}
-
 func (v *Variable) IsConstAfterDerefSess(s *Session, derefLevel int) bool {
 	// Variable always live; sticky incomplete no invent non-const soft-skip
 	if v == nil {
@@ -1689,10 +1531,6 @@ func (v *Variable) IsConstAfterDerefSess(s *Session, derefLevel int) bool {
 // Variable.cpp:561–578 — qfer then peel type; assert(t) after peel.
 // Incomplete type / OOB peel sticky volatile (no invent non-vol access / soft re-pick).}
 
-func (v *Variable) IsVolatileAfterDeref(derefLevel int) bool {
-	return v.IsVolatileAfterDerefSess(testAmbientSession, derefLevel)
-}
-
 func (v *Variable) IsVolatileAfterDerefSess(s *Session, derefLevel int) bool {
 	// Variable always live; sticky incomplete no invent non-vol soft-skip
 	if v == nil {
@@ -1741,10 +1579,6 @@ func (v *Variable) IsVolatileAfterDerefSess(s *Session, derefLevel int) bool {
 // IsPartialVolatileAfterDeref mirrors Variable::is_partial_volatile_after_deref.
 // Variable.cpp:541–558 — not fully volatile at level, but pointee is volatile struct/union.
 // Incomplete type / OOB peel sticky partial-vol (restrictive IsEligibleVar).}
-
-func (v *Variable) IsPartialVolatileAfterDeref(derefLevel int) bool {
-	return v.IsPartialVolatileAfterDerefSess(testAmbientSession, derefLevel)
-}
 
 func (v *Variable) IsPartialVolatileAfterDerefSess(s *Session, derefLevel int) bool {
 	// Variable always live; sticky incomplete no invent not-partial-vol soft-skip
@@ -1796,10 +1630,6 @@ func (v *Variable) IsPartialVolatileAfterDerefSess(s *Session, derefLevel int) b
 // Variable.cpp:878–886 — no volatiles; same ptr; expand_struct only non-fields.
 // Incomplete Variable* sticky false (no invent soft-skip compatibility past holes).}
 
-func (v *Variable) Compatible(other *Variable, expandStruct bool) bool {
-	return v.CompatibleSess(testAmbientSession, other, expandStruct)
-}
-
 func (v *Variable) CompatibleSess(s *Session, other *Variable, expandStruct bool) bool {
 	// both Variable* always live; sticky incomplete no invent soft-skip
 	if v == nil || other == nil {
@@ -1842,9 +1672,6 @@ func (v *Variable) CompatibleSess(s *Session, other *Variable, expandStruct bool
 // Incomplete Variable sticky false (no invent not-pointer soft-skip past hole).
 // Special null/garbage/tbd have Type nil by design — complete not-pointer.
 // Other Type-nil shells sticky (no invent not-pointer soft-skip past incomplete IR).
-func (v *Variable) IsPointer() bool {
-	return v.IsPointerSess(testAmbientSession)
-}
 
 func (v *Variable) IsPointerSess(s *Session) bool {
 	if v == nil {
@@ -1871,10 +1698,6 @@ func (v *Variable) IsPointerSess(s *Session) bool {
 // (parent array, not itemized member). Dummy null/garbage/tbd use IsSpecialPtr / Type==nil.
 // Incomplete Variable sticky false (no invent not-virtual soft-skip past hole).
 // IsArray without AsArray sticky false (no invent virtual-collective past broken shell).}
-
-func (v *Variable) IsVirtual() bool {
-	return v.IsVirtualSess(testAmbientSession)
-}
 
 func (v *Variable) IsVirtualSess(s *Session) bool {
 	// Variable always live; sticky incomplete no invent not-virtual soft-skip
@@ -1907,9 +1730,6 @@ func (v *Variable) IsVirtualSess(s *Session) bool {
 // Incomplete Variable sticky false (no invent not-aggregate soft-skip past hole).
 // Special null/garbage/tbd have Type nil by design — complete not-aggregate.
 // Other Type-nil shells sticky (no invent not-aggregate soft-skip past incomplete IR).
-func (v *Variable) IsAggregate() bool {
-	return v.IsAggregateSess(testAmbientSession)
-}
 
 // IsAggregateSess is IsAggregate with explicit session residual sticky.
 func (v *Variable) IsAggregateSess(s *Session) bool {
@@ -1924,7 +1744,7 @@ func (v *Variable) IsAggregateSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := v.Type.IsAggregateSess(s)
+	ok := v.Type.IsAggregate()
 	// residual ERROR sticky — no invent soft not-aggregate past IsAggregate residual
 	if sessHasError(s) {
 		return false
@@ -1946,9 +1766,6 @@ func MakeDummyStaticVariable(name string) *Variable {
 // every collective array (seed-7 choose_var ok pool half-size vs upstream).
 // Incomplete FieldVars / missing parent / OOB field path fails closed sticky nil
 // (no invent return self as collective / soft re-pick past broken field map).
-func (v *Variable) GetCollective() *Variable {
-	return v.GetCollectiveSess(testAmbientSession)
-}
 
 func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 	if v == nil {
@@ -2016,7 +1833,7 @@ func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 	// build field index path from array ancestor down to v
 	var path []int
 	for cur := v; cur != nil && cur != parent; cur = cur.FieldVarOf {
-		fid := cur.GetFieldID()
+		fid := cur.GetFieldIDSess(s)
 		// residual ERROR sticky — no invent soft-collective past GetFieldID residual
 		if sessHasError(s) {
 			return nil
@@ -2030,7 +1847,7 @@ func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 	}
 	for _, idx := range path {
 		// Variable.cpp:608 assert(index < coll->field_vars.size()) sticky
-		if coll == nil || !coll.FieldVarsComplete() || idx < 0 || idx >= len(coll.FieldVars) {
+		if coll == nil || !coll.FieldVarsCompleteSess(s) || idx < 0 || idx >= len(coll.FieldVars) {
 			sessNoteError(s, ErrGeneric)
 			return nil
 		}
@@ -2041,10 +1858,6 @@ func (v *Variable) GetCollectiveSess(s *Session) *Variable {
 
 // GetSeqNum mirrors Variable::get_seq_num — digits after first '_'.
 // Variable.cpp:261–265 — assert('_' present); sticky no invent 0 on missing separator.}
-
-func (v *Variable) GetSeqNum() int {
-	return v.GetSeqNumSess(testAmbientSession)
-}
 
 func (v *Variable) GetSeqNumSess(s *Session) int {
 	// Variable always live with gensym name; sticky incomplete no invent 0
@@ -2066,9 +1879,6 @@ func (v *Variable) GetSeqNumSess(s *Session) int {
 // Incomplete Variable* sticky false (no invent not-match / soft re-pick past holes).
 // Special null/garbage/tbd have Type nil by design — complete not-match (unless identity).
 // Other Type-nil shells sticky (no invent not-match soft-skip past incomplete IR).
-func (v *Variable) Match(other *Variable) bool {
-	return v.MatchSess(testAmbientSession, other)
-}
 
 func (v *Variable) MatchSess(s *Session, other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-match
@@ -2086,7 +1896,7 @@ func (v *Variable) MatchSess(s *Session, other *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if v.Type.IsAggregateSess(s) {
+	if v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent match path past IsAggregate residual
 		if sessHasError(s) {
 			return false
@@ -2110,17 +1920,13 @@ func (v *Variable) MatchSess(s *Session, other *Variable) bool {
 // for mark_dead_var and similar; callers fail closed when false.
 // Nil Variable is incomplete (false) — no invent empty-complete fields for missing shell.}
 
-func (v *Variable) FieldVarsComplete() bool {
-	return v.FieldVarsCompleteSess(testAmbientSession)
-}
-
 func (v *Variable) FieldVarsCompleteSess(s *Session) bool {
 	// nil Variable is incomplete shell (not complete empty fields)
 	if v == nil {
 		return false
 	}
 	for _, f := range v.FieldVars {
-		if f == nil || !f.FieldVarsComplete() {
+		if f == nil || !f.FieldVarsCompleteSess(s) {
 			return false
 		}
 	}
@@ -2131,10 +1937,6 @@ func (v *Variable) FieldVarsCompleteSess(s *Session) bool {
 // Variable* always live in FieldVars; incomplete shell/hole sticky false
 // (no invent skip hole and match a later field / soft re-pick past holes).}
 
-func (v *Variable) HasFieldVar(other *Variable) bool {
-	return v.HasFieldVarSess(testAmbientSession, other)
-}
-
 func (v *Variable) HasFieldVarSess(s *Session, other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-has-field
 	if v == nil || other == nil {
@@ -2144,7 +1946,7 @@ func (v *Variable) HasFieldVarSess(s *Session, other *Variable) bool {
 	if v == other {
 		return true
 	}
-	if !v.FieldVarsComplete() {
+	if !v.FieldVarsCompleteSess(s) {
 		// incomplete FieldVars sticky (no invent not-has-field past hole)
 		sessNoteError(s, ErrGeneric)
 		return false
@@ -2171,9 +1973,6 @@ func (v *Variable) HasFieldVarSess(s *Session, other *Variable) bool {
 // Variable always live; sticky nil (no invent no-container soft-skip past hole).
 // Special null/garbage/tbd have Type nil by design — complete no-container.
 // Other Type-nil ancestor sticky nil (no invent skip hole and miss a later union parent).
-func (v *Variable) GetContainerUnion() *Variable {
-	return v.GetContainerUnionSess(testAmbientSession)
-}
 
 func (v *Variable) GetContainerUnionSess(s *Session) *Variable {
 	if v == nil {
@@ -2211,10 +2010,6 @@ func (v *Variable) GetContainerUnionSess(s *Session) *Variable {
 // LooseMatch mirrors Variable::loose_match.
 // Variable.cpp:239–250 — match collective, or same container union.
 // Incomplete GetCollective fails closed sticky false (no invent match / soft re-pick).}
-
-func (v *Variable) LooseMatch(other *Variable) bool {
-	return v.LooseMatchSess(testAmbientSession, other)
-}
 
 func (v *Variable) LooseMatchSess(s *Session, other *Variable) bool {
 	// both Variable* always live; sticky incomplete no invent not-loose-match
@@ -2259,10 +2054,6 @@ func (v *Variable) LooseMatchSess(s *Session, other *Variable) bool {
 // Field with live parent but Type-nil parent is incomplete IR sticky (no invent
 // not-union-field soft-skip past hole). Non-field (FieldVarOf nil) is complete false.}
 
-func (v *Variable) IsUnionField() bool {
-	return v.IsUnionFieldSess(testAmbientSession)
-}
-
 func (v *Variable) IsUnionFieldSess(s *Session) bool {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -2287,9 +2078,6 @@ func (v *Variable) IsUnionFieldSess(s *Session) bool {
 // Variable always live; sticky false for nil shell.
 // Type-nil parent on chain sticky true (restrictive — no invent not-inside
 // soft-skip past incomplete union-field IR; IsUnionField alone stickies false).
-func (v *Variable) IsInsideUnionField() bool {
-	return v.IsInsideUnionFieldSess(testAmbientSession)
-}
 
 func (v *Variable) IsInsideUnionFieldSess(s *Session) bool {
 	if v == nil {
@@ -2323,10 +2111,6 @@ func (v *Variable) IsInsideUnionFieldSess(s *Session) bool {
 // Variable* always live in FieldVars; incomplete parent FieldVars sticky -1
 // (no invent skip hole and match a later sibling index / soft re-pick).}
 
-func (v *Variable) GetFieldID() int {
-	return v.GetFieldIDSess(testAmbientSession)
-}
-
 func (v *Variable) GetFieldIDSess(s *Session) int {
 	if v == nil {
 		sessNoteError(s, ErrGeneric)
@@ -2336,7 +2120,7 @@ func (v *Variable) GetFieldIDSess(s *Session) int {
 	if v.FieldVarOf == nil {
 		return -1
 	}
-	if !v.FieldVarOf.FieldVarsComplete() {
+	if !v.FieldVarOf.FieldVarsCompleteSess(s) {
 		// incomplete parent FieldVars sticky (no invent field index past hole)
 		sessNoteError(s, ErrGeneric)
 		return -1
@@ -2356,9 +2140,6 @@ func (v *Variable) GetFieldIDSess(s *Session) int {
 // Type* always live for non-special fields; Type-nil sticky IncompleteVariables
 // (no invent soft-skip shell as neither pointer nor aggregate then complete empty/partial).
 // Complete empty (no pointer fields) returns non-nil empty slice.
-func (v *Variable) FindPointerFields() []*Variable {
-	return v.FindPointerFieldsSess(testAmbientSession)
-}
 
 func (v *Variable) FindPointerFieldsSess(s *Session) []*Variable {
 	if v == nil {
@@ -2418,10 +2199,6 @@ func (v *Variable) FindPointerFieldsSess(s *Session) []*Variable {
 // (not bare nil — FieldVarsComplete(nil)==true invents empty-complete zero fields
 // when type still has Fields / half-built list was wiped).}
 
-func (v *Variable) CreateFieldVars() {
-	v.CreateFieldVarsSess(testAmbientSession)
-}
-
 // CreateFieldVarsSess is CreateFieldVars on an explicit session bag (opts/probs/rng).
 func (v *Variable) CreateFieldVarsSess(s *Session) {
 	// Variable.cpp:338 — assert(type->is_aggregate()) sticky for live non-aggregate
@@ -2434,7 +2211,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 		sessNoteError(s, ErrGeneric)
 		return
 	}
-	if !v.Type.IsAggregateSess(s) {
+	if !v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-skip create past IsAggregate residual
 		if sessHasError(s) {
 			return
@@ -2613,9 +2390,6 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 // OutputValueDump mirrors Variable::output_value_dump.
 // Variable.cpp:1173–1203 — printf checksum lines for simples; recurse aggregates;
 // arrays expand all index combinations; unions only readable fields.
-func (v *Variable) OutputValueDump(prefix string, indent int, unionFacts []*FactUnion) string {
-	return v.OutputValueDumpSess(testAmbientSession, prefix, indent, unionFacts)
-}
 
 // OutputValueDumpSess is OutputValueDump with sticky errors on bag s.
 func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, unionFacts []*FactUnion) string {
@@ -2631,7 +2405,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		return ""
 	}
 	// Variable.cpp:1175–1183 — is_virtual() → assert(!is_field_var()); expand array
-	virt := v.IsVirtual()
+	virt := v.IsVirtualSess(s)
 	// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual
 	if sessHasError(s) {
 		return ""
@@ -2660,7 +2434,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 	if v.Type.IsSimple() {
 		// Variable.cpp:1184–1188 — name + printf_directive always live sticky
 		// no invent printf with empty name/directive
-		name := v.GetActualName(false)
+		name := v.GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent dump past GetActualName residual hole
 		if sessHasError(s) {
 			return ""
@@ -2682,7 +2456,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 			return ""
 		}
 		// incomplete FieldVars sticky whole dump (no invent soft-skip hole)
-		if !v.FieldVarsComplete() {
+		if !v.FieldVarsCompleteSess(s) {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -2707,7 +2481,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 			return ""
 		}
 		// incomplete FieldVars sticky whole dump
-		if !v.FieldVarsComplete() {
+		if !v.FieldVarsCompleteSess(s) {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -2736,7 +2510,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 	}
 	// pointers: dump as pointer directive
 	if v.Type.IsPointerLike() {
-		name := v.GetActualName(false)
+		name := v.GetActualNameSess(s, false)
 		dir := v.Type.PrintfDirective()
 		if name == "" || dir == "" {
 			if !sessHasError(s) {
@@ -2753,9 +2527,6 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 // outputValueDumpArray expands array into all index combinations and dumps elements.
 // Variable always live; sticky empty (no invent soft-skip dump past hole).
 // Zero-rank ArraySizes is complete empty (not incomplete IR).
-func outputValueDumpArray(v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
-	return outputValueDumpArraySess(testAmbientSession, v, prefix, indent, unionFacts)
-}
 
 // outputValueDumpArraySess is outputValueDumpArray with sticky errors on bag s.
 func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
@@ -2767,7 +2538,7 @@ func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int
 		return ""
 	}
 	// base name always live sticky; no invent printf with bare "[0]" access
-	base := v.GetActualName(false)
+	base := v.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty dump past GetActualName residual
 	if sessHasError(s) {
 		return ""
@@ -2938,9 +2709,6 @@ func itoa(n int) string {
 // (not bare nil — VariablesComplete(nil)==true invents empty expand success).
 // Special null/garbage/tbd have Type nil by design — complete expand as self only.
 // Other Type-nil shells sticky IncompleteVariables (no invent expand pool past hole).
-func (v *Variable) CollectExpandable() []*Variable {
-	return v.CollectExpandableSess(testAmbientSession)
-}
 
 func (v *Variable) CollectExpandableSess(s *Session) []*Variable {
 	if v == nil {
@@ -2980,9 +2748,6 @@ func (v *Variable) CollectExpandableSess(s *Session) []*Variable {
 // Standalone path allocates temporary letter ctrl names (i,j,…) without
 // mutating the package ctrl-var pool when no last set exists.
 // unionFacts nil → hash all union fields (no FactMgr); non-nil → IsFieldReadable.
-func (v *Variable) HashOutput() string {
-	return v.HashOutputSess(testAmbientSession)
-}
 
 // HashOutputSess is HashOutput with Options/sticky from an explicit session bag.
 func (v *Variable) HashOutputSess(s *Session) string {
@@ -2990,17 +2755,10 @@ func (v *Variable) HashOutputSess(s *Session) string {
 }
 
 // HashOutputWithUnionFacts is HashOutput with FactUnion last-write filtering.
-func (v *Variable) HashOutputWithUnionFacts(unionFacts []*FactUnion) string {
-	return v.HashOutputWithUnionFactsSess(testAmbientSession, unionFacts)
-}
 
 // HashOutputWithUnionFactsSess is HashOutputWithUnionFacts with Options/sticky from bag s.
 func (v *Variable) HashOutputWithUnionFactsSess(s *Session, unionFacts []*FactUnion) string {
 	return v.hashOutputOptsSess(s, nil, unionFacts, sessOpts(s))
-}
-
-func (v *Variable) hashOutput(ctrl []*Variable, unionFacts []*FactUnion) string {
-	return v.hashOutputSess(testAmbientSession, ctrl, unionFacts)
 }
 
 func (v *Variable) hashOutputSess(s *Session, ctrl []*Variable, unionFacts []*FactUnion) string {
@@ -3008,9 +2766,6 @@ func (v *Variable) hashOutputSess(s *Session, ctrl []*Variable, unionFacts []*Fa
 }
 
 // hashOutputOpts is hashOutput with explicit Options (array post_incr etc.).
-func (v *Variable) hashOutputOpts(ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
-	return v.hashOutputOptsSess(testAmbientSession, ctrl, unionFacts, opts)
-}
 
 // hashOutputOptsSess is hashOutputOpts with sticky errors on bag s.
 func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
@@ -3028,7 +2783,7 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 	if v.IsArray && len(v.ArraySizes) > 0 {
 		return hashArrayVariableOptsSess(s, v, ctrl, unionFacts, opts)
 	}
-	if v.Type.IsAggregateSess(s) {
+	if v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if sessHasError(s) {
 			return ""
@@ -3109,9 +2864,6 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 // hashArrayUnionExcludedFields mirrors ArrayVariable::hash excluded_fields build.
 // ArrayVariable.cpp:729–737 — unreadable union fields → indices for
 // Type::get_int_subfield_names (j after padding skip; Type.cpp:1622–1634).
-func hashArrayUnionExcludedFields(v *Variable, unionFacts []*FactUnion) []int {
-	return hashArrayUnionExcludedFieldsSess(testAmbientSession, v, unionFacts)
-}
 
 func hashArrayUnionExcludedFieldsSess(s *Session, v *Variable, unionFacts []*FactUnion) []int {
 	if v == nil || v.Type == nil || unionFacts == nil {
@@ -3161,16 +2913,9 @@ func hashArrayUnionExcludedFieldsSess(s *Session, v *Variable, unionFacts []*Fac
 // Skips arrays with no hashable payload (e.g. pointer element type).
 // Variable always live; sticky empty (no invent soft-skip hash past hole).
 // Zero-rank / no payload is complete empty (not incomplete IR shell).
-func hashArrayVariable(v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
-	return hashArrayVariableSess(testAmbientSession, v, ctrl, unionFacts)
-}
 
 func hashArrayVariableSess(s *Session, v *Variable, ctrl []*Variable, unionFacts []*FactUnion) string {
 	return hashArrayVariableOptsSess(s, v, ctrl, unionFacts, sessOpts(s))
-}
-
-func hashArrayVariableOpts(v *Variable, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
-	return hashArrayVariableOptsSess(testAmbientSession, v, ctrl, unionFacts, opts)
 }
 
 func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionFacts []*FactUnion, opts Options) string {
@@ -3208,7 +2953,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			return ""
 		}
 		useSimple = true
-	} else if v.Type.IsAggregateSess(s) {
+	} else if v.Type.IsAggregate() {
 		// residual ERROR sticky — no invent soft-hash past IsAggregate residual true
 		if sessHasError(s) {
 			return ""

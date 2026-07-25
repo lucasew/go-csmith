@@ -18,7 +18,7 @@ func TestPointerToCached(t *testing.T) {
 	if p1 != p2 {
 		t.Fatal("pointer cache")
 	}
-	if !p1.Match(p2, MatchExact) {
+	if !p1.MatchSess(testAmbientSession, p2, MatchExact) {
 		t.Fatal("eExact")
 	}
 }
@@ -26,15 +26,15 @@ func TestPointerToCached(t *testing.T) {
 func TestMatchConvertSimple(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// non-void integers interconvert
-	if !GetSimpleType(EInt).Match(GetSimpleType(EShort), MatchConvert) {
+	if !GetSimpleType(EInt).MatchSess(testAmbientSession, GetSimpleType(EShort), MatchConvert) {
 		t.Fatal("int convert short")
 	}
-	if GetSimpleType(EInt).Match(GetSimpleType(EVoid), MatchConvert) {
+	if GetSimpleType(EInt).MatchSess(testAmbientSession, GetSimpleType(EVoid), MatchConvert) {
 		t.Fatal("int not convert void")
 	}
 	// float → int forbidden when target is int and other is float
 	// is_convertable: if (t->is_float() && !is_float()) return false — t is *other*
-	if GetSimpleType(EInt).Match(GetSimpleType(EFloat), MatchConvert) {
+	if GetSimpleType(EInt).MatchSess(testAmbientSession, GetSimpleType(EFloat), MatchConvert) {
 		t.Fatal("int not convertable from float")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -43,7 +43,7 @@ func TestMatchConvertSimple(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsConvertableOpts residual soft invent was soft-continue invent match true.
 	// Fair: sticky false.
-	if GetSimpleType(EInt).Match(nil, MatchConvert) {
+	if GetSimpleType(EInt).MatchSess(testAmbientSession, nil, MatchConvert) {
 		t.Fatal("nil other MatchConvert must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -55,13 +55,13 @@ func TestMatchConvertSimple(t *testing.T) {
 func TestMatchDereference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	pint := PointerTo(GetSimpleType(EInt))
-	if !GetSimpleType(EInt).Match(pint, MatchDereference) {
+	if !GetSimpleType(EInt).MatchSess(testAmbientSession, pint, MatchDereference) {
 		t.Fatal("int is_dereferenced_from int*")
 	}
-	if !GetSimpleType(EInt).Match(pint, MatchFlexible) {
+	if !GetSimpleType(EInt).MatchSess(testAmbientSession, pint, MatchFlexible) {
 		t.Fatal("flexible")
 	}
-	if GetSimpleType(EShort).Match(pint, MatchDereference) {
+	if GetSimpleType(EShort).MatchSess(testAmbientSession, pint, MatchDereference) {
 		t.Fatal("short not from int*")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -70,7 +70,7 @@ func TestMatchDereference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsDereferencedFrom residual soft invent was soft-continue invent match true.
 	// Fair: sticky false.
-	if GetSimpleType(EInt).Match(nil, MatchDereference) {
+	if GetSimpleType(EInt).MatchSess(testAmbientSession, nil, MatchDereference) {
 		t.Fatal("nil other MatchDereference must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -79,7 +79,7 @@ func TestMatchDereference(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsDerivable residual soft invent was soft-continue invent flexible match true.
 	// Fair: sticky false.
-	if GetSimpleType(EInt).Match(nil, MatchFlexible) {
+	if GetSimpleType(EInt).MatchSess(testAmbientSession, nil, MatchFlexible) {
 		t.Fatal("nil other MatchFlexible must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

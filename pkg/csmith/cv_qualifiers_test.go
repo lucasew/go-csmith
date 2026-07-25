@@ -529,7 +529,7 @@ func TestIsConstAfterDeref(t *testing.T) {
 	// Fair: sticky const true (restrictive).
 	ClearErrorSess(testAmbientSession)
 	v := &Variable{Name: "g_p", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	if !v.IsConstAfterDeref(0) {
+	if !v.IsConstAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("Type-nil IsConstAfterDeref must fail closed const true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -537,7 +537,7 @@ func TestIsConstAfterDeref(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// IsVolatileAfterDeref residual same
-	if !v.IsVolatileAfterDeref(0) {
+	if !v.IsVolatileAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("Type-nil IsVolatileAfterDeref must fail closed volatile true")
 	}
 	if !HasErrorSess(testAmbientSession) {

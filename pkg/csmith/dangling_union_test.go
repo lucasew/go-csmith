@@ -14,20 +14,20 @@ func TestGetContainerUnion(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
-	if uv.FieldVars[0].GetContainerUnion() != uv {
+	if uv.FieldVars[0].GetContainerUnionSess(testAmbientSession) != uv {
 		t.Fatal("field container")
 	}
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
-	if iv.GetContainerUnion() != nil {
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	if iv.GetContainerUnionSess(testAmbientSession) != nil {
 		t.Fatal("int")
 	}
 	// Variable always live; sticky nil (no invent no-container soft-skip)
 	ClearErrorSess(testAmbientSession)
-	if (*Variable)(nil).GetContainerUnion() != nil {
+	if (*Variable)(nil).GetContainerUnionSess(testAmbientSession) != nil {
 		t.Fatal("nil GetContainerUnion must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -37,7 +37,7 @@ func TestGetContainerUnion(t *testing.T) {
 	// Type-nil on ancestry sticky (no invent skip hole as no-container)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
-	if field.GetContainerUnion() != nil {
+	if field.GetContainerUnionSess(testAmbientSession) != nil {
 		t.Fatal("Type-nil parent GetContainerUnion must fail closed nil")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -55,7 +55,7 @@ func TestSiblingUnionPartial(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("need union with 2+ fields")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 2 {
 		t.Skip("fields")
 	}
@@ -80,12 +80,12 @@ func TestSiblingUnionPartial(t *testing.T) {
 		Sizes:    []int{2},
 	}
 	parent.AsArray = parent
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) < 2 {
 		t.Skip("need 2 fields")
 	}
 	item := parent.ItemizeConstIndices([]int{0}, nil)
-	item.CreateFieldVars()
+	item.CreateFieldVarsSess(testAmbientSession)
 	if len(item.FieldVars) < 1 {
 		t.Skip("item fields")
 	}
@@ -106,7 +106,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	f := &Function{Name: "func_1"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// dead global pointer
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(p)}
 	fm.FindDanglingGlobalPtrs(f)
 	if len(f.DeadGlobals) != 1 || f.DeadGlobals[0] != p {
@@ -114,7 +114,7 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	}
 	// const not listed
 	f.DeadGlobals = nil
-	cp := CreateVariableScalars("g_cp", PointerTo(GetIntType()), true, false)
+	cp := CreateVariableScalarsSess(testAmbientSession, "g_cp", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{NewFactPointTo(cp)}
 	fm.FindDanglingGlobalPtrs(f)
 	if len(f.DeadGlobals) != 0 {
@@ -134,8 +134,8 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsDead residual: PointTo nil hole stickies ERROR+true. Soft invent was append as
 	// dead then soft-continue later complete sibling into DeadGlobals. Fair: wipe incomplete.
-	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
-	goodDead := CreateVariableScalars("g_p3", PointerTo(GetIntType()), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(GetIntType()), false, false)
+	goodDead := CreateVariableScalarsSess(testAmbientSession, "g_p3", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{
 		{Var: p2, PointTo: []*Variable{nil}}, // residual IsDead
 		NewFactPointTo(goodDead),
@@ -152,8 +152,8 @@ func TestFindDanglingGlobalPtrs(t *testing.T) {
 }
 
 func TestOutputPtrResets(t *testing.T) {
-	CtrlVarsDoFinalization()
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	CtrlVarsDoFinalizationSess(testAmbientSession)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	out := OutputPtrResets([]*Variable{p}, Defaults())
 	if !strings.Contains(out, "g_p = 0") {
 		t.Fatal(out)
@@ -202,11 +202,11 @@ func TestLooseMatchUnion(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 2 {
 		t.Skip("fields")
 	}
-	if !uv.FieldVars[0].LooseMatch(uv.FieldVars[1]) {
+	if !uv.FieldVars[0].LooseMatchSess(testAmbientSession, uv.FieldVars[1]) {
 		t.Fatal("loose")
 	}
 }

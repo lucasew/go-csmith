@@ -247,12 +247,12 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 			}
 			// range form: (p >= &lo && p <= &hi)
 			// OutputLower/UpperBound always live; sticky no invent "(p >= & && p <= &)"
-			lo := pointee.OutputLowerBound(false)
+			lo := pointee.OutputLowerBoundSess(s, false)
 			// residual ERROR sticky — no invent soft-continue hi past LowerBound residual
 			if sessHasError(s) {
 				return ""
 			}
-			hi := pointee.OutputUpperBound(false)
+			hi := pointee.OutputUpperBoundSess(s, false)
 			// residual ERROR sticky — no invent soft-continue range past UpperBound residual
 			if sessHasError(s) {
 				return ""
@@ -300,7 +300,7 @@ func outputFactVarSess(s *Session, v *Variable) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := v.GetActualName(false)
+	name := v.GetActualNameSess(s, false)
 	// residual ERROR sticky — no invent soft-empty fact-var past GetActualName residual
 	if sessHasError(s) {
 		return ""
@@ -421,7 +421,7 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 			return ""
 		}
 		// skip globals neither read nor written in this function
-		isG := f.Var.IsGlobal()
+		isG := f.Var.IsGlobalSess(fmSess(fm))
 		// residual ERROR sticky — no invent soft-skip then partial assert emit past IsGlobal residual
 		if sessHasError(fmSess(fm)) {
 			return ""

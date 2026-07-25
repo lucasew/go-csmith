@@ -15,7 +15,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 			{Name: "f1", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	vs := NewVariableSelector(Defaults())
 	vs.GlobalList = []*Variable{uv}
 	// nil facts → all fields
@@ -37,7 +37,7 @@ func TestHashGlobalVariablesWithUnionFacts(t *testing.T) {
 func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 	// incomplete GlobalList / UnionFacts fail closed sticky (no invent empty hash)
 	vs := NewVariableSelector(Defaults())
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g, nil}
 	ClearErrorSess(testAmbientSession)
 	if HashGlobalVariables(vs) != "" {
@@ -60,7 +60,7 @@ func TestHashGlobalVariablesIncompleteSticky(t *testing.T) {
 func TestHashGlobalVariablesHashOutputResidualSticky(t *testing.T) {
 	// hashOutput residual soft invent was soft-continue later globals invent partial hash.
 	ClearErrorSess(testAmbientSession)
-	good := CreateVariableScalars("g_ok", GetIntType(), false, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_ok", GetIntType(), false, false)
 	// IsArray without AsArray stickies hashOutput
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
 	vs := NewVariableSelector(Defaults())
@@ -94,7 +94,7 @@ func TestHashFuncDefReadyIncompleteGlobalList(t *testing.T) {
 	if !g.hashFuncDefReady() {
 		t.Fatal("complete empty GlobalList must be ready")
 	}
-	g.VS.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false), nil}
+	g.VS.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), nil}
 	if g.hashFuncDefReady() {
 		t.Fatal("incomplete GlobalList must not invent hashFuncDefReady")
 	}
@@ -116,7 +116,7 @@ func TestProgramGeneratorHashGlobalsUsesFM(t *testing.T) {
 			{Name: "f1", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	// Constant init field 0 — AbstractFactUnion transfer for constant → MakeFactUnions
 	uv.Init = MakeInt(0)
 	g.VS.GlobalList = append(g.VS.GlobalList, uv)

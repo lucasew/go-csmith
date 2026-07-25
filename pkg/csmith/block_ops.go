@@ -77,7 +77,7 @@ func (b *Block) NeedNestedLoop(cg CGContext, r *Rng) bool {
 	// Block.cpp:399–414 — must_read/write vars use get_dimension()
 	// pre-validated VariablesComplete
 	check := func(v *Variable) bool {
-		dimen := v.GetDimension()
+		dimen := v.GetDimensionSess(cgSess(&cg))
 		// incomplete array IR (IsArray without AsArray) stickies via GetDimension
 		// sticky need nested (restrictive — no invent "no nested" past broken dim)
 		if sessHasError(cgSess(&cg)) {

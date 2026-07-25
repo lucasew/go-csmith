@@ -5,8 +5,8 @@ import (
 )
 
 func TestGetExternalNoReadsWrites(t *testing.T) {
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{
 		NoReadVars:  []*Variable{g, loc},
 		NoWriteVars: []*Variable{g},
@@ -41,7 +41,7 @@ func TestFindMustUseArraysNilHole(t *testing.T) {
 }
 
 func TestFindRelatedPointToNilHole(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{nil, MakeFactPointTo(p, NullPtr)}
 	if FindRelatedPointTo(facts, p) != nil {
 		t.Fatal("nil fact hole must fail closed (no invent skip to later)")
@@ -52,11 +52,11 @@ func TestFindRelatedPointToNilHole(t *testing.T) {
 }
 
 func TestPtrModifiedInRhsNilPointees(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	lhs := &Lhs{Var: p, Type: GetIntType()} // indir via type peel — set IndirectLevel path
 	// force multi-level via Type pointer chain
 	pt := PointerTo(PointerTo(GetIntType()))
-	pp := CreateVariableScalars("g_pp", pt, true, false)
+	pp := CreateVariableScalarsSess(testAmbientSession, "g_pp", pt, true, false)
 	lhs2 := &Lhs{Var: pp, Type: GetIntType()}
 	// IndirectLevel for Lhs
 	if lhs2.IndirectLevel() <= 1 {
@@ -78,7 +78,7 @@ func TestPtrModifiedInRhsNilPointees(t *testing.T) {
 
 func TestGetExternalNoWritesFromIV(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_i", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.AddIVBound(g, 10)
 	_, nw := cg.GetExternalNoReadsWrites(nil)
@@ -89,7 +89,7 @@ func TestGetExternalNoWritesFromIV(t *testing.T) {
 
 func TestBuildCalleeRWDirective(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	rwd := cg.BuildCalleeRWDirective(nil)
 	if rwd == nil || len(rwd.NoWriteVars) != 1 {
@@ -108,7 +108,7 @@ func TestFindReachableFrameVarsCompleteEmpty(t *testing.T) {
 		t.Fatal(got)
 	}
 	// incomplete fact map fails closed nil
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	if VariablesComplete(cg.FindReachableFrameVars([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})) {
 		t.Fatal("incomplete facts must fail closed incomplete")
 	}
@@ -118,9 +118,9 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 	// soft invent: incomplete frame → nil RW (no restrictions)
 	// fair: inherit full NoWrite without inventing unrestricted nil; sticky
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	rwd := cg.BuildCalleeRWDirective([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
 	if rwd == nil {
 		t.Fatal("incomplete must not invent nil unrestricted RW")
@@ -135,8 +135,8 @@ func TestBuildCalleeRWDirectiveIncompleteFactsFailClosed(t *testing.T) {
 }
 
 func TestVisitFactsInvocationParams(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	fi := &Invocation{
 		Args: []*Expression{
 			{Term: TermVariable, Var: a, ExprType: GetIntType()},
@@ -157,7 +157,7 @@ func TestVisitFactsInvocationParams(t *testing.T) {
 func TestVisitFactsInvocationArgResidualSticky(t *testing.T) {
 	// Visit residual soft invent was soft-continue later args invent visit success.
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	hole := &Expression{Term: TermConstant, Con: &Constant{Type: GetIntType()}}
 	fi := &Invocation{
 		Args: []*Expression{
@@ -218,7 +218,7 @@ func TestVisitFactsInvocationAlwaysRevisitsUser(t *testing.T) {
 func TestVisitFactsInvocationUsesFreshCalleeContext(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	g := CreateVariableScalars("g_overlap", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_overlap", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// body: g_overlap = 1
 	st := Stmt{
@@ -257,7 +257,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 	// Legacy name kept: ambient write conflict on static path removed with always-revisit.
 	// Soft analysis fail remains non-sticky (RevisitUserInvocation ClearError on body fail).
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_x", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	// body with *p write under may-null would fail; use incomplete as soft fail
 	callee.Body = &Block{StmID: 50, Func: callee, Stmts: []Stmt{{Kind: StmtAssign, StmID: IncompleteStmID}}} // StmID 0 sticky fail
@@ -280,7 +280,7 @@ func TestVisitFactsInvocationConflict(t *testing.T) {
 
 func TestFactMgrMapStmEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	eff := EmptyEffect().WriteVarSess(testAmbientSession, v)
 	fm.SetMapStmEffect(3, eff)
 	got := fm.GetMapStmEffect(3)
@@ -290,7 +290,7 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 	if fm.GetMapStmEffect(9).IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("empty")
 	}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.SetMapFactsIn(1, facts)
 	fm.SetMapFactsOut(1, facts)
@@ -301,7 +301,7 @@ func TestFactMgrMapStmEffect(t *testing.T) {
 
 func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := Stmt{
 		Kind: StmtAssign, StmID: 7, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, AssignOp: AssignSimple,
@@ -327,7 +327,7 @@ func TestVisitFactsBlockRecordsMaps(t *testing.T) {
 // visit_facts does not consult failed; generation-time Failed is not analysis fail.
 func TestVisitFactsInvocationIgnoresFailedFlag(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	fi := &Invocation{
 		Failed: true,
 		Args: []*Expression{

@@ -161,7 +161,7 @@ func TestMakeRandomArrayInitMultiDimNested(t *testing.T) {
 func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
-	vs.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false), nil}
+	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false), nil}
 	if VariablesComplete(vs.FindAllVisibleVars(nil)) {
 		t.Fatal("GlobalList nil hole must fail closed incomplete")
 	}
@@ -170,7 +170,7 @@ func TestFindAllVisibleVarsNilHoleFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	vs.GlobalList = nil
-	blk := &Block{LocalVars: []*Variable{CreateVariableScalars("l_1", GetIntType(), false, false), nil}}
+	blk := &Block{LocalVars: []*Variable{CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false), nil}}
 	if VariablesComplete(vs.FindAllVisibleVars(blk)) {
 		t.Fatal("LocalVars nil hole must fail closed incomplete")
 	}

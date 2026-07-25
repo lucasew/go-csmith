@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestAddEffect(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	e1 := EmptyEffect().ReadVarSess(testAmbientSession, a)
 	e2 := EmptyEffect().WriteVarSess(testAmbientSession, b)
 	m := e1.AddEffectSess(testAmbientSession, e2)
@@ -16,7 +16,7 @@ func TestAddEffect(t *testing.T) {
 		t.Fatal("non-vol stays SE-free")
 	}
 	// volatile write in add_effect union clears SE-free
-	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
 	m2 := EmptyEffect().AddEffectSess(testAmbientSession, EmptyEffect().WriteVarSess(testAmbientSession, vol))
 	if m2.IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
@@ -41,27 +41,27 @@ func TestUnionFieldHelpers(t *testing.T) {
 	if ut == nil {
 		t.Skip("no union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
 		t.Skip("fields")
 	}
 	f0 := uv.FieldVars[0]
-	if !f0.IsUnionField() || !f0.IsInsideUnionField() {
+	if !f0.IsUnionFieldSess(testAmbientSession) || !f0.IsInsideUnionFieldSess(testAmbientSession) {
 		t.Fatal("union field")
 	}
-	if f0.GetFieldID() != 0 {
-		t.Fatalf("fid %d", f0.GetFieldID())
+	if f0.GetFieldIDSess(testAmbientSession) != 0 {
+		t.Fatalf("fid %d", f0.GetFieldIDSess(testAmbientSession))
 	}
 	// Variable always live; sticky false (no invent not-union-field soft-skip)
 	ClearErrorSess(testAmbientSession)
-	if (*Variable)(nil).IsUnionField() {
+	if (*Variable)(nil).IsUnionFieldSess(testAmbientSession) {
 		t.Fatal("nil IsUnionField must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil IsUnionField must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Variable)(nil).IsInsideUnionField() {
+	if (*Variable)(nil).IsInsideUnionFieldSess(testAmbientSession) {
 		t.Fatal("nil IsInsideUnionField must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -71,7 +71,7 @@ func TestUnionFieldHelpers(t *testing.T) {
 	// Type-nil parent sticky true (restrictive — no invent not-inside soft-skip)
 	parent := &Variable{Name: "g_u"} // Type nil
 	field := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: parent}
-	if !field.IsInsideUnionField() {
+	if !field.IsInsideUnionFieldSess(testAmbientSession) {
 		t.Fatal("Type-nil parent IsInsideUnionField must fail closed true restrictive")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -79,11 +79,11 @@ func TestUnionFieldHelpers(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-field complete false
-	if !f0.IsInsideUnionField() {
+	if !f0.IsInsideUnionFieldSess(testAmbientSession) {
 		// f0 is real union field — should be true; use scalar
 	}
-	scalar := CreateVariableScalars("g_i", GetIntType(), false, false)
-	if scalar.IsInsideUnionField() {
+	scalar := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	if scalar.IsInsideUnionFieldSess(testAmbientSession) {
 		t.Fatal("scalar IsInsideUnionField must be false complete")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -102,7 +102,7 @@ func TestIsNonreadableField(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 2 {
 		t.Skip("fields")
 	}
@@ -166,7 +166,7 @@ func TestUpdateAssignUnionFact(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 1 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
 		t.Skip("fields")
 	}
@@ -183,8 +183,8 @@ func TestOrderedBinaryEffectIsolation(t *testing.T) {
 	// && : after left writes a, RHS generation sees pre-left context only
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	vs := NewVariableSelector(opts)
 	vs.GlobalList = []*Variable{a, b}
 	eff := EmptyEffect()

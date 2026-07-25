@@ -9,9 +9,9 @@ func TestShortcutAnalysisPreservesLiveAccumReads(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
-	g3 := CreateVariableScalars("g_3", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
+	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntType(), false, false)
 
 	st := Stmt{
 		Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID(),
@@ -66,8 +66,8 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
 
 	// Assign with nil Lhs will fail visit — still must record map_accum
 	st := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
@@ -97,8 +97,8 @@ func TestStmVisitFactsRecordsAccumEvenOnVisitFail(t *testing.T) {
 
 func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
 	live2 := EmptyEffect().ReadVarSess(testAmbientSession, g1)
 	stored := live2.CloneSess(testAmbientSession)
 	live2 = live2.ReadVarSess(testAmbientSession, g2)
@@ -116,9 +116,9 @@ func TestMapAccumEffectStoreDetachedFromLiveAccum(t *testing.T) {
 func TestMapStmEffectStoreDetachedFromLiveStm(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f", ReturnType: GetIntType()})
-	g1 := CreateVariableScalars("g_1", GetIntType(), false, false)
-	g2 := CreateVariableScalars("g_2", GetIntType(), false, false)
-	g3 := CreateVariableScalars("g_3", GetIntType(), false, false)
+	g1 := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	g2 := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
+	g3 := CreateVariableScalarsSess(testAmbientSession, "g_3", GetIntType(), false, false)
 
 	live := EmptyEffect().WriteVarSess(testAmbientSession, g1).WriteVarSess(testAmbientSession, g2)
 	id := AllocStmID()

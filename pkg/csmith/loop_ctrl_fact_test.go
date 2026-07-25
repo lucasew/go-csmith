@@ -67,21 +67,21 @@ func TestIsVisibleLocal(t *testing.T) {
 	f := &Function{Name: "f"}
 	outer := &Block{Func: f}
 	inner := &Block{Parent: outer, Func: f}
-	l := CreateVariableScalars("l_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	if l == nil {
 		t.Fatal("loc")
 	}
 	outer.LocalVars = []*Variable{l}
-	if !l.IsVisibleLocal(inner) {
+	if !l.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("outer local visible from inner")
 	}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	if g.IsVisibleLocal(inner) {
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	if g.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("global not local-visible")
 	}
-	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
 	f.Param = []*Variable{p}
-	if !p.IsVisibleLocal(inner) {
+	if !p.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("param")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -90,7 +90,7 @@ func TestIsVisibleLocal(t *testing.T) {
 	// nil Param/Local holes sticky fail closed
 	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{nil, p}
-	if p.IsVisibleLocal(inner) {
+	if p.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("nil Param hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -99,7 +99,7 @@ func TestIsVisibleLocal(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f.Param = []*Variable{p}
 	outer.LocalVars = []*Variable{nil, l}
-	if l.IsVisibleLocal(inner) {
+	if l.IsVisibleLocalSess(testAmbientSession, inner) {
 		t.Fatal("nil LocalVars hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -123,7 +123,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	opts.NoReturnDeadPointer = true
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk := &Block{LocalVars: []*Variable{loc}}
 	// collective array of int* whose fact points at a local
 	elemT := PointerTo(GetIntType())
@@ -149,7 +149,7 @@ func TestIsPointingToLocalsArrayUsesCollective(t *testing.T) {
 	}
 	// as_return ExpressionVariable must reject itemized local-pointing array
 	vs := NewVariableSelector(opts)
-	f := &Function{Name: "f", ReturnType: elemT, RV: CreateVariableScalars("rv", elemT, false, false)}
+	f := &Function{Name: "f", ReturnType: elemT, RV: CreateVariableScalarsSess(testAmbientSession, "rv", elemT, false, false)}
 	f.Stack = []*Block{blk}
 	blk.Func = f
 	blk.LocalVars = []*Variable{loc, &collAV.Variable}
@@ -181,7 +181,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 		t.Fatal("nil Variable IsPointingToLocals must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	ptr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// incomplete PointTo sticky as pointing-to-locals
 	facts := []*FactPointTo{{Var: ptr, PointTo: []*Variable{nil}}}
 	if !IsPointingToLocals(ptr, &Block{}, 0, facts) {
@@ -192,7 +192,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// incomplete map hole sticky true
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
 	blk := &Block{LocalVars: []*Variable{loc}}
 	holeMap := []*FactPointTo{nil, MakeFactPointTo(ptr, loc)}
@@ -237,7 +237,7 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 	// IsVisibleLocal residual: incomplete LocalVars on parent soft invent was not-local then invent false.
 	// Fair: sticky true (restrictive pointing-to-locals).
 	// Use indirection -1 path (direct IsVisibleLocal).
-	loc2 := CreateVariableScalars("l_2", GetIntType(), false, false)
+	loc2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntType(), false, false)
 	loc2.Name = "l_2"
 	badParent := &Block{LocalVars: []*Variable{loc2, nil}}
 	if !IsPointingToLocals(loc2, badParent, -1, nil) {
@@ -252,9 +252,9 @@ func TestIsPointingToLocalsNilHole(t *testing.T) {
 func TestIsPointingToLocals(t *testing.T) {
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk.LocalVars = []*Variable{loc}
-	ptr := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// fact points to local → true
 	facts := []*FactPointTo{MakeFactPointTo(ptr, loc)}
 	if !IsPointingToLocals(ptr, blk, 0, facts) {
@@ -271,7 +271,7 @@ func TestSelectLoopCtrlVarFiltersUnionPtr(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// plain int global
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -362,7 +362,7 @@ func TestAddNewVarFactPointer(t *testing.T) {
 	f := &Function{Name: "f"}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// Variable.cpp:395 — pointer init Constant::make_random → "0" → null fact
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
 	fp := FindRelatedPointTo(fm.GlobalFacts, p)
 	if fp == nil || !fp.IsNull() {
@@ -382,16 +382,16 @@ func TestMakeExpressionVariableAsReturnFiltersLocalPtr(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk.LocalVars = []*Variable{loc}
 	// local pointer that points to local
-	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 	blk.LocalVars = append(blk.LocalVars, lp)
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(lp, loc))
 	// also a global pointer to global target (ok to return)
-	gt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	gt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	vs.GlobalList = []*Variable{gp, gt}
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(gp, gt))
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)

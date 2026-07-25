@@ -141,7 +141,7 @@ func TestMakeRandomBinaryMayPickPtrCmp(t *testing.T) {
 
 func TestRecordPointerComparisonsGetType(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	lhs := &Expression{Term: TermVariable, Var: p, ExprType: PointerTo(GetIntType())}
 	rhs := &Expression{
 		Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"},

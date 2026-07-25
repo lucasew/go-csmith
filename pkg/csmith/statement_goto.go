@@ -313,7 +313,7 @@ func OutputSkippedVarInitsSess(s *Session, st *Stmt, indent string) string {
 			return ""
 		}
 		// get_actual_name always live; sticky no invent " = init;" without identifier
-		name := v.GetActualName(false)
+		name := v.GetActualNameSess(s, false)
 		// residual ERROR sticky — no invent soft-continue later re-inits past GetActualName residual
 		if sessHasError(s) {
 			return ""

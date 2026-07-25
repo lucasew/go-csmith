@@ -4,7 +4,7 @@ import "testing"
 
 func TestOpportunisticValidateNoDeref(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if OpportunisticValidate(NewRng(1), v, GetIntType(), nil, 0, 0) != 1 {
 		t.Fatal("same level")
 	}
@@ -27,7 +27,7 @@ func TestOpportunisticValidateNoDeref(t *testing.T) {
 
 func TestOpportunisticValidateNullDead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// nil facts is complete empty — no related fact → 0
 	if OpportunisticValidate(NewRng(1), p, GetIntType(), nil, 0, 0) != 0 {
 		t.Fatal("no fact")
@@ -51,7 +51,7 @@ func TestOpportunisticValidateNullDead(t *testing.T) {
 		t.Fatalf("null p=0 must still flipcoin once: depth %d → %d", d0, rNull.RandDepth())
 	}
 	// live target → 1 (no flip when not null/dead)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	facts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	rLive := NewRng(1)
 	dLive := rLive.RandDepth()
@@ -107,7 +107,7 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 		Sizes:    []int{3},
 	}
 	coll.AsArray = coll
-	tgt := CreateVariableScalars("g_t", elem, false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", elem, false, false)
 	facts := []*FactPointTo{MakeFactPointTo(&coll.Variable, tgt)}
 	// itemized member of that collective
 	item := &ArrayVariable{
@@ -162,7 +162,7 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 
 func TestIsNonReadableNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoReadVars: []*Variable{nil}})
 	if !cg.IsNonReadable(g) {
 		t.Fatal("nil NoReadVars hole must fail closed as nonreadable")
@@ -183,19 +183,19 @@ func TestIsNonReadableNilHole(t *testing.T) {
 
 func TestVariableCompatible(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
-	if !a.Compatible(a, false) {
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
+	if !a.CompatibleSess(testAmbientSession, a, false) {
 		t.Fatal("self")
 	}
-	if a.Compatible(b, false) {
+	if a.CompatibleSess(testAmbientSession, b, false) {
 		t.Fatal("other no expand")
 	}
-	if !a.Compatible(b, true) {
+	if !a.CompatibleSess(testAmbientSession, b, true) {
 		t.Fatal("expand non-field")
 	}
-	vol := CreateVariableScalars("g_v", GetIntType(), false, true)
-	if vol.Compatible(vol, false) {
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	if vol.CompatibleSess(testAmbientSession, vol, false) {
 		t.Fatal("vol self")
 	}
 }
@@ -203,7 +203,7 @@ func TestVariableCompatible(t *testing.T) {
 func TestCompatibleCheckerDisabled(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	e := &Expression{Term: TermVariable, Var: a}
 	if CompatibleCheckExprVar(opts, a, e) {
 		t.Fatal("disabled")
@@ -214,7 +214,7 @@ func TestCompatibleCheckerDisabled(t *testing.T) {
 		t.Fatal("enabled Variable* overload must fail closed reject")
 	}
 	// unrelated var still rejected (assert(0), not invent compatible)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	eb := &Expression{Term: TermVariable, Var: b}
 	if !CompatibleCheckExprVar(opts, a, eb) {
 		t.Fatal("enabled Variable* overload always rejects")
@@ -223,8 +223,8 @@ func TestCompatibleCheckerDisabled(t *testing.T) {
 
 func TestHasDereferenceableVar(t *testing.T) {
 	opts := Defaults()
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, tgt)}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -277,17 +277,17 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
 	// force a volatile field if possible — check method on non-vol struct pointer
 	pt := PointerTo(st)
-	v := CreateVariableQfer("g_p", pt, NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiers([]bool{false}, []bool{false}))
 	// if struct has no vol fields, partial is false
-	_ = v.IsPartialVolatileAfterDeref(1)
+	_ = v.IsPartialVolatileAfterDerefSess(testAmbientSession, 1)
 	// fully volatile pointer qfer → not partial
-	vv := CreateVariableQfer("g_pv", pt, NewCVQualifiers([]bool{false, false}, []bool{true, false}))
+	vv := CreateVariableQferSess(testAmbientSession, "g_pv", pt, NewCVQualifiers([]bool{false, false}, []bool{true, false}))
 	// IsVolatileAfterDeref(1) depends on qfer layout — just ensure no panic
-	_ = vv.IsPartialVolatileAfterDeref(1)
+	_ = vv.IsPartialVolatileAfterDerefSess(testAmbientSession, 1)
 	// Type-nil residual soft invent was not-partial soft-skip. Fair: sticky partial true.
 	ClearErrorSess(testAmbientSession)
 	hole := &Variable{Name: "g_p_hole", Type: nil, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	if !hole.IsPartialVolatileAfterDeref(0) {
+	if !hole.IsPartialVolatileAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("Type-nil IsPartialVolatileAfterDeref must fail closed partial true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -298,7 +298,7 @@ func TestIsPartialVolatileAfterDeref(t *testing.T) {
 	// Fair: sticky partial true. Use deref 0 on aggregate (qfer level 0 non-vol).
 	broken := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: nil, BitWidth: -1}}}
 	vs := &Variable{Name: "g_s_hole", Type: broken, Qfer: NewCVQualifiers([]bool{false}, []bool{false})}
-	if !vs.IsPartialVolatileAfterDeref(0) {
+	if !vs.IsPartialVolatileAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("IsVolatileStructUnion residual IsPartialVolatile must fail closed true")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -335,8 +335,8 @@ func TestMakeRandomAssignCompatibleRegen(t *testing.T) {
 func TestLhsCompatibleExpr(t *testing.T) {
 	// Lhs.cpp:359–362
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	if a == nil || b == nil {
 		t.Fatal("vars")
 	}
@@ -377,7 +377,7 @@ func TestLhsCompatibleExpr(t *testing.T) {
 func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 	// ExpressionFuncall.cpp:206–207 — unary invoke compatible via operand
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	if v == nil {
 		t.Fatal("var")
 	}
@@ -387,7 +387,7 @@ func TestExpressionFuncallCompatibleUnary(t *testing.T) {
 	if !e.CompatibleWithVar(v, false) {
 		t.Fatal("unary minus of v compatible with v")
 	}
-	other := CreateVariableScalars("g_2", GetIntType(), true, false)
+	other := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), true, false)
 	if e.CompatibleWithVar(other, false) {
 		t.Fatal("not other")
 	}
@@ -407,7 +407,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
 	// int* var with 2-level qfer; desired qfer 1-level for int* type match_indirect
 	pt := PointerTo(GetIntType())
-	vol := CreateVariableScalars("g_p", pt, true, false)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_p", pt, true, false)
 	if vol == nil {
 		t.Fatal("vol ptr")
 	}
@@ -434,7 +434,7 @@ func TestHasEligibleVolatileVarQferFilter(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	shell := &Variable{Name: "g_arr", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	good := CreateVariableScalars("g_v", GetIntType(), true, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), true, false)
 	if HasEligibleVolatileVarQfer([]*Variable{shell, good}, GetIntType(), nil, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("IsArray without AsArray HasEligibleVolatileVarQfer must fail closed false")
 	}

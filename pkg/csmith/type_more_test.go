@@ -197,7 +197,7 @@ func TestTypeNilHardQuerySticky(t *testing.T) {
 		t.Fatal("nil IsSignedChar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*Type)(nil).Match(GetIntType(), MatchExact) {
+	if (*Type)(nil).MatchSess(testAmbientSession, GetIntType(), MatchExact) {
 		t.Fatal("nil Match must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

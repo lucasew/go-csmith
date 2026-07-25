@@ -54,7 +54,7 @@ func TestMakeRandomExpressionVariableCreatesGlobal(t *testing.T) {
 	if e == nil || e.Term != TermVariable || e.Var == nil {
 		t.Fatalf("%+v", e)
 	}
-	if !e.Var.IsGlobal() {
+	if !e.Var.IsGlobalSess(testAmbientSession) {
 		t.Fatal("expected global")
 	}
 	if len(vs.GlobalList) < 1 {
@@ -98,7 +98,7 @@ func TestExpressionTypeProbabilitySeedBand(t *testing.T) {
 func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
 	// ExpressionVariable always has live Variable*; nil hole sticky fail closed reject
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	live := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 	hole := &Expression{Term: TermVariable, Var: nil}
 	if hole.CompatibleWithExpr(live, false) {
@@ -133,7 +133,7 @@ func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
 func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
 	// Constant.cpp:488–493 — expand_struct → true; else false
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	c := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	if c.CompatibleWithVar(v, false) {
 		t.Fatal("without expand_struct constant incompatible")
@@ -157,7 +157,7 @@ func TestExpressionGetQualifiersIndirect(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false, true}, []bool{false, false})
-	v := CreateVariableQfer("g_p", pt, q)
+	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	e := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 	gq := e.GetQualifiers()
 	if len(gq.IsConsts) != 1 {
@@ -218,7 +218,7 @@ func TestExpressionGetTypeIncompleteFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete still works
-	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	if (&Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}).GetType() != GetIntType() {
 		t.Fatal("complete variable type")
 	}
@@ -484,7 +484,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// only a float global
-	fv := CreateVariableScalars("g_f", GetSimpleType(EFloat), true, false)
+	fv := CreateVariableScalarsSess(testAmbientSession, "g_f", GetSimpleType(EFloat), true, false)
 	vs.GlobalList = []*Variable{fv}
 	vs.AllVars = []*Variable{fv}
 	// force global selection
@@ -525,7 +525,7 @@ func TestMakeExpressionVariablePassesDummyToSelect(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Variable::type always live; Type-nil candidate must not soft-skip filters to success
 	ClearErrorSess(testAmbientSession)
-	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
+	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
 	broken.Type = nil
 	vs.GlobalList = []*Variable{broken}
 	vs.AllVars = []*Variable{broken}
@@ -547,7 +547,7 @@ func TestMakeExpressionVariableIncompleteAmbientFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{v}
 	vs.AllVars = []*Variable{v}
 	inc := IncompleteEffect()
@@ -577,7 +577,7 @@ func TestMakeExpressionVariableIndirectZeroUsesVarType(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{v}
 	vs.AllVars = []*Variable{v}
 	vs.Opts = opts
@@ -606,7 +606,7 @@ func TestMakeExpressionVariableMutatesCallerEffect(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
@@ -628,14 +628,14 @@ func TestSelectWithInvalidRejectsVolatileWhenImpure(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	vs.Opts = opts
 	vq := NewCVQualifiers([]bool{false}, []bool{true})
-	vol := CreateVariableQfer("g_v", GetIntType(), vq)
+	vol := CreateVariableQferSess(testAmbientSession, "g_v", GetIntType(), vq)
 	vs.GlobalList = []*Variable{vol}
 	vs.AllVars = []*Variable{vol}
 	cg := WithEffectContext(WithSideEffects()).WithSession(testAmbientSession)
 	// under impure context must never hand back a volatile
 	for seed := uint64(1); seed < 40; seed++ {
 		got := vs.SelectWithInvalid(AccessRead, cg, GetIntType(), nil, NewRng(seed), MatchFlexible, nil)
-		if got != nil && got.IsVolatile() {
+		if got != nil && got.IsVolatileSess(testAmbientSession) {
 			t.Fatalf("seed %d: must not return volatile under impure effect_context", seed)
 		}
 	}
@@ -673,8 +673,8 @@ func TestSelectWithInvalidExpandStructNewValueErrors(t *testing.T) {
 func TestSelectWithInvalidExcludesDummy(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{a, b}
 	vs.AllVars = []*Variable{a, b}
 	vs.Opts = opts
@@ -690,7 +690,7 @@ func TestBumpsExprDepth(t *testing.T) {
 	if !BumpsExprDepth(&Expression{Term: TermConstant, Con: MakeInt(1)}) {
 		t.Fatal("const")
 	}
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	if !BumpsExprDepth(&Expression{Term: TermVariable, Var: v}) {
 		t.Fatal("var")
 	}
@@ -956,13 +956,13 @@ func TestMakeExpressionFuncallRestoresFactsOnFail(t *testing.T) {
 	opts.MaxFuncs = 0 // force failure to create user funcs; may still get std
 	vs := NewVariableSelector(opts)
 	// seed globals for variable fallback
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	eff := EmptyEffect()
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -992,9 +992,9 @@ func TestExpressionVariableAddrOfArgForbiddenAsParam(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	pt := PointerTo(GetIntType())
 	// sole candidate: int argument (address would yield int*)
-	arg := CreateVariableScalars("p_1", GetIntType(), false, false)
+	arg := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
 	// mark as argument via name p_ / IsArgument
-	if !arg.IsArgument() {
+	if !arg.IsArgumentSess(testAmbientSession) {
 		// force argument role if CreateVariableScalars does not
 		arg.Name = "p_1"
 	}
@@ -1034,9 +1034,9 @@ func TestMakeExpressionVariableResidualSticky(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	vs.Types = &TypeEnv{Sess: testAmbientSession}
-	broken := CreateVariableScalars("g_broken", GetIntType(), true, false)
+	broken := CreateVariableScalarsSess(testAmbientSession, "g_broken", GetIntType(), true, false)
 	broken.Type = nil
-	good := CreateVariableScalars("g_good", GetIntType(), true, false)
+	good := CreateVariableScalarsSess(testAmbientSession, "g_good", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{good}
 	vs.AllVars = []*Variable{good}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -1214,7 +1214,7 @@ func TestGetQualifiersEqualsIncompleteSticky(t *testing.T) {
 
 func TestCompatibleWithIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	if (*Expression)(nil).CompatibleWithVar(v, false) {
 		t.Fatal("nil Expression CompatibleWithVar must fail closed false")
 	}
@@ -1315,7 +1315,7 @@ func TestIs0Or1NotEqualsLessThanIncompleteSticky(t *testing.T) {
 
 func TestUseVarIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	subj := CreateVariableScalars("g_x", GetIntType(), false, false)
+	subj := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	if !(*Expression)(nil).UseVar(subj) {
 		t.Fatal("nil Expression UseVar must fail closed true (uses)")
 	}
@@ -1356,7 +1356,7 @@ func TestUseVarIncompleteSticky(t *testing.T) {
 	// Match residual: Type-nil aggregate subject soft invent was not-use soft-skip.
 	// Fair: sticky uses true (restrictive).
 	hole := &Variable{Name: "g_agg", Type: nil}
-	other := CreateVariableScalars("g_y", GetIntType(), false, false)
+	other := CreateVariableScalarsSess(testAmbientSession, "g_y", GetIntType(), false, false)
 	if !(&Expression{Term: TermVariable, Var: hole}).UseVar(other) {
 		t.Fatal("Match residual UseVar must fail closed true (uses)")
 	}

@@ -40,7 +40,7 @@ func TestPostLoopRestoresEntryMayNullNotOut(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "func_54", ReturnType: GetIntType()}
 	ptType := PointerTo(GetSimpleType(EShort))
-	g := CreateVariableScalars("g_127", GetSimpleType(EShort), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", GetSimpleType(EShort), false, false)
 	arr := &ArrayVariable{
 		Variable: Variable{Name: "l_233", Type: ptType, IsArray: true},
 		Sizes:    []int{10},
@@ -72,10 +72,10 @@ func TestFindFixedPointAfterResetKeepsEntryMayNull(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	ptType := PointerTo(GetIntType())
-	g := CreateVariableScalars("g_t", GetIntType(), false, false)
-	p := CreateVariableScalars("g_p", ptType, false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ptType, false, false)
 	entry := []*FactPointTo{MakeFactPointToSet(p, []*Variable{g, NullPtr})}
-	x := CreateVariableScalars("g_x", GetIntType(), false, false)
+	x := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	asg := Stmt{
 		Kind: StmtAssign, StmID: 2,
 		LhsVar: x, Lhs: &Lhs{Var: x, Type: GetIntType()},

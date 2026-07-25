@@ -32,7 +32,7 @@ func TestMakeRandomGotoBackEdge(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	vs.AllVars = []*Variable{g}
 	vs.GlobalList = []*Variable{g}
 	// target stmt for back-edge
@@ -76,7 +76,7 @@ func TestMakeRandomGotoDoesNotReadVarAtMake(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	tables := NewExprTables(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	vs.AllVars = []*Variable{g}
 	vs.GlobalList = []*Variable{g}
 	tgt := Stmt{Kind: StmtAssign, AssignOp: AssignSimple, StmID: AllocStmID()}
@@ -191,10 +191,10 @@ func TestStmVisitFactsClearsEffectStmBeforeForVisit(t *testing.T) {
 	opts := Defaults()
 	f := &Function{Name: "func_68", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
-	pollute := CreateVariableScalars("g_77", GetIntType(), false, false)
-	bodyRead := CreateVariableScalars("g_16", GetIntType(), false, false)
-	tmp := CreateVariableScalars("l_1", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
+	pollute := CreateVariableScalarsSess(testAmbientSession, "g_77", GetIntType(), false, false)
+	bodyRead := CreateVariableScalarsSess(testAmbientSession, "g_16", GetIntType(), false, false)
+	tmp := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	body := &Block{
 		StmID: AllocStmID(), Func: f, Looping: true,
 		Stmts: []Stmt{{
@@ -362,7 +362,7 @@ func TestMakeRandomGotoRequiresFactMgr(t *testing.T) {
 func TestMakeBinaryForCompare(t *testing.T) {
 	opts := Defaults()
 	opts.SafeMath = true
-	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), true, false), ExprType: GetIntType()}
+	lhs := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), true, false), ExprType: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(10), ExprType: GetIntType()}
 	fi := MakeBinary(NewRng(1), opts, NewProbabilities(opts), EmptyCGContext().WithSession(testAmbientSession), BinCmpLt, lhs, rhs)
 	if fi == nil || fi.Binary != "<" {
@@ -503,7 +503,7 @@ func TestMakeRandomGotoForwardInsert(t *testing.T) {
 		}
 	}
 	// visible read var on accum for cond selection (back) / src accum (forward)
-	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, g)
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -596,7 +596,7 @@ func TestForwardGotoSameBlockInsertPreservesDestID(t *testing.T) {
 	f.Blocks = []*Block{blk}
 	f.Body = blk
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalars("g_c", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	vs.AllVars = append(vs.AllVars, g)
 	eff := EmptyEffect().ReadVarSess(testAmbientSession, g)
 	for i := range blk.Stmts {
@@ -699,7 +699,7 @@ func TestSeed2GensymNamesMatchUpstreamAfterGotoFix(t *testing.T) {
 
 func TestResetEffectAccum(t *testing.T) {
 	cg := EmptyCGContext().WithSession(testAmbientSession)
-	v := CreateVariableScalars("g_x", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
 	pre := EmptyEffect().ReadVarSess(testAmbientSession, v)
 	cg.EffectAccum = &Effect{}
 	*cg.EffectAccum = EmptyEffect().WriteVarSess(testAmbientSession, v)
@@ -810,7 +810,7 @@ func TestVisitFactsGotoIncompleteFactsFailClosed(t *testing.T) {
 	// incomplete working facts or prev outs sticky fail closed
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	st := &Stmt{Kind: StmtGoto, StmID: 10, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, GotoDestStmID: 20}
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
@@ -866,10 +866,10 @@ func TestPreOutputLabelAttrResidualSticky(t *testing.T) {
 func TestOutputSkippedVarInitsResidualSticky(t *testing.T) {
 	// InitExpr Output residual soft invent was soft-continue invent partial re-inits.
 	ClearErrorSess(testAmbientSession)
-	ok := CreateVariableScalars("l_ok", GetIntType(), false, false)
+	ok := CreateVariableScalarsSess(testAmbientSession, "l_ok", GetIntType(), false, false)
 	ok.Init = MakeInt(0)
 	ok.InitExpr = nil
-	hole := CreateVariableScalars("l_bad", GetIntType(), false, false)
+	hole := CreateVariableScalarsSess(testAmbientSession, "l_bad", GetIntType(), false, false)
 	hole.Init = nil
 	hole.InitExpr = &Expression{Term: TermConstant, Con: &Constant{Value: "1"}} // Type-nil residual
 	st := &Stmt{Kind: StmtGoto, InitSkippedVars: []*Variable{ok, hole}}
@@ -921,19 +921,19 @@ func TestIsVisibleLocalUsesMatch(t *testing.T) {
 	// Variable.cpp:490–500 — match() for params and locals.
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	p := CreateVariableScalars("p_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)
 	if p == nil {
 		t.Fatal("param")
 	}
 	f.Param = []*Variable{p}
 	blk := &Block{StmID: 1, Func: f}
-	if !p.IsVisibleLocal(blk) {
+	if !p.IsVisibleLocalSess(testAmbientSession, blk) {
 		t.Fatal("param must be visible in function block")
 	}
 	// identity via Match path for locals
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk.LocalVars = []*Variable{loc}
-	if !loc.IsVisibleLocal(blk) {
+	if !loc.IsVisibleLocalSess(testAmbientSession, blk) {
 		t.Fatal("local must be visible")
 	}
 	if HasErrorSess(testAmbientSession) {
@@ -956,7 +956,7 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, f)
 
 	// earlier local pointer with fact (simulates l_432)
-	lp := CreateVariableScalars("l_early", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_early", PointerTo(GetIntType()), false, false)
 	// IsLocal is name-prefix "l_" (Variable.cpp:is_local)
 	blk.LocalVars = append(blk.LocalVars, lp)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(lp, NullPtr)}
@@ -965,7 +965,7 @@ func TestForwardGotoVisitMakeupLaterLocals(t *testing.T) {
 	blk.Stmts = []Stmt{dest}
 	// map_in[dest] is incomplete relative to GlobalFacts (no l_early)
 	otherFact := MakeFactPointTo(
-		CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false),
+		CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false),
 		NullPtr,
 	)
 	fm.SetMapFactsIn(10, []*FactPointTo{otherFact})
@@ -1005,7 +1005,7 @@ func TestForwardGotoCondUsesMapUnionFactsOut(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 2 {
 		t.Skip("union")
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) < 1 {
 		t.Skip("fields")
 	}

@@ -547,7 +547,7 @@ func containsUnfixedGotoIDsSess(s *Session, ids map[int]bool, fm *FactMgr) bool 
 					sessNoteError(s, ErrGeneric)
 					return true
 				}
-				if f.Var.IsRV() {
+				if f.Var.IsRVSess(s) {
 					// residual ERROR sticky — no invent soft-continue unfixed scan past IsRV hole
 					if sessHasError(s) {
 						return true
@@ -581,7 +581,7 @@ func containsUnfixedGotoIDsSess(s *Session, ids map[int]bool, fm *FactMgr) bool 
 					sessNoteError(s, ErrGeneric)
 					return true
 				}
-				if fu.Var.IsRV() {
+				if fu.Var.IsRVSess(s) {
 					if sessHasError(s) {
 						return true
 					}

@@ -294,7 +294,7 @@ func TestUnaryStandardOutputNoExtraArgParens(t *testing.T) {
 	}
 	// ! on bare constant: (!4294967295UL) not (!(4294967295UL)) — Constant may already paren
 	// use a simple non-paren-wrapped path via variable name
-	v := CreateVariableScalars("g_x", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
 	not := &Invocation{
 		IsStd: true, IsUnary: true, Unary: "!",
 		Args: []*Expression{{Term: TermVariable, Var: v, ExprType: GetIntType()}},

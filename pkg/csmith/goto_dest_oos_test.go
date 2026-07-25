@@ -22,8 +22,8 @@ func TestIsVarOOSFieldOfLaterSiblingLocal(t *testing.T) {
 	body := &Block{StmID: 8, Func: f}
 	for106 := &Block{StmID: 106, Func: f, Parent: body, Looping: true}
 	for146 := &Block{StmID: 146, Func: f, Parent: body, Looping: true}
-	l298 := CreateVariableScalars("l_298", st, false, false)
-	l298.CreateFieldVars()
+	l298 := CreateVariableScalarsSess(testAmbientSession, "l_298", st, false, false)
+	l298.CreateFieldVarsSess(testAmbientSession)
 	if len(l298.FieldVars) < 1 {
 		t.Fatal("need f0")
 	}
@@ -64,15 +64,15 @@ func TestUpdateFactsForDestMarksFieldPointeeDead(t *testing.T) {
 	f := &Function{Name: "func_61", ReturnType: GetIntType()}
 	body := &Block{StmID: 8, Func: f}
 	for146 := &Block{StmID: 146, Func: f, Parent: body, Looping: true}
-	l298 := CreateVariableScalars("l_298", st, false, false)
-	l298.CreateFieldVars()
+	l298 := CreateVariableScalarsSess(testAmbientSession, "l_298", st, false, false)
+	l298.CreateFieldVarsSess(testAmbientSession)
 	f0 := l298.FieldVars[0]
 	for146.LocalVars = []*Variable{l298}
 	f.Blocks = []*Block{body, for146}
 	f.Stack = []*Block{body}
 
-	g77 := CreateVariableScalars("g_77", PointerTo(GetIntType()), false, false)
-	g67 := CreateVariableScalars("g_67", GetIntType(), false, false)
+	g77 := CreateVariableScalarsSess(testAmbientSession, "g_77", PointerTo(GetIntType()), false, false)
+	g67 := CreateVariableScalarsSess(testAmbientSession, "g_67", GetIntType(), false, false)
 	factsIn := []*FactPointTo{MakeFactPointToSet(g77, []*Variable{g67, f0})}
 	factsOut := []*FactPointTo{}
 	UpdateFactsForDest(factsIn, &factsOut, f, body)

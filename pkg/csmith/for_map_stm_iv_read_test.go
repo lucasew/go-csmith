@@ -12,7 +12,7 @@ func TestMakeRandomForMapStmHasIVRead(t *testing.T) {
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	probs := NewProbabilities(opts)
-	g := CreateVariableScalars("g_iv", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntType(), false, false)
 	fn := &Function{Name: "func_x", ReturnType: GetIntType()}
 	blk := &Block{Func: fn, StmID: AllocStmID()}
 	fn.Body = blk

@@ -29,7 +29,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	}
 	av.AsArray = av
 	// ArrayVariable.cpp:161–163 — collective create_field_vars for aggregate element
-	av.CreateFieldVars()
+	av.CreateFieldVarsSess(testAmbientSession)
 	if HasErrorSess(testAmbientSession) || len(av.FieldVars) < 4 {
 		t.Fatalf("collective fields n=%d err=%v", len(av.FieldVars), GetErrorSess(testAmbientSession))
 	}
@@ -42,7 +42,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	}
 	f3 := item.FieldVars[3]
 	// GetCollective of itemized field maps onto collective field
-	collF3 := f3.GetCollective()
+	collF3 := f3.GetCollectiveSess(testAmbientSession)
 	if collF3 == nil || HasErrorSess(testAmbientSession) {
 		t.Fatalf("GetCollective itemized field err=%v", GetErrorSess(testAmbientSession))
 	}
@@ -56,7 +56,7 @@ func TestAbstractFactForVarInitAddressOfItemizedField(t *testing.T) {
 	if n, ok := init.IndirectLevelComplete(); !ok || n != -1 {
 		t.Fatalf("want address-of -1 got n=%d ok=%v", n, ok)
 	}
-	p := CreateVariableScalars("l_1226", ptrType, false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "l_1226", ptrType, false, false)
 	p.InitExpr = init
 
 	pt, _ := AbstractFactForVarInit(p)

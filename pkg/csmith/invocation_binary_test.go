@@ -40,7 +40,7 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 		t.Fatal("*0")
 	}
 	// same expr subtract
-	v := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_1", GetIntType(), true, false)}
+	v := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)}
 	fi = &Invocation{IsStd: true, Binary: "-", Args: []*Expression{v, v}}
 	if !fi.EqualsInt(0) {
 		t.Fatal("a-a")
@@ -84,9 +84,9 @@ func TestInvocationEqualsIntFold(t *testing.T) {
 
 func TestVisitFactsBinaryOrderedMerges(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	// start with a
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
 	eff := EmptyEffect()
@@ -133,13 +133,13 @@ func TestVisitFactsBinaryOrderedMergesUnionWrite(t *testing.T) {
 			{Name: "f1", Type: i64, Qfer: q, BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, q)
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, q)
 	if uv == nil || len(uv.FieldVars) < 2 {
 		t.Fatalf("want 2 field vars, got %v (fields=%d)", uv, len(uv.FieldVars))
 	}
 	f0, f1 := uv.FieldVars[0], uv.FieldVars[1]
 	// pointer to f1 so *p = … renews union last=f1
-	p := CreateVariableQfer("l_p", PointerTo(f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableQferSess(testAmbientSession, "l_p", PointerTo(f1.Type), NewCVQualifiers([]bool{false}, []bool{false}))
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	// post-left lattice: last written f0
 	fm.UnionFacts = []*FactUnion{MakeFactUnion(uv, 0)}
@@ -498,7 +498,7 @@ func TestVisitFactsBinaryOrderedPostMergeIncompleteFailClosed(t *testing.T) {
 	// incomplete GlobalFacts before left snapshot sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
@@ -606,13 +606,13 @@ func TestInvocationSafeInvocation(t *testing.T) {
 
 func TestInvocationCompatibleVarUnary(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	ev := &Expression{Term: TermVariable, Var: v, ExprType: GetIntType()}
 	fi := &Invocation{IsStd: true, IsUnary: true, Unary: "-", Args: []*Expression{ev}}
 	if !fi.CompatibleVar(v, false) {
 		t.Fatal("self")
 	}
-	if fi.CompatibleVar(CreateVariableScalars("g_2", GetIntType(), true, false), false) {
+	if fi.CompatibleVar(CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), true, false), false) {
 		t.Fatal("other")
 	}
 	// binary never compatible (complete false, not sticky)

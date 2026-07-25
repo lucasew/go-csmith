@@ -98,7 +98,7 @@ func TestConstantEquals(t *testing.T) {
 }
 
 func TestRhsToLhsTransferNullConst(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
 	facts := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
 	if len(facts) != 1 || !facts[0].IsNull() {
@@ -108,7 +108,7 @@ func TestRhsToLhsTransferNullConst(t *testing.T) {
 
 func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	// FactPointTo.cpp:168–169 — nullptr rhs → garbage (AddParamFacts missing arg)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	facts := RhsToLhsTransfer(nil, []*Variable{p}, nil)
 	if len(facts) != 1 || !facts[0].IsDead() {
 		t.Fatal("nil rhs must abstract as garbage like C++", facts)
@@ -116,7 +116,7 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 	// return always has Expression*; sticky fail closed before garbage invent
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	rv := CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	rv := CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
 	if fm.UpdateFactForReturnStmt(&Stmt{Kind: StmtReturn, StmID: 1}, rv, nil) {
 		t.Fatal("nil return expr must fail closed")
 	}
@@ -140,8 +140,8 @@ func TestRhsToLhsTransferNilRHSIsGarbage(t *testing.T) {
 }
 
 func TestRhsToLhsTransferAddrOf(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	// ExpressionVariable with ExprType = pointer means &g_t if var is int?
 	// IndirectLevel = var.level - exprType.level; int(0) - ptr(1) = -1 → address-of
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(GetIntType())}
@@ -155,9 +155,9 @@ func TestRhsToLhsTransferAddrOf(t *testing.T) {
 }
 
 func TestRhsToLhsTransferCopy(t *testing.T) {
-	p1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
-	p2 := CreateVariableScalars("g_p2", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerTo(GetIntType()), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "g_p2", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	in := []*FactPointTo{MakeFactPointTo(p2, tgt)}
 	rhs := &Expression{Term: TermVariable, Var: p2, ExprType: PointerTo(GetIntType())}
 	// p2 level 1, expr 1 → indirect 0; merge uses fact of p2
@@ -170,7 +170,7 @@ func TestRhsToLhsTransferCopy(t *testing.T) {
 func TestUpdateFactForAssign(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// nil FM / lhs sticky — no invent soft-skip assign update
-	if (*FactMgr)(nil).UpdateFactForAssign(CreateVariableScalars("g_x", GetIntType(), false, false), 0, nil) {
+	if (*FactMgr)(nil).UpdateFactForAssign(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), 0, nil) {
 		t.Fatal("nil FM must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -186,13 +186,13 @@ func TestUpdateFactForAssign(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Variable.cpp:395 — pointer Constant::make_random is "0" → null on AddNewVarFact
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fm.AddNewVarFact(p)
 	if !FindRelatedPointTo(fm.GlobalFacts, p).IsNull() {
 		t.Fatal("init null")
 	}
 	// assign to non-null target expression
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	rhs := &Expression{Term: TermVariable, Var: a, ExprType: PointerTo(GetIntType())}
 	// take address form for pointee
 	rhs = &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
@@ -205,7 +205,7 @@ func TestUpdateFactForAssign(t *testing.T) {
 }
 
 func TestAbstractFactNonPointerLHS(t *testing.T) {
-	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	// non-pointer scalar: complete empty (no pointer facts), not incomplete marker
 	if out, _ := AbstractFactForAssign(nil, v, 0, rhs); !FactsComplete(out) || len(out) != 0 {
@@ -215,7 +215,7 @@ func TestAbstractFactNonPointerLHS(t *testing.T) {
 
 func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 	// FactPointTo.cpp:259–261 — comma uses RHS of comma
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -231,7 +231,7 @@ func TestRhsToLhsTransferCommaPeel(t *testing.T) {
 func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
 	// incomplete CommaRHS must not invent complete GarbagePtr via nil-rhs peel
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermConstant, Con: MakeInt(1)},
@@ -250,9 +250,9 @@ func TestRhsToLhsTransferCommaNilRHSFailClosed(t *testing.T) {
 func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
 	// multi-level & hard IR sticky — no invent MakeFactsPointTo past assert(indirect==-1)
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// force Indir < -1 by ExprType deeper than Var.Type
-	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_i", GetIntType(), false, false), ExprType: PointerTo(PointerTo(GetIntType()))}
+	rhs := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false), ExprType: PointerTo(PointerTo(GetIntType()))}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
 		t.Fatal("multi-level & must fail closed incomplete")
 	}
@@ -264,8 +264,8 @@ func TestRhsToLhsTransferAddrOfNilCollectiveFailClosed(t *testing.T) {
 
 func TestRhsToLhsTransferAssignPeel(t *testing.T) {
 	// FactPointTo.cpp:256–258 — embedded assign peels to assign RHS
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
 	assign := &Stmt{
 		Kind: StmtAssign, LhsVar: q, Lhs: &Lhs{Var: q, Type: PointerTo(GetIntType())},
 		Expr:     &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}, ExprType: PointerTo(GetIntType())},
@@ -281,8 +281,8 @@ func TestRhsToLhsTransferAssignPeel(t *testing.T) {
 func TestRhsToLhsTransferAssignNilExprFailClosed(t *testing.T) {
 	// incomplete Assign.Expr must not invent complete GarbagePtr via nil-rhs peel
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
 	assign := &Stmt{
 		Kind: StmtAssign, LhsVar: q, Lhs: &Lhs{Var: q, Type: PointerTo(GetIntType())},
 		// Expr nil
@@ -303,10 +303,10 @@ func TestRhsToLhsTransferFunctionReturn(t *testing.T) {
 	// FactPointTo.cpp:247–253 — RV return fact copied to LHS
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
-	fn.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fn.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
 	fi := &Invocation{User: fn}
 	AddReturnFactForInvocation(fi, MakeFactPointTo(fn.RV, tgt))
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerTo(GetIntType())}
@@ -321,7 +321,7 @@ func TestRhsToLhsTransferRVTypeNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
 	fn.RV = &Variable{Name: "f_rv", Type: nil}
 	fi := &Invocation{User: fn}
@@ -363,8 +363,8 @@ func TestRhsToLhsTransferUnionAggregateFields(t *testing.T) {
 	uv := &Variable{Name: "g_u", Type: ut}
 	pf := &Variable{Name: "g_u.f0", Type: PointerTo(GetIntType()), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{pf}
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
-	lhsP := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
+	lhsP := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	in := []*FactPointTo{MakeFactPointTo(pf, tgt)}
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
 	facts := RhsToLhsTransfer(in, []*Variable{lhsP}, rhs)
@@ -379,7 +379,7 @@ func TestRhsToLhsTransferStructIsGarbage(t *testing.T) {
 		{Name: "f0", Type: PointerTo(GetIntType()), BitWidth: -1},
 	}}
 	sv := &Variable{Name: "g_s", Type: st}
-	lhsP := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	lhsP := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{Term: TermVariable, Var: sv, ExprType: st}
 	facts := RhsToLhsTransfer(nil, []*Variable{lhsP}, rhs)
 	if len(facts) != 1 || !facts[0].IsDead() {
@@ -400,9 +400,9 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 			{Name: "p1", Type: PointerTo(GetIntType()), BitWidth: -1},
 		},
 	}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(uv.FieldVars) == 0 {
-		uv.CreateFieldVars()
+		uv.CreateFieldVarsSess(testAmbientSession)
 	}
 	if len(uv.FieldVars) < 3 {
 		t.Skip("need 3 fields")
@@ -413,7 +413,7 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 		if f == nil {
 			continue
 		}
-		if f.IsPointer() {
+		if f.IsPointerSess(testAmbientSession) {
 			if p0 == nil {
 				p0 = f
 			} else if p1 == nil {
@@ -439,7 +439,7 @@ func TestAbstractFactUnionFieldAssignsAllPtrFields(t *testing.T) {
 func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
 	// FactPointTo.cpp:164–167 — assert all LHS are pointers; hard IR sticky
 	ClearErrorSess(testAmbientSession)
-	i := CreateVariableScalars("g_i", GetIntType(), false, false)
+	i := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: PointerTo(GetIntType()), Value: "0"}}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-pointer lvar must fail closed incomplete")
@@ -453,8 +453,8 @@ func TestRhsToLhsTransferNonPointerLvarsFailClosed(t *testing.T) {
 func TestRhsToLhsTransferMultiLevelAddrFailClosed(t *testing.T) {
 	// FactPointTo.cpp:205 — assert(indirect == -1); hard IR sticky
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	// int var with ** type → IndirectLevel = 0-2 = -2
 	rhs := &Expression{Term: TermVariable, Var: tgt, ExprType: PointerTo(PointerTo(GetIntType()))}
 	if rhs.IndirectLevel() != -2 {
@@ -479,8 +479,8 @@ func TestRhsToLhsTransferAggregateLenMismatchNDEBUG(t *testing.T) {
 	uv := &Variable{Name: "g_u", Type: ut}
 	pf := &Variable{Name: "g_u.f0", Type: PointerTo(GetIntType()), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{pf}
-	lhs0 := CreateVariableScalars("g_p0", PointerTo(GetIntType()), false, false)
-	lhs1 := CreateVariableScalars("g_p1", PointerTo(GetIntType()), false, false)
+	lhs0 := CreateVariableScalarsSess(testAmbientSession, "g_p0", PointerTo(GetIntType()), false, false)
+	lhs1 := CreateVariableScalarsSess(testAmbientSession, "g_p1", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{Term: TermVariable, Var: uv, ExprType: ut}
 	// two LHS pointers vs one field pointer → must not sticky-poison (NDEBUG assert).
 	_ = RhsToLhsTransfer(nil, []*Variable{lhs0, lhs1}, rhs)
@@ -495,9 +495,9 @@ func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	InvocationReturnFactsDoFinalization()
 	defer InvocationReturnFactsDoFinalization()
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	fn := &Function{Name: "f", ReturnType: PointerTo(GetIntType())}
-	fn.RV = CreateVariableScalars("f_rv", PointerTo(GetIntType()), false, false)
+	fn.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", PointerTo(GetIntType()), false, false)
 	fi := &Invocation{User: fn}
 	// no AddReturnFactForInvocation
 	rhs := &Expression{Term: TermFunction, Invoke: fi, ExprType: PointerTo(GetIntType())}
@@ -513,8 +513,8 @@ func TestRhsToLhsTransferMissingReturnFactFailClosed(t *testing.T) {
 func TestRhsToLhsTransferIncompleteMapsNonSticky(t *testing.T) {
 	// incomplete fact map / MergePointees hole stays non-sticky for soft re-pick
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
 	// incomplete map: nil hole so MergePointeesOfPointer fails closed incomplete
 	hole := []*FactPointTo{MakeFactPointTo(q, NullPtr), nil}
 	rhs := &Expression{Term: TermVariable, Var: q, ExprType: PointerTo(GetIntType())}
@@ -546,8 +546,8 @@ func TestAbstractFactForAssignTypeNilMorePointeeSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// p:int* points to q:int*; *p peels to int (non-pointer branch); lvars=[q];
 	// more = MergePointees(q,1) → Type-nil shell sticky
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
 	shell := &Variable{Name: "g_hole"} // Type nil
 	factsIn := []*FactPointTo{
 		MakeFactPointTo(p, q),
@@ -568,7 +568,7 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 	// IsUnion residual soft invent was invent non-union complete transfer past hole.
 	// Type-nil non-special already sticky; complete non-union empty transfer hygiene.
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	out, n := AbstractFactUnionForAssign(nil, nil, iv, 0, nil, nil)
 	if !UnionFactsComplete(out) && out != nil {
 		// IncompleteUnionFactSlice when incomplete maps — nil maps are complete empty
@@ -595,7 +595,7 @@ func TestAbstractFactUnionForAssignIsUnionResidualSticky(t *testing.T) {
 func TestRhsToLhsTransferGetTypeResidualSticky(t *testing.T) {
 	// GetType residual soft invent was invent GarbagePtr complete success past Type-nil RHS.
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// Type-nil constant shell → GetType residual
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Value: "0"}}
 	if FactsComplete(RhsToLhsTransfer(nil, []*Variable{p}, rhs)) {
@@ -626,7 +626,7 @@ func TestRhsToLhsTransferUnionGetCollectiveResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray GetCollective residual
 	shell := &Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{2}}
-	lvars := []*Variable{CreateVariableScalars("g_u", GetIntType(), false, false)}
+	lvars := []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntType(), false, false)}
 	// force union transfer path via RhsToLhsTransferUnion with TermVariable shell
 	rhs := &Expression{Term: TermVariable, Var: shell, ExprType: GetIntType()}
 	out := RhsToLhsTransferUnion(nil, nil, lvars, rhs)
@@ -645,7 +645,7 @@ func TestRhsToLhsTransferGetCollectiveResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// IsArray without AsArray GetCollective residual
 	shell := &Variable{Name: "g_a", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{2}}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	rhs := &Expression{Term: TermVariable, Var: shell, ExprType: PointerTo(GetIntType())}
 	out := RhsToLhsTransfer(nil, []*Variable{p}, rhs)
 	if FactsComplete(out) && out != nil && len(out) > 0 {

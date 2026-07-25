@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestMarkDeadVar(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	f := MakeFactPointTo(p, tgt)
 	nf := f.MarkDeadVar(tgt)
 	if nf == nil || !nf.IsDead() {
@@ -16,17 +16,17 @@ func TestMarkDeadVar(t *testing.T) {
 	if nf2 == nil || len(nf2.PointTo) != 1 || nf2.PointTo[0] != GarbagePtr {
 		t.Fatalf("%+v", nf2)
 	}
-	if f.MarkDeadVar(CreateVariableScalars("g_x", GetIntType(), false, false)) != nil {
+	if f.MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)) != nil {
 		t.Fatal("unrelated")
 	}
 }
 
 func TestUpdateFactsForOOSVars(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// fact for local pointer removed when oos
-	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(lp, loc),
 		MakeFactPointTo(p, loc),
@@ -90,26 +90,26 @@ func TestVariableMatchAggregate(t *testing.T) {
 	env := TypeEnv{Sess: testAmbientSession}
 	env.AllTypes = []*Type{GetIntType(), GetSimpleType(EShort), GetSimpleType(EUInt)}
 	st := MakeRandomStructType(NewRng(2), opts, probs, &env, "S0")
-	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Skip("no fields")
 	}
-	if !sv.Match(sv.FieldVars[0]) {
+	if !sv.MatchSess(testAmbientSession, sv.FieldVars[0]) {
 		t.Fatal("field match")
 	}
 }
 
 func TestMarkDeadVarNilSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalars("g_x", GetIntType(), false, false)) != nil {
+	if (*FactPointTo)(nil).MarkDeadVar(CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)) != nil {
 		t.Fatal("nil Fact MarkDeadVar must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Fact MarkDeadVar must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	tgt := CreateVariableScalars("g_t", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)
 	f := MakeFactPointTo(p, tgt)
 	if f.MarkDeadVar(nil) != nil {
 		t.Fatal("nil var MarkDeadVar must fail closed")
@@ -127,13 +127,13 @@ func TestMarkDeadVarStructFieldPointee(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	agg := CreateVariableScalars("l_531", st, false, false)
-	agg.CreateFieldVars()
+	agg := CreateVariableScalarsSess(testAmbientSession, "l_531", st, false, false)
+	agg.CreateFieldVarsSess(testAmbientSession)
 	if len(agg.FieldVars) == 0 {
 		t.Fatal("need field")
 	}
 	fld := agg.FieldVars[0]
-	p := CreateVariableScalars("g_113", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerTo(GetIntType()), false, false)
 	f := MakeFactPointToSet(p, []*Variable{fld, NullPtr})
 	nf := f.MarkDeadVar(agg)
 	if nf == nil {
@@ -159,10 +159,10 @@ func TestMarkFuncEndLocalsStructFieldPointee(t *testing.T) {
 	st := &Type{isStruct: true, StructName: "S", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	agg := CreateVariableScalars("l_531", st, false, false)
-	agg.CreateFieldVars()
+	agg := CreateVariableScalarsSess(testAmbientSession, "l_531", st, false, false)
+	agg.CreateFieldVarsSess(testAmbientSession)
 	fld := agg.FieldVars[0]
-	p := CreateVariableScalars("g_113", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_113", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{MakeFactPointToSet(p, []*Variable{fld, NullPtr})}
 	nf := facts[0].MarkFuncEndLocals([]*Variable{agg})
 	if nf == nil || !nf.IsDead() {

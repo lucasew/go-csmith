@@ -847,7 +847,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	}
 	f := fm.Func
 	// visibility needs complete stack for non-globals
-	if f != nil && !fact.Var.IsGlobal() {
+	if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
 		// residual ERROR sticky — no invent soft-skip AddFactOut past IsGlobal hole
 		if sessHasError(fmSess(fm)) {
 			fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
@@ -892,7 +892,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 	}
 	switch st.Kind {
 	case StmtReturn:
-		if !fact.Var.IsGlobal() {
+		if !fact.Var.IsGlobalSess(fmSess(fm)) {
 			// residual ERROR sticky — no invent soft-drop return non-global past IsGlobal hole
 			if sessHasError(fmSess(fm)) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
@@ -909,7 +909,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 		for b != nil && !b.Looping {
 			b = b.Parent
 		}
-		if f != nil && !fact.Var.IsGlobal() {
+		if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapFactsOut[st.StmID] = IncompleteFactSlice()
 				return
@@ -946,7 +946,7 @@ func (fm *FactMgr) AddFactOut(st *Stmt, stParent *Block, fact *FactPointTo) {
 			}
 		}
 		if destParent != nil && f != nil {
-			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
+			if !fact.Var.IsGlobalSess(fmSess(fm)) && !f.StackScanComplete(destParent) {
 				if !sessHasError(fmSess(fm)) {
 					sessNoteError(fmSess(fm), ErrGeneric)
 				}
@@ -1013,7 +1013,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 		return
 	}
 	f := fm.Func
-	if f != nil && !fact.Var.IsGlobal() {
+	if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
 		if sessHasError(fmSess(fm)) {
 			fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			return
@@ -1053,7 +1053,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 	}
 	switch st.Kind {
 	case StmtReturn:
-		if !fact.Var.IsGlobal() {
+		if !fact.Var.IsGlobalSess(fmSess(fm)) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 			}
@@ -1069,7 +1069,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 		for b != nil && !b.Looping {
 			b = b.Parent
 		}
-		if f != nil && !fact.Var.IsGlobal() {
+		if f != nil && !fact.Var.IsGlobalSess(fmSess(fm)) {
 			if sessHasError(fmSess(fm)) {
 				fm.MapUnionFactsOut[st.StmID] = IncompleteUnionFactSlice()
 				return
@@ -1103,7 +1103,7 @@ func (fm *FactMgr) AddFactOutUnion(st *Stmt, stParent *Block, fact *FactUnion) {
 			}
 		}
 		if destParent != nil && f != nil {
-			if !fact.Var.IsGlobal() && !f.StackScanComplete(destParent) {
+			if !fact.Var.IsGlobalSess(fmSess(fm)) && !f.StackScanComplete(destParent) {
 				if !sessHasError(fmSess(fm)) {
 					sessNoteError(fmSess(fm), ErrGeneric)
 				}
@@ -2084,7 +2084,7 @@ func RemoveFunctionLocalFactsAtSess(s *Session, facts []*FactPointTo, f *Functio
 		if sessHasError(s) {
 			return IncompleteFactSlice()
 		}
-		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.MatchSess(s, fact.Var)) {
+		if fact.Var.IsRVSess(s) && (f == nil || f.RV == nil || !f.RV.MatchSess(s, fact.Var)) {
 			// residual ERROR sticky — no invent soft-skip RV past Match hole
 			if sessHasError(s) {
 				return IncompleteFactSlice()
@@ -2152,7 +2152,7 @@ func RemoveFunctionLocalUnionFactsAtSess(s *Session, facts []*FactUnion, f *Func
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
-		if fact.Var.IsRV() && (f == nil || f.RV == nil || !f.RV.MatchSess(s, fact.Var)) {
+		if fact.Var.IsRVSess(s) && (f == nil || f.RV == nil || !f.RV.MatchSess(s, fact.Var)) {
 			if sessHasError(s) {
 				return IncompleteUnionFactSlice()
 			}
@@ -2665,7 +2665,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 	// FactMgr.cpp:72 — assert(var->is_global()) when blk==nullptr
 	// no soft invent facts for non-global "global create" path
 	if blk == nil {
-		isG := v.IsGlobal()
+		isG := v.IsGlobalSess(fmSess(fm))
 		// residual ERROR sticky — no invent soft-skip makeup past IsGlobal residual
 		if sessHasError(fmSess(fm)) {
 			return
@@ -3020,7 +3020,7 @@ func (fm *FactMgr) AddNewVarFactAndUpdate(blk *Block, v *Variable) {
 				if b == nil {
 					continue
 				}
-				if fm.Func != nil && !uf.Var.IsGlobal() {
+				if fm.Func != nil && !uf.Var.IsGlobalSess(fmSess(fm)) {
 					vis := fm.Func.IsVarVisibleSess(fmSess(fm), uf.Var, b.Parent)
 					if sessHasError(fmSess(fm)) {
 						fm.GlobalFacts = IncompleteFactSlice()
@@ -3513,7 +3513,7 @@ func MakeupNewVarFactsSess(s *Session, oldFacts *[]*FactPointTo, newFacts []*Fac
 			return false
 		}
 		v := f.Var
-		if !v.IsGlobal() && !v.IsLocal() {
+		if !v.IsGlobalSess(s) && !v.IsLocalSess(s) {
 			// residual ERROR sticky — no invent soft-continue makeup past IsGlobal/IsLocal hole
 			if sessHasError(s) {
 				*oldFacts = IncompleteFactSlice()
@@ -3716,7 +3716,7 @@ func (fm *FactMgr) FindDanglingGlobalPtrs(f *Function) {
 		// FactsComplete guarantees live fact.Var
 		v := fact.Var
 		// const pointers should never be dangling; only globals
-		if v.IsConstSess(s) || !v.IsGlobalSess(s) {
+		if v.IsConstSess(fmSess(fm)) || !v.IsGlobalSess(fmSess(fm)) {
 			// residual ERROR sticky — no invent soft-continue dead scan past IsConst/IsGlobal hole
 			if sessHasError(s) {
 				f.DeadGlobals = IncompleteVariables()
@@ -3877,7 +3877,7 @@ func (fm *FactMgr) FilterUnionFactsForHandover(keepPT []*FactPointTo) {
 	out := make([]*FactUnion, 0, len(fm.UnionFacts))
 	for _, uf := range fm.UnionFacts {
 		v := uf.Var
-		isG := v.IsGlobal()
+		isG := v.IsGlobalSess(fmSess(fm))
 		if sessHasError(fmSess(fm)) {
 			fm.UnionFacts = IncompleteUnionFactSlice()
 			return
@@ -4097,7 +4097,7 @@ func (fm *FactMgr) CallerToCalleeHandover(args []*Expression, inputs *[]*FactPoi
 	var keep, rest []*FactPointTo
 	for _, f := range *inputs {
 		v := f.Var
-		isG := v.IsGlobal()
+		isG := v.IsGlobalSess(fmSess(fm))
 		// residual ERROR sticky — no invent soft-partition past IsGlobal residual
 		if sessHasError(fmSess(fm)) {
 			*inputs = IncompleteFactSlice()
@@ -4178,7 +4178,7 @@ func (fm *FactMgr) RemoveRVFacts(facts *[]*FactPointTo) {
 	}
 	out := make([]*FactPointTo, 0, len(*facts))
 	for _, f := range *facts {
-		if f.Var.IsRV() {
+		if f.Var.IsRVSess(fmSess(fm)) {
 			// keep only this function's RV
 			if fm.Func != nil && fm.Func.RV != nil {
 				match := fm.Func.RV.MatchSess(fmSess(fm), f.Var)

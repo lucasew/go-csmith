@@ -57,7 +57,7 @@ func TestGetLastStmStopsAtReturn(t *testing.T) {
 
 func TestSetAccumulatedEffect(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	fm.SetMapStmEffect(1, EmptyEffect().WriteVarSess(testAmbientSession, v))
 	fm.SetMapStmEffect(2, EmptyEffect().ReadVarSess(testAmbientSession, v))
 	b := &Block{
@@ -184,7 +184,7 @@ func TestLabelAttrEmit(t *testing.T) {
 		LabelAttrRng:   NewRng(1),
 		Stmts: []Stmt{{
 			Kind: StmtAssign, SourceLabel: "lbl_1",
-			LhsVar:   CreateVariableScalars("g_1", GetIntType(), false, false),
+			LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false),
 			AssignOp: AssignSimple,
 			Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
 		}},
@@ -325,7 +325,7 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	b := &Block{StmID: 42, Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 1,
-		LhsVar:   CreateVariableScalars("g_1", GetIntType(), false, false),
+		LhsVar:   CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false),
 		Expr:     &Expression{Term: TermConstant, Con: MakeInt(0)},
 		AssignOp: AssignSimple,
 	}}}
@@ -345,7 +345,7 @@ func TestBlockOutputBlockIDComment(t *testing.T) {
 // same as header (not indent+1). Unfair indent+1: "for\n        {" vs "for\n    {".
 func TestForBodyBlockSameIndentAsHeader(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	body := &Block{StmID: 7, Stmts: []Stmt{{
 		Kind: StmtReturn,
 		Expr: &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()},

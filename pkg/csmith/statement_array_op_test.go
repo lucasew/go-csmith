@@ -28,7 +28,7 @@ func TestMakeRandomArrayInitOneStmIDMultiDim(t *testing.T) {
 	vs.GlobalList = []*Variable{&av.Variable}
 	// Loop IVs for both dims
 	for _, name := range []string{"i", "j", "k"} {
-		iv := CreateVariableQfer(name, GetIntType(), q)
+		iv := CreateVariableQferSess(testAmbientSession, name, GetIntType(), q)
 		vs.GlobalList = append(vs.GlobalList, iv)
 	}
 	f := &Function{Name: "f", ReturnType: GetIntType()}
@@ -83,9 +83,9 @@ func TestMultiDimArrayOpLabelOnce(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
 	// 3-dim shells: outer + 2 nested
-	iv0 := CreateVariableScalars("i", GetIntType(), false, false)
-	iv1 := CreateVariableScalars("j", GetIntType(), false, false)
-	iv2 := CreateVariableScalars("k", GetIntType(), false, false)
+	iv0 := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
+	iv1 := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
+	iv2 := CreateVariableScalarsSess(testAmbientSession, "k", GetIntType(), false, false)
 	if iv0 == nil || iv1 == nil || iv2 == nil {
 		t.Fatal("iv")
 	}

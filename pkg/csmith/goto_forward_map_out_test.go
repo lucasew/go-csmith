@@ -21,10 +21,10 @@ func TestForwardGotoRecomputesGotoOutFromLiveOtherMaps(t *testing.T) {
 	f.Body = body
 	f.Blocks = []*Block{body}
 
-	g124 := CreateVariableScalars("g_124", PointerTo(GetIntType()), true, false)
-	g106 := CreateVariableScalars("g_106", GetIntType(), true, false)
-	l2181 := CreateVariableScalars("l_2181", GetIntType(), false, false)
-	l2156 := CreateVariableScalars("l_2156", GetIntType(), false, false)
+	g124 := CreateVariableScalarsSess(testAmbientSession, "g_124", PointerTo(GetIntType()), true, false)
+	g106 := CreateVariableScalarsSess(testAmbientSession, "g_106", GetIntType(), true, false)
+	l2181 := CreateVariableScalarsSess(testAmbientSession, "l_2181", GetIntType(), false, false)
+	l2156 := CreateVariableScalarsSess(testAmbientSession, "l_2156", GetIntType(), false, false)
 	wide := MakeFactPointToSet(g124, []*Variable{l2181, g106, l2156})
 	precise := MakeFactPointTo(g124, g106)
 

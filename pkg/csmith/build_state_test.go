@@ -8,7 +8,7 @@ func TestBuildStateTransitions(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("func_1_rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
 	// Function.cpp FMList at create — pair before GenerateBody (no invent inside)
 	_ = f.ensurePairedFactMgr()
 	if f.BuildState != BuildUnbuilt || f.IsEffectKnown() {
@@ -32,8 +32,8 @@ func TestPointerParamTBD(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
-	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
 	f.Param = []*Variable{p}
 	// pair FactMgr at create (Function.cpp FMList); pass same via CGContext
 	fm := f.ensurePairedFactMgr()
@@ -42,8 +42,8 @@ func TestPointerParamTBD(t *testing.T) {
 	// after build, may still have fact (or oos); at least was added during building
 	// regenerate blocked so check via second function
 	f2 := &Function{Name: "f2", ReturnType: GetIntType()}
-	f2.RV = CreateVariableScalars("f2_rv", GetIntType(), false, false)
-	p2 := CreateVariableScalars("p_2", PointerTo(GetIntType()), false, false)
+	f2.RV = CreateVariableScalarsSess(testAmbientSession, "f2_rv", GetIntType(), false, false)
+	p2 := CreateVariableScalarsSess(testAmbientSession, "p_2", PointerTo(GetIntType()), false, false)
 	f2.Param = []*Variable{p2}
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	// manually run param fact path: Building adds tbd before body
@@ -57,18 +57,18 @@ func TestPointerParamTBD(t *testing.T) {
 }
 
 func TestIsVisible(t *testing.T) {
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	if !g.IsVisible(nil) {
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	if !g.IsVisibleSess(testAmbientSession, nil) {
 		t.Fatal("global")
 	}
 	f := &Function{Name: "f"}
 	blk := &Block{Func: f}
-	l := CreateVariableScalars("l_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk.LocalVars = []*Variable{l}
-	if !l.IsVisible(blk) {
+	if !l.IsVisibleSess(testAmbientSession, blk) {
 		t.Fatal("local")
 	}
-	if l.IsVisible(nil) {
+	if l.IsVisibleSess(testAmbientSession, nil) {
 		t.Fatal("local nil blk")
 	}
 }

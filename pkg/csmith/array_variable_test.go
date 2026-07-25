@@ -222,7 +222,7 @@ func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 		Sizes:    []int{8},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	off := &Expression{Term: TermConstant, Con: MakeInt(2), ExprType: GetIntType()}
 	ivExpr := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
 	fi := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ivExpr, off}}
@@ -242,11 +242,11 @@ func TestOutputAccessItemizedUsesIndexExprs(t *testing.T) {
 		t.Fatal("must prefer IndexExprs over Indices strings")
 	}
 	// Variable::Output dispatches to ArrayVariable::Output for itemized
-	if item.OutputC() != out {
-		t.Fatalf("OutputC %q want %q", item.OutputC(), out)
+	if item.OutputCSess(testAmbientSession, false) != out {
+		t.Fatalf("OutputC %q want %q", item.OutputCSess(testAmbientSession, false), out)
 	}
-	if item.OutputLhsC() != out {
-		t.Fatalf("OutputLhsC %q", item.OutputLhsC())
+	if item.OutputLhsCOptsSess(testAmbientSession, false) != out {
+		t.Fatalf("OutputLhsC %q", item.OutputLhsCOptsSess(testAmbientSession, false))
 	}
 }
 
@@ -430,7 +430,7 @@ func TestOutputUpperBoundArray(t *testing.T) {
 	if got := av.OutputUpperBoundArray(); got != "g_a[3][4]" {
 		t.Fatal(got)
 	}
-	if got := av.Variable.OutputUpperBound(false); got != "g_a[3][4]" {
+	if got := av.Variable.OutputUpperBoundSess(testAmbientSession, false); got != "g_a[3][4]" {
 		t.Fatal(got)
 	}
 	// ArrayVariable.cpp:575 — always sizes[i]-1 (no soft "0" for empty dim)
@@ -580,7 +580,7 @@ func TestToUnsignedSimple(t *testing.T) {
 
 func TestOutputIndexModuloSignedCast(t *testing.T) {
 	av := &ArrayVariable{Sizes: []int{10}}
-	idx := &Expression{Term: TermVariable, Var: CreateVariableScalars("i", GetIntType(), false, false), ExprType: GetIntType()}
+	idx := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false), ExprType: GetIntType()}
 	got := av.OutputIndexModulo(0, idx)
 	if !strings.Contains(got, "% 10") {
 		t.Fatal(got)
@@ -699,8 +699,8 @@ func TestItemizeCreateFieldVarsAggregate(t *testing.T) {
 		t.Fatalf("field1 name want %q got %q", want1, item.FieldVars[1].Name)
 	}
 	// OutputC / GetActualName on field must carry indices (seed-5 g_42[1].f0)
-	if item.FieldVars[0].OutputC() != want0 {
-		t.Fatalf("field OutputC want %q got %q", want0, item.FieldVars[0].OutputC())
+	if item.FieldVars[0].OutputCSess(testAmbientSession, false) != want0 {
+		t.Fatalf("field OutputC want %q got %q", want0, item.FieldVars[0].OutputCSess(testAmbientSession, false))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -718,15 +718,15 @@ func TestCreateFieldVarsArrayUsesOutputAccess(t *testing.T) {
 		Collective: &ArrayVariable{Variable: Variable{Name: "g_42"}, Sizes: []int{2}},
 	}
 	item.AsArray = item
-	item.CreateFieldVars()
+	item.CreateFieldVarsSess(testAmbientSession)
 	if HasErrorSess(testAmbientSession) || len(item.FieldVars) != 1 {
 		t.Fatalf("fields err=%v n=%d", HasErrorSess(testAmbientSession), len(item.FieldVars))
 	}
 	if item.FieldVars[0].Name != "g_42[1].f0" {
 		t.Fatalf("want g_42[1].f0 got %q", item.FieldVars[0].Name)
 	}
-	if item.FieldVars[0].OutputAddrOf(false) != "&g_42[1].f0" {
-		t.Fatalf("addr %q", item.FieldVars[0].OutputAddrOf(false))
+	if item.FieldVars[0].OutputAddrOfSess(testAmbientSession, false) != "&g_42[1].f0" {
+		t.Fatalf("addr %q", item.FieldVars[0].OutputAddrOfSess(testAmbientSession, false))
 	}
 	ClearErrorSess(testAmbientSession)
 }
@@ -819,7 +819,7 @@ func TestArrayVariableNilPredicatesSticky(t *testing.T) {
 		t.Fatal("nil TotalSize must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if (*ArrayVariable)(nil).IsGlobal() {
+	if (*ArrayVariable)(nil).IsGlobalSess(testAmbientSession) {
 		t.Fatal("nil IsGlobal must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -864,7 +864,7 @@ func TestContainsBackEdgeDestParentOnly(t *testing.T) {
 
 func TestCountAndFindExprKeyVar(t *testing.T) {
 	// ArrayVariable.cpp:66–119
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
 	if CountExprKeyVar(ev) != 1 || FindExprKeyVar(ev) != iv {
 		t.Fatal("var")
@@ -880,7 +880,7 @@ func TestCountAndFindExprKeyVar(t *testing.T) {
 		t.Fatalf("bin count=%d key=%v", CountExprKeyVar(bin), FindExprKeyVar(bin))
 	}
 	// i + j → two keys
-	jv := CreateVariableScalars("j", GetIntType(), false, false)
+	jv := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
 	ej := &Expression{Term: TermVariable, Var: jv, ExprType: GetIntType()}
 	fi2 := &Invocation{IsStd: true, Binary: "+", Args: []*Expression{ev, ej}}
 	bin2 := &Expression{Term: TermFunction, Invoke: fi2}
@@ -960,7 +960,7 @@ func TestIsVariantKeyVars(t *testing.T) {
 		Sizes:    []int{8},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	ev := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntType()}
 	off := &Expression{Term: TermConstant, Con: MakeInt(1), ExprType: GetIntType()}
 	// a[i] and a[i+1] share key i
@@ -981,7 +981,7 @@ func TestIsVariantKeyVars(t *testing.T) {
 		t.Fatal("same key i")
 	}
 	// a[j] different key
-	jv := CreateVariableScalars("j", GetIntType(), false, false)
+	jv := CreateVariableScalarsSess(testAmbientSession, "j", GetIntType(), false, false)
 	a3 := &ArrayVariable{
 		Variable: Variable{Name: "g_a", Type: GetIntType(), IsArray: true},
 		Sizes:    []int{8}, Collective: parent,
@@ -1062,10 +1062,10 @@ func TestHasEligibleVolatileVarIncrements(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	BookkeeperDoFinalizationSess(testAmbientSession)
 	defer BookkeeperDoFinalizationSess(testAmbientSession)
-	vol := CreateVariableScalars("g_v", GetIntType(), true, false)
+	vol := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), true, false)
 	vol.Qfer = NewCVQualifiers([]bool{false}, []bool{true})
 	// ensure IsVolatile true
-	if !vol.IsVolatile() {
+	if !vol.IsVolatileSess(testAmbientSession) {
 		// set storage volatile
 		vol.Qfer.IsVolatiles = []bool{true}
 	}
@@ -1119,7 +1119,7 @@ func TestOutputWithIndicesGetActualNameResidualSticky(t *testing.T) {
 		t.Fatal("empty name residual OutputWithIndices must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if s := av.OutputLowerBound(); s != "" {
+	if s := av.OutputLowerBoundSess(testAmbientSession); s != "" {
 		t.Fatal("empty name residual must fail closed OutputLowerBound", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1227,9 +1227,9 @@ func TestVariableOutputDefVolatileCommentNoSpace(t *testing.T) {
 	// Variable.cpp:662–664 + OutputMgr.cpp:318 — ";/* VOLATILE GLOBAL name */"
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
 	v.Init = MakeInt(0)
-	s := v.OutputDefOpts(true, false)
+	s := v.OutputDefFullSess(testAmbientSession, true, false, false, nil)
 	if !strings.Contains(s, ";/* VOLATILE GLOBAL g_v */") {
 		t.Fatal(s)
 	}

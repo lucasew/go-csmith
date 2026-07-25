@@ -5,7 +5,7 @@ import "testing"
 func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	outer := &Block{Func: f, LocalVars: []*Variable{
-		CreateVariableScalars("l_1", GetIntType(), false, false),
+		CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false),
 	}}
 	// mark local properly
 	loc := outer.LocalVars[0]
@@ -13,7 +13,7 @@ func TestUpdateFactsForDestDropsOOS(t *testing.T) {
 	// force local flag via name prefix used by IsLocal
 	inner := &Block{Parent: outer, Func: f}
 	f.Blocks = []*Block{outer, inner}
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	// fact: g_p points to local l_1 which is OOS at dest with nil parent (outside func stack)
 	// destParent = nil means only globals visible → local is OOS
 	in := []*FactPointTo{MakeFactPointToSet(p, []*Variable{loc})}
@@ -100,7 +100,7 @@ func TestClearMapVisited(t *testing.T) {
 
 func TestSetupInOutMaps(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	f1 := MakeFactPointTo(p, NullPtr)
 	fm.SetMapFactsIn(1, []*FactPointTo{f1})
 	fm.SetMapFactsOut(1, []*FactPointTo{f1})
@@ -123,7 +123,7 @@ func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	// incomplete hole must not invent cleaned final map entry — sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	// plant holes bypassing SetMapFacts* (CloneFactSlice strips holes)
 	fm.MapFactsIn = map[int][]*FactPointTo{
 		1: {MakeFactPointTo(p, NullPtr), nil},
@@ -173,7 +173,7 @@ func TestSetupInOutMapsSiblingResidualSticky(t *testing.T) {
 	// Fair: sticky fail closed whole SetupInOutMaps — wipe finals (no invent partial complete).
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	good := MakeFactPointTo(p, NullPtr)
 	fm.MapFactsIn = map[int][]*FactPointTo{
 		1: {good, nil}, // incomplete
@@ -194,7 +194,7 @@ func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 	// second visit: incomplete current map must not invent join into final — sticky
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	f1 := MakeFactPointTo(p, NullPtr)
 	fm.SetMapFactsIn(1, []*FactPointTo{f1})
 	fm.SetupInOutMaps(true)
@@ -212,7 +212,7 @@ func TestSetupInOutMapsCombineIncompleteFailClosed(t *testing.T) {
 
 func TestBackupRestoreStmFactMaps(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	thenB := &Block{StmID: 20, Stmts: []Stmt{{StmID: 21}}}
 	// StatementIf always has both arms
 	st := &Stmt{Kind: StmtIfElse, StmID: 10, Then: thenB, Else: &Block{}}
@@ -259,8 +259,8 @@ func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	entryU := MakeFactUnion(parent, 0)
 	exitU := MakeFactUnion(parent, 1)
 	if entryU == nil || exitU == nil {
@@ -296,7 +296,7 @@ func TestBackupRestoreStmFactMapsUnionPartition(t *testing.T) {
 func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 	// incomplete source maps must not invent cleaned backup clones
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 15}
 	fm.MapFactsIn = map[int][]*FactPointTo{
 		15: {MakeFactPointTo(p, NullPtr), nil},
@@ -326,7 +326,7 @@ func TestBackupStmFactMapsIncompleteFailClosed(t *testing.T) {
 
 func TestFindUpdatedFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr)})
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(p, GarbagePtr)})
 	u := fm.FindUpdatedFacts(1)
@@ -362,7 +362,7 @@ func TestFindUpdatedFacts(t *testing.T) {
 		t.Fatal("no change")
 	}
 	// FactMgr.cpp:660 assert(prev_f) — out-only fact without in match is not updated
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
 	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointTo(q, NullPtr)})
 	if len(fm.FindUpdatedFacts(1)) != 0 {
 		t.Fatal("missing prev must fail closed, not invent as updated")
@@ -421,8 +421,8 @@ func TestFindUpdatedFacts(t *testing.T) {
 func TestRestoreFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, GarbagePtr), MakeFactPointTo(q, NullPtr)}
 	fm.RestoreFacts(old)
@@ -458,8 +458,8 @@ func TestRestoreFacts(t *testing.T) {
 func TestRestoreFactsDoesNotReinjectLiveMayNull(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
-	p := CreateVariableScalars("l_233", PointerTo(PointerTo(GetSimpleType(EShort))), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "l_233", PointerTo(PointerTo(GetSimpleType(EShort))), false, false)
 	p.IsArray = true
 	snap := []*FactPointTo{MakeFactPointToSet(p, []*Variable{g})}
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSet(p, []*Variable{NullPtr, g})}
@@ -486,8 +486,8 @@ func TestMakeupNewVarFactsIncompleteFailClosed(t *testing.T) {
 		t.Fatal("nil oldFacts MakeupNewVarFacts must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
 	if MakeupNewVarFacts(&old, newF) {
@@ -521,12 +521,12 @@ func TestMakeupNewVarFactsAddNewHoleStopsLaterVars(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, opts)
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	// non-pointer aggregate with nil field hole (global name)
-	agg := CreateVariableScalars("g_agg", GetIntType(), true, false)
+	agg := CreateVariableScalarsSess(testAmbientSession, "g_agg", GetIntType(), true, false)
 	if agg == nil {
 		t.Fatal("agg")
 	}
 	agg.FieldVars = []*Variable{nil}
-	later := CreateVariableScalars("g_later", PointerTo(GetIntType()), true, false)
+	later := CreateVariableScalarsSess(testAmbientSession, "g_later", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{}
 	// both appear as new_facts subjects so makeup tries AddNewVarFactInto for each
 	newF := []*FactPointTo{
@@ -550,10 +550,10 @@ func TestMakeupNewVarFactsAmbientResidualSticky(t *testing.T) {
 	// Fair: sticky wipe IncompleteFactSlice whole MakeupNewVarFacts.
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	old := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	SetErrorSess(testAmbientSession, ErrGeneric)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), true, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), true, false)
 	newF := []*FactPointTo{MakeFactPointTo(q, NullPtr)}
 	if MakeupNewVarFacts(&old, newF) {
 		t.Fatal("ambient residual must fail closed MakeupNewVarFacts")
@@ -572,7 +572,7 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 	// no soft invent RemoveFunctionLocalFacts when dest fields present.
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	// nested local not visible at body dest → OOS/garbage
-	innerLoc := CreateVariableScalars("l_inner", PointerTo(GetIntType()), false, false)
+	innerLoc := CreateVariableScalarsSess(testAmbientSession, "l_inner", PointerTo(GetIntType()), false, false)
 	inner := &Block{Func: f, LocalVars: []*Variable{innerLoc}}
 	body := &Block{Func: f, LocalVars: nil}
 	inner.Parent = body
@@ -589,7 +589,7 @@ func TestSetMapFactsOutGotoDest(t *testing.T) {
 	}
 	inner.Stmts = []Stmt{*st}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// global points to inner local; after goto to body, pointee is OOS → garbage
 	facts := []*FactPointTo{
 		MakeFactPointTo(g, innerLoc),
@@ -624,7 +624,7 @@ func TestSetMapFactsIncompleteStoresNil(t *testing.T) {
 	// incomplete facts must not invent cleaned MapFactsIn/Out entry
 	// stored as hole marker (FactsComplete false), not bare nil (FactsComplete true)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	fm.SetMapFactsIn(1, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil})
 	if FactsComplete(fm.MapFactsIn[1]) {
 		t.Fatal("SetMapFactsIn incomplete must not invent complete empty")
@@ -644,7 +644,7 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	// LocalVars nil hole fails closed sticky (no invent skip partial OOS list)
 	ClearErrorSess(testAmbientSession)
 	loop := &Block{Looping: true, LocalVars: []*Variable{
-		CreateVariableScalars("l_1", GetIntType(), false, false),
+		CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false),
 		nil,
 	}}
 	if VariablesComplete(collectLoopLocalVars(loop)) {
@@ -665,7 +665,7 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 	}
 	// incomplete facts on RemoveLoopLocalFacts sticky
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	if FactsComplete(RemoveLoopLocalFacts([]*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, empty)) {
 		t.Fatal("incomplete facts RemoveLoopLocalFacts must fail closed")
 	}
@@ -699,7 +699,7 @@ func TestCollectLoopLocalVarsNilHoleFailClosed(t *testing.T) {
 func TestSetMapFactsOutForStmtIncompleteFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
 	fm.SetMapFactsOutForStmt(st, []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}, nil)
 	if FactsComplete(fm.MapFactsOut[5]) {
@@ -726,9 +726,9 @@ func TestArrayPointerAssignMergesNotRenews(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	SetProcessRngSess(testAmbientSession, NewRng(1))
 
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
-	base := CreateVariableScalars("l_233", elem, false, false)
+	base := CreateVariableScalarsSess(testAmbientSession, "l_233", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
 	av.IsArray = true
 	av.AsArray = av
@@ -754,9 +754,9 @@ func TestAbstractFactForVarInitArrayPointerMergesAlts(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	SetProcessRngSess(testAmbientSession, NewRng(2))
 
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
-	base := CreateVariableScalars("l_233", elem, false, false)
+	base := CreateVariableScalarsSess(testAmbientSession, "l_233", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
 	av.IsArray = true
 	av.AsArray = av
@@ -792,7 +792,7 @@ func TestEqualsIntZeroPointer(t *testing.T) {
 func TestAbstractFactAssignConstant0Pointer(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	elem := PointerTo(GetIntType())
-	base := CreateVariableScalars("p", elem, false, false)
+	base := CreateVariableScalarsSess(testAmbientSession, "p", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{2}}
 	av.IsArray = true
 	av.AsArray = av
@@ -823,9 +823,9 @@ func TestUpdateFactArrayAssignKeepsMayNull(t *testing.T) {
 	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(opts))
 	SetProcessRngSess(testAmbientSession, NewRng(1))
 
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
-	base := CreateVariableScalars("l_233", elem, false, false)
+	base := CreateVariableScalarsSess(testAmbientSession, "l_233", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
 	av.IsArray = true
 	av.AsArray = av
@@ -869,9 +869,9 @@ func TestFixedPointBlockReintroducesMayNull(t *testing.T) {
 
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort)))
-	base := CreateVariableScalars("l_233", elem, false, false)
+	base := CreateVariableScalarsSess(testAmbientSession, "l_233", elem, false, false)
 	av := &ArrayVariable{Variable: *base, Sizes: []int{10}}
 	av.IsArray = true
 	av.AsArray = av
@@ -948,13 +948,13 @@ func TestRemoveLoopLocalUnionFactsDropsParentLocals(t *testing.T) {
 	}}
 	loop := &Block{Looping: true, StmID: 333, LocalVars: []*Variable{}}
 	parent := &Block{Parent: loop, Looping: false, StmID: 336}
-	l810 := CreateVariableScalars("l_810", ut, false, false)
+	l810 := CreateVariableScalarsSess(testAmbientSession, "l_810", ut, false, false)
 	parent.LocalVars = []*Variable{l810}
 	inner := &Block{Parent: parent, Looping: false, StmID: 367, LocalVars: []*Variable{}}
 	// continue lives in inner; walk collects inner + parent (l_810) + loop locals
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "func_t", ReturnType: GetIntType()})
 	fm.UnionFacts = []*FactUnion{
-		MakeFactUnion(CreateVariableScalars("g_25", ut, true, false), 0),
+		MakeFactUnion(CreateVariableScalarsSess(testAmbientSession, "g_25", ut, true, false), 0),
 		MakeFactUnion(l810, 0),
 	}
 	cont := &Stmt{Kind: StmtContinue, StmID: 379}

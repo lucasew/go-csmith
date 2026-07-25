@@ -12,7 +12,7 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 	if st == nil {
 		t.Fatal("struct")
 	}
-	sv := CreateVariableQfer("g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	sv := CreateVariableQferSess(testAmbientSession, "g_s", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	if len(sv.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
@@ -28,7 +28,7 @@ func TestIsWrittenFieldInheritsParent(t *testing.T) {
 func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	vs := NewVariableSelector(Defaults())
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	vs.GlobalList = []*Variable{g, nil}
 	if VariablesComplete(vs.FindAllNonArrayVisibleVars(nil)) {
 		t.Fatal("nil GlobalList hole must fail closed incomplete")
@@ -66,7 +66,7 @@ func TestFindAllNonArrayVisibleVarsNilHole(t *testing.T) {
 }
 
 func TestIsEligibleVarSEFreeVolatile(t *testing.T) {
-	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
 	// SE-free: ok
 	if !IsEligibleVar(v, 0, AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("se-free")
@@ -78,7 +78,7 @@ func TestIsEligibleVarSEFreeVolatile(t *testing.T) {
 }
 
 func TestIsEligibleVarWrittenConflict(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, a)).WithSession(testAmbientSession)
 	if IsEligibleVar(a, 0, AccessRead, cg) {
 		t.Fatal("written conflict")
@@ -89,7 +89,7 @@ func TestIsEligibleVarWrittenConflict(t *testing.T) {
 }
 
 func TestIsEligibleVarConstWrite(t *testing.T) {
-	c := CreateVariableScalars("g_c", GetIntType(), true, false)
+	c := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	if IsEligibleVar(c, 0, AccessWrite, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("const write")
 	}
@@ -101,12 +101,12 @@ func TestIsEligibleVarConstWrite(t *testing.T) {
 func TestFindAllVisibleVars(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	outer := &Block{}
 	inner := &Block{Parent: outer}
-	l1 := CreateVariableScalars("l_1", GetIntType(), false, false)
-	l2 := CreateVariableScalars("l_2", GetIntType(), false, false)
+	l1 := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
+	l2 := CreateVariableScalarsSess(testAmbientSession, "l_2", GetIntType(), false, false)
 	outer.LocalVars = []*Variable{l1}
 	inner.LocalVars = []*Variable{l2}
 	got := vs.FindAllVisibleVars(inner)
@@ -114,7 +114,7 @@ func TestFindAllVisibleVars(t *testing.T) {
 		t.Fatalf("want 3 got %d", len(got))
 	}
 	// params not included
-	f := &Function{Param: []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)}}
+	f := &Function{Param: []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)}}
 	outer.Func = f
 	na := vs.FindAllNonArrayVisibleVars(inner)
 	// global + param + 2 locals
@@ -124,8 +124,8 @@ func TestFindAllVisibleVars(t *testing.T) {
 }
 
 func TestChooseVarSkipsIneligible(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	cg := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, a)).WithSession(testAmbientSession)
 	// only b eligible
 	got := ChooseVar(NewRng(2), []*Variable{a, b}, AccessRead, cg, GetIntType(), MatchFlexible)
@@ -141,7 +141,7 @@ func TestIsEligibleVarItemizedReadIndices(t *testing.T) {
 		Sizes:    []int{4},
 	}
 	parent.AsArray = parent
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	item := &ArrayVariable{
 		Variable:   Variable{Name: "g_a", Type: GetIntType(), IsArray: true, ArraySizes: []int{4}},
 		Sizes:      []int{4},
@@ -176,12 +176,12 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 		Sizes: []int{2},
 	}
 	parent.AsArray = parent
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	item := parent.ItemizeConstIndices([]int{0}, nil)
 	if item == nil {
 		t.Fatal("itemize")
 	}
-	item.CreateFieldVars()
+	item.CreateFieldVarsSess(testAmbientSession)
 	if len(item.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
@@ -194,7 +194,7 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 		t.Fatal("incomplete collective must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if fld.LooseMatch(fld) {
+	if fld.LooseMatchSess(testAmbientSession, fld) {
 		t.Fatal("incomplete LooseMatch must fail closed false")
 	}
 }
@@ -202,7 +202,7 @@ func TestIsEligibleVarIncompleteCollectiveFailClosed(t *testing.T) {
 func TestIsEligibleVarIncompleteEffectSticky(t *testing.T) {
 	// Incomplete EffectContext must sticky (no invent soft-skip as absent re-pick)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if IsEligibleVar(v, 0, AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession)) {
 		t.Fatal("incomplete EffectContext must fail closed not eligible")
 	}
@@ -270,7 +270,7 @@ func TestSelectParentParamFallsBackLocal(t *testing.T) {
 	if v == nil {
 		t.Fatal("nil")
 	}
-	if len(blk.LocalVars) == 0 && !v.IsGlobal() {
+	if len(blk.LocalVars) == 0 && !v.IsGlobalSess(testAmbientSession) {
 		// should have created local
 		t.Log(v.Name)
 	}
@@ -285,7 +285,7 @@ func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 		t.Fatal("ChooseOKVar incomplete must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if ChooseVarFull(NewRng(2), []*Variable{g, nil}, AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete vars must fail closed ChooseVarFull")
 	}
@@ -298,7 +298,7 @@ func TestChooseOKVarChooseVarFullIncompleteFailClosed(t *testing.T) {
 func TestChooseVarFullIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts must not invent choose / soft re-pick past holes
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vars := []*Variable{g}
 	if ChooseVarFull(NewRng(1), vars, AccessRead, WithEffectContext(IncompleteEffect()).WithSession(testAmbientSession), GetIntType(), nil, MatchExact, nil, false, false, false) != nil {
 		t.Fatal("incomplete EffectContext must fail closed ChooseVarFull")

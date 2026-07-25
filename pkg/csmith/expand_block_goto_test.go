@@ -229,7 +229,7 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 	// soft invent: LocalVars hole → IsVariableInSet false → var stays remaining
 	// fair: incomplete LocalVars → nil, IncompleteVariables sticky
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("l_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntType(), false, false)
 	a.Name = "l_a"
 	inner := &Block{LocalVars: []*Variable{a, nil}}
 	blk, rem := LowerBlockForVars([]*Block{inner}, []*Variable{a})
@@ -244,9 +244,9 @@ func TestLowerBlockForVarsLocalVarsHoleFailClosed(t *testing.T) {
 
 func TestLowerBlockForVars(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("l_a", GetIntType(), false, false)
-	b := CreateVariableScalars("l_b", GetIntType(), false, false)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "l_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "l_b", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	inner := &Block{LocalVars: []*Variable{a}}
 	outer := &Block{LocalVars: []*Variable{a, b}, Parent: nil}
 	// vars {a,b}: inner covers only a → remaining {b}; outer covers rest

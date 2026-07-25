@@ -10,9 +10,9 @@
 //
 // Quarantined ambient (unit tests only):
 //   - testAmbientSession bag + *Sess(testAmbientSession, …) accessors
-//   - residual non-Sess duals: Variable duals, NewVariableSelector ambient
-//     install, rSess/vsSess/… nil→ambient owner helpers
-//   - CVQualifiers + statement_meta + Effect duals deleted (*Sess only)
+//   - residual non-Sess duals: NewVariableSelector ambient install,
+//     rSess/vsSess/… nil→ambient owner helpers, ArrayVariable/bookkeeper/…
+//   - CVQualifiers + statement_meta + Effect + Variable duals deleted (*Sess only)
 //   - Rng.Sess routes non-Sess RndUpto residual sticky to run bag when set
 //   - EmptyCGContext/WithFunc leave Sess nil — callers WithSession(…)
 //   - NewFactMgrSess / NewFactMgrMapSess require non-nil bag

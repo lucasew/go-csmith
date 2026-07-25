@@ -724,7 +724,7 @@ func IsNonreadableFieldSess(s *Session, v *Variable, facts []*FactUnion) bool {
 		return true
 	}
 	parent := uf.FieldVarOf
-	fid := uf.GetFieldID()
+	fid := uf.GetFieldIDSess(s)
 	// incomplete parent FieldVars → GetFieldID -1 → MakeFactUnion fails → nonreadable
 	tmp := MakeFactUnionSess(s, parent, fid)
 	if tmp == nil {

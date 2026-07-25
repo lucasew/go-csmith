@@ -10,7 +10,7 @@ import "testing"
 func TestArrayInitAccessUsesItemizedIVOutput(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	defer ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	SetProcessOptionsSess(testAmbientSession, opts)
 	// itemized array IV like choose_ok_var after SelectLoopCtrlVar
@@ -27,7 +27,7 @@ func TestArrayInitAccessUsesItemizedIVOutput(t *testing.T) {
 	if iv.Name != "g_106" {
 		t.Fatalf("Name field is bare %q", iv.Name)
 	}
-	if out := iv.OutputC(); out != "g_106[4]" {
+	if out := iv.OutputCSess(testAmbientSession, false); out != "g_106[4]" {
 		t.Fatalf("OutputC got %q want g_106[4]", out)
 	}
 	// Soft invent: Name only loses indices
@@ -36,7 +36,7 @@ func TestArrayInitAccessUsesItemizedIVOutput(t *testing.T) {
 		t.Fatal(bad)
 	}
 	// Fair: OutputC
-	good := "l_91[" + iv.OutputC() + "]"
+	good := "l_91[" + iv.OutputCSess(testAmbientSession, false) + "]"
 	if good != "l_91[g_106[4]]" {
 		t.Fatalf("got %q", good)
 	}

@@ -134,7 +134,7 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 		Name: "g_p", Type: PointerTo(GetIntType()), IsArray: true, ArraySizes: []int{4},
 		Qfer: NewCVQualifiers([]bool{false}, []bool{false}),
 	}
-	if v.HashOutput() != "" {
+	if v.HashOutputSess(testAmbientSession) != "" {
 		t.Fatal("pointer array must not hash")
 	}
 	// sticky residual from IsArray without AsArray — clear so later hash tests stay complete
@@ -146,7 +146,7 @@ func TestHashNoEmptyArrayLoops(t *testing.T) {
 
 func TestHashGlobalVarsSharedIndices(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	CtrlVarsDoFinalization()
+	CtrlVarsDoFinalizationSess(testAmbientSession)
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
 	// live AsArray required for GetMaxArrayDimension / hashArrayVariable
@@ -162,9 +162,9 @@ func TestHashGlobalVarsSharedIndices(t *testing.T) {
 	gb.AsArray = gb
 	vs.GlobalList = []*Variable{&ga.Variable, &gb.Variable}
 	// OutputHashFuncDef path: declare ctrl vars then hash
-	dimen := GetMaxArrayDimension(vs.GlobalList)
-	ctrl := GetNewCtrlVars(opts)
-	decl := OutputArrayCtrlVars(ctrl, dimen, "    ")
+	dimen := GetMaxArrayDimensionSess(testAmbientSession, vs.GlobalList)
+	ctrl := GetNewCtrlVarsSess(testAmbientSession, opts)
+	decl := OutputArrayCtrlVarsSess(testAmbientSession, ctrl, dimen, "    ")
 	out := decl + HashGlobalVariables(vs)
 	// one combined "int i, j;" (max dim 2)
 	if !strings.Contains(out, "int i, j;") {

@@ -4,7 +4,7 @@ import "testing"
 
 func TestMergeParamContext(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	parent := EmptyCGContext().WithSession(testAmbientSession)
 	eff := EmptyEffect()
 	parent.EffectAccum = &eff
@@ -88,7 +88,7 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 	// FunctionInvocationUser.cpp:252–268 — param_cg + merge_param_context raises expr_depth
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	vs.Opts = opts
@@ -97,7 +97,7 @@ func TestBuildUserInvocationParamMerge(t *testing.T) {
 		ReturnType: GetIntType(),
 		BuildState: BuildBuilt,
 		IsBuilt:    true,
-		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
 	}
 	caller := &Function{Name: "a"}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)
@@ -123,7 +123,7 @@ func TestBuildUserInvocationErrorGuardOnParam(t *testing.T) {
 		ReturnType: GetIntType(),
 		BuildState: BuildBuilt,
 		IsBuilt:    true,
-		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
 	}
 	caller := &Function{Name: "a"}
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession)

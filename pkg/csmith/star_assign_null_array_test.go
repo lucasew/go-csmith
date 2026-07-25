@@ -9,14 +9,14 @@ func TestStarAssignNullMergesIntoPointerArray(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	elem := PointerTo(PointerTo(GetSimpleType(EShort))) // int16_t**
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	arr := &ArrayVariable{
 		Variable: Variable{Name: "l_233", Type: elem, IsArray: true},
 		Sizes:    []int{10},
 	}
 	arr.AsArray = arr
 	// l_236: int16_t *** pointing at l_233 collective
-	p := CreateVariableScalars("l_236", PointerTo(elem), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "l_236", PointerTo(elem), false, false)
 	fm := NewFactMgrSess(testAmbientSession, &Function{Name: "f"})
 	fm.GlobalFacts = []*FactPointTo{
 		MakeFactPointTo(&arr.Variable, g),

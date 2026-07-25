@@ -3,8 +3,8 @@ package csmith
 import "testing"
 
 func TestAddExternalEffectGlobalsOnly(t *testing.T) {
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
-	l := CreateVariableScalars("l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
+	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	e := EmptyEffect().WriteVarSess(testAmbientSession, g).WriteVarSess(testAmbientSession, l).ReadVarSess(testAmbientSession, g)
 	ext := EmptyEffect().AddExternalEffectSess(testAmbientSession, e)
 	if !ext.IsWrittenSess(testAmbientSession, g) || ext.IsWrittenSess(testAmbientSession, l) {
@@ -94,7 +94,7 @@ func TestBuildUserInvocationMergesFEffect(t *testing.T) {
 	// Function.cpp:657 finalizes caller feffect from map_stm_effect[body].
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	g := CreateVariableScalars("g_x", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	callee := &Function{Name: "c", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	callee.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	caller := &Function{Name: "a", ReturnType: GetIntType()}

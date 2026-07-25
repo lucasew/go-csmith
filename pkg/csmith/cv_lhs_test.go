@@ -177,8 +177,8 @@ func TestGetAllQualifiers(t *testing.T) {
 }
 
 func TestLhsGetLvarsAndQualifiers(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, tgt)}
 	// bare pointer as LHS (want int* → indirect 0)
 	lhs0 := &Lhs{Var: p, Type: PointerTo(GetIntType())}
@@ -210,7 +210,7 @@ func TestLhsGetLvarsAndQualifiers(t *testing.T) {
 func TestLhsGetQualifiersConstSetsError(t *testing.T) {
 	// Lhs.cpp:200 — assert(!qfer.is_const()); sticky error, no invent strip / invent quals shell
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_c", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_c", GetIntType(), true, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	q := lhs.GetQualifiers()
 	if len(q.IsConsts) != 0 || len(q.IsVolatiles) != 0 {
@@ -235,7 +235,7 @@ func TestLhsVisitIndicesOK(t *testing.T) {
 }
 
 func TestLhsIsVolatileAfterDeref(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	// volatile at storage (after one deref of pointer-to-vol?)
 	// IsVolatileAfterDeref(0) for bare uses Qfer
 	p.Qfer = NewCVQualifiers([]bool{false, true}, []bool{false, true})
@@ -251,21 +251,21 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	v := &Variable{Name: "g_p", Qfer: NewCVQualifiers([]bool{false, false}, []bool{false, false})}
 	// Type nil
-	if !v.IsConstAfterDeref(1) {
+	if !v.IsConstAfterDerefSess(testAmbientSession, 1) {
 		t.Fatal("nil Type must fail closed as const after deref")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsConstAfterDeref must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !v.IsVolatileAfterDeref(1) {
+	if !v.IsVolatileAfterDerefSess(testAmbientSession, 1) {
 		t.Fatal("nil Type must fail closed as volatile after deref")
 	}
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil Type IsVolatileAfterDeref must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	if !v.IsPartialVolatileAfterDeref(1) {
+	if !v.IsPartialVolatileAfterDerefSess(testAmbientSession, 1) {
 		t.Fatal("nil Type must fail closed as partial volatile")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -276,16 +276,16 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	// Qfer OOB (len 2, deref 3) fail-closed const/vol non-sticky first; Type peel
 	// sticky only when Qfer does not already short-circuit (empty qfer + nil type).
 	v.Type = PointerTo(GetIntType())
-	if !v.IsConstAfterDeref(3) {
+	if !v.IsConstAfterDerefSess(testAmbientSession, 3) {
 		t.Fatal("OOB peel must fail closed as const")
 	}
-	if !v.IsVolatileAfterDeref(3) {
+	if !v.IsVolatileAfterDerefSess(testAmbientSession, 3) {
 		t.Fatal("OOB peel must fail closed as volatile")
 	}
 	// Type peel sticky path: empty qfer + incomplete type
 	ClearErrorSess(testAmbientSession)
 	v2 := &Variable{Name: "g_q", Type: nil}
-	if !v2.IsConstAfterDeref(0) {
+	if !v2.IsConstAfterDerefSess(testAmbientSession, 0) {
 		t.Fatal("nil Type empty qfer must fail closed const")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -296,7 +296,7 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	parent := &Variable{Name: "u", Type: &Type{isUnion: true}}
 	f0 := &Variable{Name: "u.f0", Type: GetIntType(), FieldVarOf: parent}
 	parent.FieldVars = []*Variable{nil, f0}
-	if f0.GetFieldID() != -1 {
+	if f0.GetFieldIDSess(testAmbientSession) != -1 {
 		t.Fatal("FieldVars hole must fail closed GetFieldID -1")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -304,7 +304,7 @@ func TestIsConstVolatileAfterDerefIncompleteTypeFailClosed(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Variable always live; sticky -1 (no invent not-field soft-skip past hole)
-	if (*Variable)(nil).GetFieldID() != -1 {
+	if (*Variable)(nil).GetFieldIDSess(testAmbientSession) != -1 {
 		t.Fatal("nil GetFieldID must fail closed -1")
 	}
 	if !HasErrorSess(testAmbientSession) {

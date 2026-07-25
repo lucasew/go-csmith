@@ -4,11 +4,11 @@ import "testing"
 
 func TestEffectHasGlobalAndUnionRead(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	if g == nil {
 		t.Fatal("global")
 	}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	loc.Name = "l_1"
 	e := EmptyEffect().ReadVarSess(testAmbientSession, loc)
 	if e.HasGlobalEffectSess(testAmbientSession) {
@@ -60,7 +60,7 @@ func TestEffectHasGlobalAndUnionRead(t *testing.T) {
 }
 
 func TestEffectUpdatePurity(t *testing.T) {
-	g := CreateVariableScalars("g_1", GetIntType(), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	e := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	// WriteVar already sets pure false typically — force pure then update
 	e.pure = true
@@ -78,7 +78,7 @@ func TestEffectUpdatePurity(t *testing.T) {
 }
 
 func TestEffectConsolidate(t *testing.T) {
-	parent := CreateVariableScalars("g_s", GetIntType(), true, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), true, false)
 	// make parent aggregate-ish with field
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect().ReadVarSess(testAmbientSession, parent).ReadVarSess(testAmbientSession, field)
@@ -111,7 +111,7 @@ func TestReadVarNoRepushWhenStructParentRead(t *testing.T) {
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
 	parent := &Variable{Name: "g_s", Type: st}
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) < 2 {
 		t.Fatal("need struct fields")
 	}
@@ -207,7 +207,7 @@ func TestEffectIsReadTypeNilParentSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete non-field not-read
-	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	if e.IsReadSess(testAmbientSession, v) {
 		t.Fatal("unrelated var must be not-read complete")
 	}
@@ -267,7 +267,7 @@ func TestEffectConsolidateNilKeyFailClosed(t *testing.T) {
 	// soft invent: delete some fields then hit nil key mid-map under random order
 	// fair: incomplete sticky → IncompleteEffect (not invent partial consolidate / leave base complete)
 	ClearErrorSess(testAmbientSession)
-	parent := CreateVariableScalars("g_s", GetIntType(), true, false)
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_s", GetIntType(), true, false)
 	field := &Variable{Name: "g_s.f0", Type: GetIntType(), FieldVarOf: parent}
 	e := EmptyEffect().ReadVarSess(testAmbientSession, parent).ReadVarSess(testAmbientSession, field)
 	e.read[nil] = true
@@ -288,7 +288,7 @@ func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
 	// WriteVar/ReadVar on IncompleteEffect must not invent map growth as complete Effect sticky
 	// (membership on incomplete is fail-closed true separately)
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
 	w := IncompleteEffect().WriteVarSess(testAmbientSession, v)
 	if EffectComplete(w) {
 		t.Fatal("WriteVar incomplete base must stay IncompleteEffect")
@@ -338,7 +338,7 @@ func TestWriteReadVarIncompleteBaseFailClosed(t *testing.T) {
 func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	// IsWritten/IsRead false on IncompleteEffect invents conflict-free / eligible
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_v", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, false)
 	inc := IncompleteEffect()
 	if !inc.IsWrittenSess(testAmbientSession, v) {
 		t.Fatal("incomplete IsWritten must fail closed true")
@@ -361,7 +361,7 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 	// aggregate field membership
 	st := &Type{isStruct: true, Fields: []StructField{{Name: "f0", Type: GetIntType(), BitWidth: -1}}}
 	parent := &Variable{Name: "g_s", Type: st}
-	parent.CreateFieldVars()
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) == 0 {
 		t.Fatal("fields")
 	}
@@ -375,7 +375,7 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
 	uv := &Variable{Name: "g_u", Type: ut}
-	uv.CreateFieldVars()
+	uv.CreateFieldVarsSess(testAmbientSession)
 	if len(uv.FieldVars) < 1 || uv.FieldVars[0] == nil {
 		t.Fatal("union fields")
 	}
@@ -421,7 +421,7 @@ func TestIsWrittenIncompleteEffectFailClosed(t *testing.T) {
 
 func TestEffectIsReadByName(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_x", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), true, false)
 	e := EmptyEffect().ReadVarSess(testAmbientSession, v).WriteVarSess(testAmbientSession, v)
 	if !e.IsReadByNameSess(testAmbientSession, "g_x") || !e.IsWrittenByNameSess(testAmbientSession, "g_x") {
 		t.Fatal("by name")
@@ -451,9 +451,9 @@ func TestEffectIsReadByName(t *testing.T) {
 
 func TestJoinVisits(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	// TBD-only base
 	f := MakeFactPointTo(p, TBDPtr)
 	if !f.IsTBDOnly() {
@@ -598,7 +598,7 @@ func TestIsTBDOnlyIncompleteSticky(t *testing.T) {
 		t.Fatal("nil Fact IsTBDOnly must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	f := &FactPointTo{Var: p, PointTo: []*Variable{nil}}
 	if f.IsTBDOnly() {
 		t.Fatal("PointTo hole IsTBDOnly must fail closed false")
@@ -644,7 +644,7 @@ func TestAccessDerefVolatileResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete non-vol peel must stay SE-free complete
-	ok := CreateVariableScalars("g_i", GetIntType(), false, false)
+	ok := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	e := EmptyEffect().AccessDerefVolatileSess(testAmbientSession, ok, 0, true)
 	if !EffectComplete(e) {
 		t.Fatal("complete AccessDerefVolatile level0 must stay complete")
@@ -683,7 +683,7 @@ func TestFieldIsReadIsAggregateResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete non-aggregate
-	v := CreateVariableScalars("g_i", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	if EmptyEffect().FieldIsReadSess(testAmbientSession, v) {
 		t.Fatal("scalar FieldIsRead must be false")
 	}

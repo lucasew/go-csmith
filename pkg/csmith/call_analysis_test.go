@@ -104,10 +104,10 @@ func TestCollectCalledForTestExpr(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// StatementArrayOp.h:65–68 — get_exprs is if(init_value) only, not For test.
 	// array_init numeric LoopControl must not fail closed incomplete (seed-2 fair).
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, StmID: 2,
-		LhsVar:      CreateVariableScalars("a", GetIntType(), false, false),
+		LhsVar:      CreateVariableScalarsSess(testAmbientSession, "a", GetIntType(), false, false),
 		Expr:        &Expression{Term: TermConstant, Con: MakeInt(0)},
 		ArrayAccess: "a[i]",
 	}}}
@@ -234,7 +234,7 @@ func TestHasUncertainCall(t *testing.T) {
 func TestHasSimpleParams(t *testing.T) {
 	fi := &Invocation{Args: []*Expression{
 		{Term: TermConstant, Con: MakeInt(1)},
-		{Term: TermVariable, Var: CreateVariableScalars("g_1", GetIntType(), true, false)},
+		{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)},
 	}}
 	if !fi.HasSimpleParams() {
 		t.Fatal("simple")
@@ -349,7 +349,7 @@ func TestFindContainedLabels(t *testing.T) {
 
 func TestCombineBranchFacts(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, nil)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	pre := []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	preU := []*FactUnion{}
 	thenB := &Block{StmID: 10}
@@ -477,8 +477,8 @@ func TestCombineBranchFactsMergesUnionWrite(t *testing.T) {
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		{Name: "f1", Type: GetIntType(), BitWidth: -1},
 	}}
-	parent := CreateVariableScalars("g_u", ut, false, false)
-	parent.CreateFieldVars()
+	parent := CreateVariableScalarsSess(testAmbientSession, "g_u", ut, false, false)
+	parent.CreateFieldVarsSess(testAmbientSession)
 	if len(parent.FieldVars) < 2 {
 		t.Fatal("need fields")
 	}
@@ -528,8 +528,8 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U1", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	elseLocal := CreateVariableScalars("l_else_u", ut, false, false)
-	g := CreateVariableScalars("g_u2", ut, false, false)
+	elseLocal := CreateVariableScalarsSess(testAmbientSession, "l_else_u", ut, false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_u2", ut, false, false)
 	if elseLocal == nil || g == nil {
 		t.Fatal("vars")
 	}
@@ -554,8 +554,8 @@ func TestDropUnionSubjectsByVarsSiblingArmLocal(t *testing.T) {
 func TestPostCreationAssignFacts(t *testing.T) {
 	f := &Function{Name: "func_2", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
-	tgt := CreateVariableScalars("g_1", GetIntType(), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
+	tgt := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, NullPtr)}
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
@@ -598,7 +598,7 @@ func TestPostCreationUncertainFunc1(t *testing.T) {
 			Args: []*Expression{a, b},
 		},
 	}
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -626,8 +626,8 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, opts)
 	f := &Function{Name: "func_1", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	gExtra := CreateVariableScalars("g_extra", GetIntType(), true, false)
-	gKeep := CreateVariableScalars("g_keep", GetIntType(), true, false)
+	gExtra := CreateVariableScalarsSess(testAmbientSession, "g_extra", GetIntType(), true, false)
+	gKeep := CreateVariableScalarsSess(testAmbientSession, "g_keep", GetIntType(), true, false)
 	// Gen-time effect_stm already includes a global read from a nested call.
 	genEff := EmptyEffect().ReadVarSess(testAmbientSession, gKeep).ReadVarSess(testAmbientSession, gExtra)
 	eff := EmptyEffect()
@@ -644,7 +644,7 @@ func TestPostCreationUncertainFunc1KeepsGenStmEffect(t *testing.T) {
 			Args: []*Expression{a, b},
 		},
 	}
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: AllocStmID(),
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},

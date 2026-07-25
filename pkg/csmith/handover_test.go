@@ -5,26 +5,26 @@ import (
 )
 
 func TestIsRV(t *testing.T) {
-	v := CreateVariableScalars("func_1_rv", GetIntType(), false, false)
-	if !v.IsRV() {
+	v := CreateVariableScalarsSess(testAmbientSession, "func_1_rv", GetIntType(), false, false)
+	if !v.IsRVSess(testAmbientSession) {
 		t.Fatal("rv")
 	}
-	if CreateVariableScalars("g_1", GetIntType(), false, false).IsRV() {
+	if CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false).IsRVSess(testAmbientSession) {
 		t.Fatal("not")
 	}
 }
 
 func TestCallerToCalleeHandoverKeepsGlobals(t *testing.T) {
 	callee := &Function{Name: "c", ReturnType: GetIntType()}
-	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
 	callee.Param = []*Variable{p}
 	fm := NewFactMgrSess(testAmbientSession, callee)
-	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	// g points to loc — loc should be kept transitively
 	facts := []*FactPointTo{
 		MakeFactPointTo(g, loc),
-		MakeFactPointTo(CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false), NullPtr),
+		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false), NullPtr),
 	}
 	// subject l_p is local name — not kept unless pointed
 	fm.CallerToCalleeHandover(nil, &facts)
@@ -47,12 +47,12 @@ func TestCallerToCalleeHandoverKeepsGlobals(t *testing.T) {
 func TestCallerToCalleeHandoverTransitive(t *testing.T) {
 	callee := &Function{Name: "c"}
 	fm := NewFactMgrSess(testAmbientSession, callee)
-	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	// caller local that g points to
-	loc := CreateVariableScalars("l_tgt", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_tgt", GetIntType(), false, false)
 	// fact about loc as subject (e.g. field) — use pointer fact with subject loc that is pointed
 	// better: subject is another pointer that lives on stack
-	lp := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	lp := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 	facts := []*FactPointTo{
 		MakeFactPointTo(g, lp),   // global points to stack ptr
 		MakeFactPointTo(lp, loc), // stack ptr facts
@@ -68,7 +68,7 @@ func TestCallerToCalleeHandoverNilHole(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, NullPtr), nil}
 	fm.CallerToCalleeHandover(nil, &facts)
 	if FactsComplete(facts) {
@@ -118,12 +118,12 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	if ut == nil || len(ut.Fields) < 1 {
 		t.Skip("union type")
 	}
-	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if gu == nil {
 		t.Fatal("global union var")
 	}
 	// local union — dropped unless pointed-to by kept PT
-	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	if lu == nil {
 		t.Fatal("local union var")
 	}
@@ -149,7 +149,7 @@ func TestCallerToCalleeUnionFactsHandover(t *testing.T) {
 	// transitive: global pointer to local union keeps local FactUnion
 	ClearErrorSess(testAmbientSession)
 	fm2 := NewFactMgrSess(testAmbientSession, callee)
-	gp := CreateVariableScalars("g_p", PointerTo(ut), true, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(ut), true, false)
 	fm2.UnionFacts = []*FactUnion{MakeFactUnion(lu, 1)}
 	keepPT := []*FactPointTo{MakeFactPointTo(gp, lu)}
 	fm2.FilterUnionFactsForHandover(keepPT)
@@ -192,8 +192,8 @@ func TestUpdateUnionFactsForOOSVars(t *testing.T) {
 	if ut == nil {
 		t.Skip("union")
 	}
-	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	facts := []*FactUnion{MakeFactUnion(gu, 0), MakeFactUnion(lu, 0)}
 	UpdateUnionFactsForOOSVars([]*Variable{lu}, &facts)
 	if FindRelatedUnion(facts, gu) == nil || FindRelatedUnion(facts, lu) != nil {
@@ -227,9 +227,9 @@ func TestSetMapFactsOutForBlockOOSsUnionLocals(t *testing.T) {
 	if ut == nil {
 		t.Skip("union")
 	}
-	gu := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	lu := CreateVariableQfer("l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	gu := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	lu := CreateVariableQferSess(testAmbientSession, "l_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	body := &Block{StmID: 10, Func: f, LocalVars: []*Variable{lu}, Parent: &Block{StmID: 1, Func: f}}
 	f.Body = body
@@ -262,10 +262,10 @@ func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 	// fair: VariablesComplete Param fails closed nil inputs sticky
 	ClearErrorSess(testAmbientSession)
 	callee := &Function{Name: "c", ReturnType: GetIntType()}
-	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
 	callee.Param = []*Variable{p, nil}
 	fm := NewFactMgrSess(testAmbientSession, callee)
-	g := CreateVariableScalars("g_p", PointerTo(GetIntType()), true, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), true, false)
 	facts := []*FactPointTo{MakeFactPointTo(g, NullPtr), MakeFactPointTo(p, NullPtr)}
 	fm.CallerToCalleeHandover(nil, &facts)
 	if FactsComplete(facts) {
@@ -279,8 +279,8 @@ func TestCallerToCalleeHandoverParamHoleFailClosed(t *testing.T) {
 
 func TestVariablesCompleteAndIsVariableInSet(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	a := CreateVariableScalars("g_a", GetIntType(), true, false)
-	b := CreateVariableScalars("g_b", GetIntType(), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), true, false)
 	if !VariablesComplete([]*Variable{a, b}) || VariablesComplete([]*Variable{a, nil, b}) {
 		t.Fatal("VariablesComplete")
 	}
@@ -310,11 +310,11 @@ func TestRemoveRVFactsNilHole(t *testing.T) {
 
 func TestRemoveRVFacts(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	f := &Function{Name: "f", RV: CreateVariableScalars("f_rv", GetIntType(), false, false)}
+	f := &Function{Name: "f", RV: CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	other := CreateVariableScalars("other_rv", GetIntType(), false, false)
+	other := CreateVariableScalarsSess(testAmbientSession, "other_rv", GetIntType(), false, false)
 	facts := []*FactPointTo{
-		MakeFactPointTo(CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false), NullPtr),
+		MakeFactPointTo(CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false), NullPtr),
 		{Var: other, PointTo: []*Variable{NullPtr}},
 		{Var: f.RV, PointTo: []*Variable{NullPtr}},
 	}
@@ -337,8 +337,8 @@ func TestRemoveRVFactsMatchResidualSticky(t *testing.T) {
 	defer ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", RV: &Variable{Name: "f_rv"}} // Type nil
 	fm := NewFactMgrSess(testAmbientSession, f)
-	gp := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	other := CreateVariableScalars("other_rv", GetIntType(), false, false)
+	gp := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	other := CreateVariableScalarsSess(testAmbientSession, "other_rv", GetIntType(), false, false)
 	facts := []*FactPointTo{
 		{Var: other, PointTo: []*Variable{NullPtr}}, // IsRV; Match residual vs Type-nil f.RV
 		MakeFactPointTo(gp, NullPtr),
@@ -363,7 +363,7 @@ func TestAddParamFacts(t *testing.T) {
 	// FactMgr.cpp:108–114 — update_fact_for_assign; null const → null fact
 	// (not invent NewFactPointTo garbage when abstract succeeds)
 	callee := &Function{Name: "c"}
-	p := CreateVariableScalars("p_1", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p_1", PointerTo(GetIntType()), false, false)
 	callee.Param = []*Variable{p}
 	fm := NewFactMgrSess(testAmbientSession, callee)
 	facts := []*FactPointTo{}

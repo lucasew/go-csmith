@@ -152,8 +152,8 @@ func TestBuildUserInvocationArgCount(t *testing.T) {
 		Name:       "g_1",
 		ReturnType: GetIntType(),
 		Param: []*Variable{
-			CreateVariableScalars("p_1", GetIntType(), false, false),
-			CreateVariableScalars("p_2", PointerTo(GetIntType()), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_2", PointerTo(GetIntType()), false, false),
 		},
 		BuildState: BuildBuilt,
 	}
@@ -192,7 +192,7 @@ func TestBuildUserInvocationParamFailHard(t *testing.T) {
 	callee := &Function{
 		Name:       "g_1",
 		ReturnType: GetIntType(),
-		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
 		BuildState: BuildBuilt,
 		IsBuilt:    true,
 	}
@@ -275,7 +275,7 @@ func TestBuildUserInvocationIncompleteAccumEffContextFailClosed(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
-	vs.GlobalList = []*Variable{CreateVariableScalars("g_1", GetIntType(), false, false)}
+	vs.GlobalList = []*Variable{CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)}
 	// callee not first, NeedsRevisit, incomplete AccumEffContext
 	callee := &Function{
 		Name:            "g_helper",
@@ -344,7 +344,7 @@ func TestBuildUserInvocationGenVisibleEffectUsesCurrentBlock(t *testing.T) {
 	opts.MaxBlockSize = 1
 	// Frame local lives only on stack-top (inner). Outer parent is stale CurrBlk.
 	// IsVarOnStack walks Parent: inner sees l_inner; outer alone does not.
-	innerLoc := CreateVariableScalars("l_inner", GetIntType(), false, false)
+	innerLoc := CreateVariableScalarsSess(testAmbientSession, "l_inner", GetIntType(), false, false)
 	if innerLoc == nil {
 		t.Fatal("create inner local")
 	}
@@ -436,7 +436,7 @@ func TestBuildUserInvocationRevisitClearsCallerCurrRHS(t *testing.T) {
 	fm := NewFactMgrSess(testAmbientSession, caller)
 	cg := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFuncList(list).WithFactMgr(fm)
 	// Simulate ExpressionAssign: CurrRHS set while building invocation as RHS of assign.
-	rhsDummy := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false), ExprType: GetIntType()}
+	rhsDummy := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), ExprType: GetIntType()}
 	cg.CurrRHS = rhsDummy
 	cg.EffectStm = EmptyEffect()
 	// Mark a write on EffectStm as if RHS gen ran
@@ -556,7 +556,7 @@ func TestBuildUserInvocationRevisitPath(t *testing.T) {
 		IsBuilt:     true,
 		FactChanged: true,
 		Body:        &Block{StmID: AllocStmID(), Stmts: []Stmt{}},
-		Param:       []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+		Param:       []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
 	}
 	callee.Body.Func = callee
 	// FunctionInvocationUser.cpp:311 — revisit uses get_fact_mgr_for_func(callee)

@@ -10,7 +10,7 @@ import "testing"
 func TestItemizedArrayAssignMergesNotRenews(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	SetProcessOptionsSess(testAmbientSession, Defaults())
-	g := CreateVariableScalars("g_127", PointerTo(GetSimpleType(EShort)), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_127", PointerTo(GetSimpleType(EShort)), false, false)
 	elem := PointerTo(PointerTo(GetSimpleType(EShort))) // int16_t**
 	coll := &ArrayVariable{
 		Variable: Variable{Name: "l_233", Type: elem, IsArray: true},
@@ -81,7 +81,7 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 	}
 	item.AsArray = item
 	// may-null on collective (post_loop / merge lattice)
-	facts := []*FactPointTo{MakeFactPointToSet(&coll.Variable, []*Variable{NullPtr, CreateVariableScalars("g_t", GetIntType(), false, false)})}
+	facts := []*FactPointTo{MakeFactPointToSet(&coll.Variable, []*Variable{NullPtr, CreateVariableScalarsSess(testAmbientSession, "g_t", GetIntType(), false, false)})}
 	r := NewRng(1)
 	d0 := r.RandDepth()
 	// need one more indir than var for validate to check null
@@ -93,7 +93,7 @@ func TestOpportunisticValidateItemizedUsesCollectiveNullFlip(t *testing.T) {
 		t.Fatalf("must still flipcoin(null_prob=0): depth %d → %d", d0, r.RandDepth())
 	}
 	// pure non-null: no flipcoin
-	live := []*FactPointTo{MakeFactPointTo(&coll.Variable, CreateVariableScalars("g_u", GetIntType(), false, false))}
+	live := []*FactPointTo{MakeFactPointTo(&coll.Variable, CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntType(), false, false))}
 	r2 := NewRng(1)
 	d1 := r2.RandDepth()
 	if OpportunisticValidate(r2, &item.Variable, GetIntType(), live, 0, 0) != 1 {

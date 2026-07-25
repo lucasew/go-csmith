@@ -76,7 +76,7 @@ func TestVariableSelectFilterSkipsEmptyParams(t *testing.T) {
 		}
 	}
 	// with a param, ParentParam is allowed
-	f.Param = []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)}
+	f.Param = []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)}
 	seenParam := false
 	for seed := uint64(1); seed < 100; seed++ {
 		if VariableSelectionProbabilityCG(NewRng(seed), opts, &cg, MaxVarScope) == ScopeParentParam {
@@ -141,7 +141,7 @@ func TestSelectCreatesOrFinds(t *testing.T) {
 			found = true
 		}
 	}
-	if !found && !v.IsGlobal() && !v.IsLocal() {
+	if !found && !v.IsGlobalSess(testAmbientSession) && !v.IsLocalSess(testAmbientSession) {
 		t.Fatalf("orphan var %+v", v)
 	}
 }

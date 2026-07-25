@@ -32,7 +32,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 		t.Fatal("empty block")
 	}
 	// Verify NoteWrite works on shared accum
-	v := CreateVariableQfer("g_x", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_x", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	cg.NoteWrite(v)
 	// NoteWrite updates EffectAccum; non-vol write stays SE-free (Effect.cpp:144–145)
 	if !cg.AccumEffect().IsWrittenSess(testAmbientSession, v) {
@@ -45,7 +45,7 @@ func TestBlockEffectAccumAfterAssign(t *testing.T) {
 	eff2 := EmptyEffect()
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	cg2.EffectAccum = &eff2
-	vv := CreateVariableQfer("g_v", GetIntType(), NewCVQualifiers([]bool{false}, []bool{true}))
+	vv := CreateVariableQferSess(testAmbientSession, "g_v", GetIntType(), NewCVQualifiers([]bool{false}, []bool{true}))
 	cg2.NoteWrite(vv)
 	if cg2.AccumEffect().IsSideEffectFreeSess(testAmbientSession) {
 		t.Fatal("vol write clears SE-free")
@@ -158,7 +158,7 @@ func TestNoteWriteWriteVarResidualSticky(t *testing.T) {
 	cg2 := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	inc := IncompleteEffect()
 	cg2.EffectAccum = &inc
-	cg2.NoteWrite(CreateVariableScalars("g_y", GetIntType(), false, false))
+	cg2.NoteWrite(CreateVariableScalarsSess(testAmbientSession, "g_y", GetIntType(), false, false))
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("Incomplete EffectAccum NoteWrite must SetError sticky")
 	}
@@ -184,7 +184,7 @@ func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	cg.EffectStm = EmptyEffect()
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg.NoteRead(g)
 	if !cg.EffectStm.IsReadSess(testAmbientSession, g) || !cg.EffectAccum.IsReadSess(testAmbientSession, g) {
 		t.Fatal("NoteRead must update EffectStm and EffectAccum like read_var")
@@ -194,7 +194,7 @@ func TestNoteReadWriteUpdateEffectStm(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	cg.EffectStm = EmptyEffect()
-	w := CreateVariableScalars("g_2", GetIntType(), false, false)
+	w := CreateVariableScalarsSess(testAmbientSession, "g_2", GetIntType(), false, false)
 	cg.NoteWrite(w)
 	if !cg.EffectStm.IsWrittenSess(testAmbientSession, w) || !cg.EffectAccum.IsWrittenSess(testAmbientSession, w) {
 		t.Fatal("NoteWrite must update EffectStm and EffectAccum like write_var")
@@ -223,7 +223,7 @@ func TestWriteVarIsNonWritableResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	cg := EmptyCGContext().WithSession(testAmbientSession)
 	cg.RW = &RWDirective{NoWriteVars: []*Variable{nil}}
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	cg.WriteVar(v)
 	if !HasErrorSess(testAmbientSession) {
 		t.Fatal("nil NoWriteVars hole WriteVar must SetError sticky")
@@ -242,7 +242,7 @@ func TestFindVariableScopeIsGlobalResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete global
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	if EmptyCGContext().WithSession(testAmbientSession).FindVariableScope(v) != ScopeGlobalVar {
 		t.Fatal("global FindVariableScope")
 	}

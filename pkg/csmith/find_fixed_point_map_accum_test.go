@@ -18,8 +18,8 @@ func TestFindFixedPointMultiPassResetsEffectAccumForMapAccum(t *testing.T) {
 	SetProcessOptionsSess(testAmbientSession, Defaults())
 	f := &Function{Name: "f_map_accum_prog"}
 	fm := NewFactMgrSess(testAmbientSession, f)
-	early := CreateVariableScalars("g_early", GetIntType(), false, false)
-	late := CreateVariableScalars("g_late", GetIntType(), false, false)
+	early := CreateVariableScalarsSess(testAmbientSession, "g_early", GetIntType(), false, false)
+	late := CreateVariableScalarsSess(testAmbientSession, "g_late", GetIntType(), false, false)
 
 	// Minimal body: two invokes so AnalyzeWithEdgesIn has something to walk.
 	// Use assign with constant RHS so visit_facts stays simple.

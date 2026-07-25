@@ -378,7 +378,7 @@ func TestConstantCloneOutputCompatible(t *testing.T) {
 	if z.Output() != "(void*)0" {
 		t.Fatal(z.Output())
 	}
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	if !c.CompatibleWithVar(v, true) || c.CompatibleWithVar(v, false) {
 		t.Fatal("expand_struct gate")
 	}

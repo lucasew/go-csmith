@@ -73,7 +73,7 @@ func TestAllowVolatileAndAcceptType(t *testing.T) {
 
 func TestInConflictReadWrite(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	// context already wrote g
 	ctx := WithEffectContext(EmptyEffect().WriteVarSess(testAmbientSession, g)).WithSession(testAmbientSession)
 	// callee reads g
@@ -88,7 +88,7 @@ func TestInConflictReadWrite(t *testing.T) {
 }
 
 func TestInConflictNoWrite(t *testing.T) {
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	cg := EmptyCGContext().WithSession(testAmbientSession).WithRW(&RWDirective{NoWriteVars: []*Variable{g}})
 	eff := EmptyEffect().WriteVarSess(testAmbientSession, g)
 	if !cg.InConflict(eff) {
@@ -140,7 +140,7 @@ func TestInConflictIncompleteEffectFailClosed(t *testing.T) {
 }
 
 func TestChooseFuncContextSkipsConflict(t *testing.T) {
-	g := CreateVariableScalars("g_x", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	bad := &Function{Name: "bad", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	bad.FEffect = EmptyEffect().WriteVarSess(testAmbientSession, g)
 	good := &Function{Name: "good", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
@@ -153,7 +153,7 @@ func TestChooseFuncContextSkipsConflict(t *testing.T) {
 }
 
 func TestComputeSummaryReferencedPtrs(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	f.Body = &Block{Stmts: []Stmt{
 		{Kind: StmtAssign, LhsVar: p, Lhs: &Lhs{Var: p, Type: p.Type},
@@ -177,7 +177,7 @@ func TestReadUnionFieldForTestExpr(t *testing.T) {
 	ut := &Type{isUnion: true, StructName: "U0", Fields: []StructField{
 		{Name: "f0", Type: GetIntType(), BitWidth: -1},
 	}}
-	uv := CreateVariableQfer("g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
+	uv := CreateVariableQferSess(testAmbientSession, "g_u", ut, NewCVQualifiers([]bool{false}, []bool{false}))
 	f0 := &Variable{Name: "g_u.f0", Type: GetIntType(), FieldVarOf: uv}
 	uv.FieldVars = []*Variable{f0}
 	test := &Expression{Term: TermVariable, Var: f0, ExprType: GetIntType()}
@@ -212,7 +212,7 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	// C++ get_exprs always live; nil Expr must not invent empty ptr list sticky
 	ClearErrorSess(testAmbientSession)
 	var ptrs []*Variable
-	ptrs = []*Variable{CreateVariableScalars("stale", PointerTo(GetIntType()), false, false)}
+	ptrs = []*Variable{CreateVariableScalarsSess(testAmbientSession, "stale", PointerTo(GetIntType()), false, false)}
 	CollectReferencedPtrsStmt(&Stmt{Kind: StmtAssign, StmID: 1}, &ptrs)
 	// IncompleteVariables sticky — not bare nil invent empty-complete
 	if VariablesComplete(ptrs) {
@@ -304,9 +304,9 @@ func TestCollectReferencedPtrsAssignNilExprFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// StatementArrayOp.h:65–68 / 69–71 — get_exprs if(init_value); get_blocks if(body).
 	// array_init Expression ctor: body=0, init_value=e. Go Then is Output-only.
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(0)}
-	ptrArr := CreateVariableScalars("a", PointerTo(GetIntType()), false, false)
+	ptrArr := CreateVariableScalarsSess(testAmbientSession, "a", PointerTo(GetIntType()), false, false)
 	body := &Block{Stmts: []Stmt{{
 		Kind: StmtAssign, LhsVar: ptrArr,
 		Expr: rhs, ArrayAccess: "a[i]", StmID: 2,
@@ -382,14 +382,14 @@ func TestComputeSummaryIncompleteForFailClosed(t *testing.T) {
 func TestIsFrameVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f"}
-	loc := CreateVariableScalars("l_1", GetIntType(), false, false)
+	loc := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntType(), false, false)
 	blk := &Block{Func: f, LocalVars: []*Variable{loc}}
 	f.Stack = []*Block{blk}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)
 	if !cg.IsFrameVar(loc) {
 		t.Fatal("local frame")
 	}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	if cg.IsFrameVar(g) {
 		t.Fatal("global not frame")
 	}
@@ -452,7 +452,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// complete constant assign does not read union field
-	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, LhsVar: CreateVariableScalars("g_x", GetIntType(), false, false), AssignOp: AssignSimple}
+	st := &Stmt{Kind: StmtAssign, Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, LhsVar: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false), AssignOp: AssignSimple}
 	if ReadUnionFieldStmt(st) {
 		t.Fatal("scalar assign must not read union field")
 	}
@@ -474,7 +474,7 @@ func TestReadUnionFieldIncompleteSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// comma LHS residual soft invent was soft-continue RHS invent no-union-read.
 	lhsHole := &Expression{Term: TermVariable, Var: fieldHole}
-	rhsOK := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x2", GetIntType(), false, false)}
+	rhsOK := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x2", GetIntType(), false, false)}
 	comma := &Expression{Term: TermCommaExpr, CommaLHS: lhsHole, CommaRHS: rhsOK}
 	if !ReadUnionFieldExpr(comma) {
 		t.Fatal("nested IsInside residual ReadUnionFieldExpr must fail closed true")

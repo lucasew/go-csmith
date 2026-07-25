@@ -96,7 +96,7 @@ func TestFactUnionOutput(t *testing.T) {
 func TestMakeFactUnionNonUnionFailClosed(t *testing.T) {
 	// FactUnion.cpp:163 assert union type sticky — no invent FactUnion on int
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_i", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), true, false)
 	if MakeFactUnion(v, 0) != nil {
 		t.Fatal("non-union must not invent FactUnion")
 	}
@@ -227,7 +227,7 @@ func TestRhsToLhsTransferUnionVariable(t *testing.T) {
 	}
 	// non-union lvar hard IR sticky
 	ClearErrorSess(testAmbientSession)
-	i := CreateVariableScalars("g_i", GetIntType(), true, false)
+	i := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), true, false)
 	if UnionFactsComplete(RhsToLhsTransferUnion(nil, nil, []*Variable{i}, rhs)) {
 		t.Fatal("non-union lvar must fail closed incomplete")
 	}
@@ -392,7 +392,7 @@ func TestFindRelatedUnionNilSticky(t *testing.T) {
 		t.Fatal("nil subject FindRelatedUnion must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_u", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntType(), false, false)
 	if FindRelatedUnion([]*FactUnion{nil}, v) != nil {
 		t.Fatal("nil fact hole FindRelatedUnion must fail closed")
 	}
@@ -463,7 +463,7 @@ func TestFactUnionIsTopBottomCloneIncompleteSticky(t *testing.T) {
 func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 	// IsUnion residual soft invent was invent soft-nil FactUnion past non-union Type.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	if MakeFactUnion(v, 0) != nil {
 		t.Fatal("non-union MakeFactUnion must fail closed nil")
 	}
@@ -484,7 +484,7 @@ func TestMakeFactUnionIsUnionResidualSticky(t *testing.T) {
 func TestImplyIsBottomResidualSticky(t *testing.T) {
 	// IsBottom residual soft invent was invent soft-imply past nil FactUnion.
 	ClearErrorSess(testAmbientSession)
-	if (*FactUnion)(nil).Imply(MakeFactUnionTop(CreateVariableScalars("g_u", GetIntType(), false, false))) {
+	if (*FactUnion)(nil).Imply(MakeFactUnionTop(CreateVariableScalarsSess(testAmbientSession, "g_u", GetIntType(), false, false))) {
 		t.Fatal("nil Imply must fail closed false")
 	}
 	if !HasErrorSess(testAmbientSession) {

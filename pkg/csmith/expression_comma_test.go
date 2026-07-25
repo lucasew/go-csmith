@@ -40,7 +40,7 @@ func TestMakeExpressionComma(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// non-constant complete no-op
-	castIfNeeded(testAmbientSession, &Expression{Term: TermVariable, Var: CreateVariableScalars("g_x", GetIntType(), false, false)})
+	castIfNeeded(testAmbientSession, &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)})
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("non-constant castIfNeeded must complete no-op")
 	}
@@ -213,7 +213,7 @@ func TestHaveOverlappingFieldsFindUnionResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	// Type-nil non-special expr → FindUnionPointees incomplete → overlap sticky
 	e1 := &Expression{Term: TermVariable, Var: &Variable{Name: "g_p", Type: nil}}
-	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)}
+	e2 := &Expression{Term: TermVariable, Var: CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)}
 	if !HaveOverlappingFields(e1, e2, nil) {
 		t.Fatal("Type-nil FindUnion residual must fail closed overlap true")
 	}

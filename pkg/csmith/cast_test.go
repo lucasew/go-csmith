@@ -110,7 +110,7 @@ func TestHasBitfields(t *testing.T) {
 
 func TestCheckAndSetCast(t *testing.T) {
 	// int* expr desired as char* → needs cast if bases inequivalent
-	v := CreateVariableQfer("g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
 	want := PointerTo(GetSimpleType(EChar))
 	e.CheckAndSetCast(want)
@@ -164,7 +164,7 @@ func TestCheckAndSetCast(t *testing.T) {
 
 func TestCheckAndSetCastOptsLangCPP(t *testing.T) {
 	// Expression.cpp:222 — only lang_cpp sets cast
-	v := CreateVariableQfer("g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
+	v := CreateVariableQferSess(testAmbientSession, "g_1", PointerTo(GetIntType()), NewCVQualifiers([]bool{false}, []bool{false}))
 	e := &Expression{Term: TermVariable, Var: v, ExprType: PointerTo(GetIntType())}
 	want := PointerTo(GetSimpleType(EChar))
 	opts := Defaults()

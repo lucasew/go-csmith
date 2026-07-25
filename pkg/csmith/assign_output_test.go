@@ -6,7 +6,7 @@ import (
 )
 
 func TestOutputAssignSimple(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(3)},
@@ -25,7 +25,7 @@ func TestOutputAssignSimple(t *testing.T) {
 func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 	// StatementAssign.cpp:515–537 — expr.Output always; sticky no invent "g_1 = "
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple}
 	if out := OutputAssignSimple(st, false); out != "" {
 		t.Fatal("nil Expr must fail closed", out)
@@ -70,7 +70,7 @@ func TestOutputAssignSimpleNoInventEmptyRHS(t *testing.T) {
 func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 	// ccomp volatile rewrite needs live rhs; sticky no invent "g = g & "
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_v", GetIntType(), true, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), true, true)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignBitAnd,
 		Expr:      &Expression{Term: TermConstant}, // empty Output sticky
@@ -98,7 +98,7 @@ func TestOutputAssignAsExprNoInventEmptyCCompRHS(t *testing.T) {
 }
 
 func TestOutputAssignAsExprSafeWrapper(t *testing.T) {
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
@@ -170,7 +170,7 @@ func TestStopByStmtForcesReturn(t *testing.T) {
 
 func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 	// StatementAssign.cpp:552–556 — ccomp + volatile compound → lhs = lhs op rhs
-	v := CreateVariableScalars("g_v", GetIntType(), false, true) // volatile
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true) // volatile
 	flags := MakeDummyFlags()
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -201,7 +201,7 @@ func TestOutputAssignAsExprCCompVolatileBit(t *testing.T) {
 
 func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
 	// simple assign has no compound_to_binary — stays "lhs = rhs"
-	v := CreateVariableScalars("g_v", GetIntType(), false, true)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignSimple,
 		Expr: &Expression{Term: TermConstant, Con: MakeInt(1)}, SafeFlags: MakeDummyFlags(),
@@ -220,7 +220,7 @@ func TestOutputAssignAsExprSimpleNotCCompExpanded(t *testing.T) {
 func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 	// StatementAssign.cpp:543 — avoid_signed_overflow() && op_flags
 	// no soft invent safe_* when SafeMath off despite flags present
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	flags := MakeRandomBinary(NewRng(1), Defaults(), NewProbabilities(Defaults()), GetIntType())
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignAdd,
@@ -241,7 +241,7 @@ func TestOutputAssignAsExprRequiresSafeMathOption(t *testing.T) {
 func TestOutputAssignAsExprUnknownOpWithFlagsFailClosed(t *testing.T) {
 	// StatementAssign.cpp:618–619 assert(false) sticky; no invent OutputSimple for *= with flags
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), true, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), true, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, AssignOp: AssignMul,
 		Expr:      &Expression{Term: TermConstant, Con: MakeInt(2)},
@@ -351,7 +351,7 @@ func TestOutputAssignAsExprLhsOutputResidualSticky(t *testing.T) {
 func TestOutputAssignAsExprRhsOutputResidualSticky(t *testing.T) {
 	// Expr.Output residual soft invent was soft-continue invent bare lhs / partial assign.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_x", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
 		AssignOp: AssignSimple,

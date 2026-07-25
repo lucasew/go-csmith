@@ -117,8 +117,8 @@ func TestGenerateNewVariableIncompleteAmbientSticky(t *testing.T) {
 func TestSelectGlobalMTInvalidVars(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(opts)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{a, b}
 	vs.GlobalNonvolatilesList = []*Variable{a, b}
 	// invalidate a → only b
@@ -137,7 +137,7 @@ func TestSelectDerefPointerPrefersNonvol(t *testing.T) {
 	// int* global nonvol
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	pv := CreateVariableQfer("g_p", pt, q)
+	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	vs.GlobalList = []*Variable{pv}
 	vs.GlobalNonvolatilesList = []*Variable{pv}
 	f := &Function{Name: "f"}
@@ -160,7 +160,7 @@ func TestSelectDerefPointerInvIncompleteAmbientSticky(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	pt := PointerTo(GetIntType())
 	q := NewCVQualifiers([]bool{false}, []bool{false})
-	pv := CreateVariableQfer("g_p", pt, q)
+	pv := CreateVariableQferSess(testAmbientSession, "g_p", pt, q)
 	vs.GlobalList = []*Variable{pv}
 	vs.GlobalNonvolatilesList = []*Variable{pv}
 	f := &Function{Name: "f"}

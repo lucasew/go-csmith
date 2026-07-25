@@ -41,7 +41,7 @@ func TestArrayInitAggregateTmpEmit(t *testing.T) {
 			{Name: "f0", Type: GetIntType(), BitWidth: -1},
 		},
 	}
-	av := CreateVariableQfer("g_a", st, NewCVQualifiers([]bool{false}, []bool{false}))
+	av := CreateVariableQferSess(testAmbientSession, "g_a", st, NewCVQualifiers([]bool{false}, []bool{false}))
 	// fake constant aggregate
 	rhs := &Expression{Term: TermConstant, Con: &Constant{Type: st, Value: "{1}"}, ExprType: st}
 	asg := Stmt{
@@ -65,7 +65,7 @@ func TestVisitFactsStatementArrayOpInit(t *testing.T) {
 	av.Sizes = []int{3}
 	vs.Arrays = []*ArrayVariable{av}
 	vs.GlobalList = []*Variable{&av.Variable}
-	iv := CreateVariableQfer("i", GetIntType(), q)
+	iv := CreateVariableQferSess(testAmbientSession, "i", GetIntType(), q)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	blk := &Block{Func: f}
@@ -89,7 +89,7 @@ func TestMakeRandomReturnNoEagerVisitFacts(t *testing.T) {
 	opts.NoReturnDeadPointer = true
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableQfer("rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	f.RV = CreateVariableQferSess(testAmbientSession, "rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	blk := &Block{Func: f}
 	f.Stack = []*Block{blk}
 	_ = vs.GenerateNewGlobal(AccessRead, WithFunc(f, EmptyEffect()).WithSession(testAmbientSession), GetIntType(), nil, NewRng(1))

@@ -170,7 +170,7 @@ func TestMakeRandomForSharesEffectAccumWithParent(t *testing.T) {
 	f.Stack = []*Block{parent}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	// Plant a read on the parent accum before for-body generation.
-	pre := CreateVariableScalars("pre_rd", GetIntType(), true, false)
+	pre := CreateVariableScalarsSess(testAmbientSession, "pre_rd", GetIntType(), true, false)
 	accum := EmptyEffect().ReadVarSess(testAmbientSession, pre)
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &accum

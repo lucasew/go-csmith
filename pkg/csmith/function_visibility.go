@@ -444,7 +444,7 @@ func UpdateFactsForOOSVarsSess(s *Session, vars []*Variable, facts *[]*FactPoint
 		return
 	}
 	for _, v := range vars {
-		if v == nil || !v.FieldVarsComplete() {
+		if v == nil || !v.FieldVarsCompleteSess(s) {
 			*facts = IncompleteFactSlice()
 			sessNoteError(s, ErrGeneric)
 			return

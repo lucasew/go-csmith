@@ -5,8 +5,8 @@ import "testing"
 func TestCloneSubcontextDeepCopiesIVBounds(t *testing.T) {
 	// CGContext.cpp copy ctor deep-copies iv_bounds map
 	ClearErrorSess(testAmbientSession)
-	iv1 := CreateVariableScalars("i1", GetIntType(), false, false)
-	iv2 := CreateVariableScalars("i2", GetIntType(), false, false)
+	iv1 := CreateVariableScalarsSess(testAmbientSession, "i1", GetIntType(), false, false)
+	iv2 := CreateVariableScalarsSess(testAmbientSession, "i2", GetIntType(), false, false)
 	parent := EmptyCGContext().WithSession(testAmbientSession)
 	parent.AddIVBound(iv1, 3)
 	child := parent.CloneSubcontext()
@@ -49,13 +49,13 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 	// Return with const may not need RV; still exercise CurrBlk assignment path
 	// via ValidateAndUpdateFacts which sets CurrBlk before StmVisitFacts.
 	fm := NewFactMgrSess(testAmbientSession, f)
-	f.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
 	f.ReturnType = GetIntType()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	eff := EmptyEffect()
 	cg.EffectAccum = &eff
 	// Valid return expr: variable not pointing to locals
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st.Expr = &Expression{Term: TermVariable, Var: g, ExprType: GetIntType()}
 	fm.AddNewVarFact(g)
 	facts := CloneFactSlice(fm.GlobalFacts)
@@ -73,7 +73,7 @@ func TestStmVisitFactsSetsCurrBlk(t *testing.T) {
 func TestWithLoopBodyMatchesCtor(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(1)}
 	eff := EmptyEffect()
 	parent := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession)

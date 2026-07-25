@@ -240,7 +240,7 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		m := v.MatchVarName(name)
+		m := v.MatchVarNameSess(vsSess(vs), name)
 		// residual ERROR sticky — no invent soft-continue later vars past MatchVarName residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -256,7 +256,7 @@ func (vs *VariableSelector) FindVarByName(name string) *Variable {
 			sessNoteError(vsSess(vs), ErrGeneric)
 			return nil
 		}
-		m := av.Variable.MatchVarName(name)
+		m := av.Variable.MatchVarNameSess(vsSess(vs), name)
 		// residual ERROR sticky — no invent soft-continue later arrays past MatchVarName residual
 		if sessHasError(vsSess(vs)) {
 			return nil
@@ -370,7 +370,7 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 				return nil
 			}
 			// VariableSelector.cpp:1457–1458 — ccomp packed aggregate field IV
-			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVar() {
+			if vs != nil && vs.Opts.CComp && iv.IsPackedAggregateFieldVarSess(vsSess(vs)) {
 				// residual ERROR sticky — no invent soft-skip then pick later IV past packed hole
 				if sessHasError(vsSess(vs)) {
 					return nil

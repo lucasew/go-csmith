@@ -149,7 +149,7 @@ func TestOutputHeaderInlineStatic(t *testing.T) {
 		ReturnType: GetIntType(),
 		IsInlined:  true,
 		Param: []*Variable{
-			CreateVariableScalars("p_1", GetIntType(), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false),
 		},
 	}
 	h := f.OutputHeader(true)

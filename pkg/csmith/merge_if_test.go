@@ -3,9 +3,9 @@ package csmith
 import "testing"
 
 func TestFactPointToImplyJoin(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	wide := MakeFactPointToSet(p, []*Variable{a, b})
 	narrow := MakeFactPointTo(p, a)
 	if !wide.Imply(narrow) {
@@ -30,9 +30,9 @@ func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
 	// soft invent: Join soft-skips nil PointTo and still absorbs later pointees
 	// fair: incomplete PointTo sticky fail closed (no partial join / soft re-pick)
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	base := MakeFactPointTo(p, a)
 	hole := &FactPointTo{Var: p, PointTo: []*Variable{nil, b}}
 	cp := base.Clone()
@@ -71,9 +71,9 @@ func TestFactPointToJoinImplyNilPointeeHoleFailClosed(t *testing.T) {
 
 func TestMergeFactLattice(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
 	facts = MergeFactInto(facts, MakeFactPointTo(p, b))
 	fp := FindRelatedPointTo(facts, p)
@@ -101,11 +101,11 @@ func TestMergeFactsNilAccumulatorSticky(t *testing.T) {
 }
 
 func TestMergeFacts(t *testing.T) {
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
 	facts := []*FactPointTo{MakeFactPointTo(p, a)}
-	other := []*FactPointTo{MakeFactPointTo(q, a), MakeFactPointTo(p, CreateVariableScalars("g_b", GetIntType(), false, false))}
+	other := []*FactPointTo{MakeFactPointTo(q, a), MakeFactPointTo(p, CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false))}
 	MergeFacts(&facts, other)
 	if FindRelatedPointTo(facts, q) == nil {
 		t.Fatal("q")
@@ -160,8 +160,8 @@ func TestMergeFacts(t *testing.T) {
 
 func TestHasEligibleVolatileVar(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_v", GetIntType(), false, true)
-	nv := CreateVariableScalars("g_n", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_v", GetIntType(), false, true)
+	nv := CreateVariableScalarsSess(testAmbientSession, "g_n", GetIntType(), false, false)
 	if !HasEligibleVolatileVar([]*Variable{v, nv}, GetIntType(), AccessRead, EmptyCGContext().WithSession(testAmbientSession)) {
 		t.Fatal("vol")
 	}
@@ -185,13 +185,13 @@ func TestIfMergesFacts(t *testing.T) {
 	probs := NewProbabilities(opts)
 	vs := NewVariableSelector(opts)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	f.RV = CreateVariableScalars("f_rv", GetIntType(), false, false)
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "f_rv", GetIntType(), false, false)
 	fm := NewFactMgrSess(testAmbientSession, f)
-	p := CreateVariableScalars("g_p", PointerTo(GetIntType()), false, false)
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerTo(GetIntType()), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, a)}
-	vs.GlobalList = []*Variable{p, a, b, CreateVariableScalars("g_i", GetIntType(), false, false)}
+	vs.GlobalList = []*Variable{p, a, b, CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	f.Stack = []*Block{{Func: f}}
 	// generate if — may or may not change facts; ensure no panic and FM restored/merged

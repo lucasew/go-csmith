@@ -27,9 +27,9 @@ func TestGenerateBodyWithKnownParamsSetsRW(t *testing.T) {
 	callee := &Function{
 		Name:       "func_2",
 		ReturnType: GetIntType(),
-		Param:      []*Variable{CreateVariableScalars("p_1", GetIntType(), false, false)},
+		Param:      []*Variable{CreateVariableScalarsSess(testAmbientSession, "p_1", GetIntType(), false, false)},
 	}
-	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgr()
 	// handover facts empty for calFM from signature pairing
 	callee.GenerateBodyWithKnownParams(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
@@ -60,7 +60,7 @@ func TestGenerateBodyResetsBlkDepth(t *testing.T) {
 	prev.ExprDepth = 7
 	prev.Flags = FlagInLoop
 	callee := &Function{Name: "func_2", ReturnType: GetIntType()}
-	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgr()
 	// Capture depth at body generation via a thin check: body must be buildable
 	// at MaxBlockDepth without inventing max-depth filter (would fail with depth 4 inherit).
@@ -84,7 +84,7 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 	opts := Defaults()
 	opts.MaxBlockSize = 1
 	vs := NewVariableSelector(opts)
-	iv := CreateVariableScalars("g_iv", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntType(), false, false)
 	caller := &Function{Name: "func_1", ReturnType: GetIntType()}
 	_ = caller.ensurePairedFactMgr()
 	prev := WithFunc(caller, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(caller.PairedFactMgr())
@@ -93,7 +93,7 @@ func TestGenerateBodyClearsIVBounds(t *testing.T) {
 		t.Fatal(prev.IVBounds)
 	}
 	callee := &Function{Name: "func_2", ReturnType: GetIntType()}
-	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgr()
 	callee.GenerateBody(NewRng(4), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	// caller map still has IV; callee generation must not keep sharing that map
@@ -152,7 +152,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 
 	// known-params path must install external no-* only (empty must).
 	callee := &Function{Name: "func_2", ReturnType: GetIntType()}
-	callee.RV = CreateVariableQfer("func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee.RV = CreateVariableQferSess(testAmbientSession, "func_2_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee.ensurePairedFactMgr()
 	callee.GenerateBodyWithKnownParams(NewRng(2), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if HasErrorSess(testAmbientSession) {
@@ -168,7 +168,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 
 	// GenerateBody (!knownParams): ctor leaves RW nil — never inherit must.
 	callee2 := &Function{Name: "func_3", ReturnType: GetIntType()}
-	callee2.RV = CreateVariableQfer("func_3_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
+	callee2.RV = CreateVariableQferSess(testAmbientSession, "func_3_rv", GetIntType(), NewCVQualifiers([]bool{false}, []bool{false}))
 	_ = callee2.ensurePairedFactMgr()
 	callee2.GenerateBody(NewRng(3), opts, NewProbabilities(opts), vs, NewExprTables(opts), NewStatementThresholdTable(opts), prev)
 	if HasErrorSess(testAmbientSession) {
@@ -188,7 +188,7 @@ func TestGenerateBodyDropsCallerMustUseArrays(t *testing.T) {
 	cg := WithFunc(callee, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(callee.PairedFactMgr())
 	cg.RW = rwd // external no-write only (post–BuildCallee)
 	// IV pool needs a non-array int
-	iv := CreateVariableScalars("g_77", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_77", GetIntType(), false, false)
 	vs.GlobalList = append(vs.GlobalList, iv)
 	ClearErrorSess(testAmbientSession)
 	lc := MakeIteration(NewRng(5), opts, NewProbabilities(opts), vs, &cg)
@@ -282,7 +282,7 @@ func TestGenerateBodyIncompleteFailClosedNoBuilt(t *testing.T) {
 		ReturnType: GetIntType(),
 		Param: []*Variable{
 			{Name: "p_typeless"}, // Type nil non-special
-			CreateVariableScalars("p_ok", PointerTo(GetIntType()), false, false),
+			CreateVariableScalarsSess(testAmbientSession, "p_ok", PointerTo(GetIntType()), false, false),
 		},
 	}
 	fmTy := fTy.ensurePairedFactMgr()

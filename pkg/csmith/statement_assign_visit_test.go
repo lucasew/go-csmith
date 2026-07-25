@@ -24,7 +24,7 @@ func TestSafeAssign(t *testing.T) {
 
 func TestVisitFactsStatementAssignSimple(t *testing.T) {
 	BookkeeperDoFinalizationSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	lhs := &Lhs{Var: v, Type: GetIntType()}
 	rhs := &Expression{Term: TermConstant, Con: MakeInt(3)}
 	st := Stmt{Kind: StmtAssign, LhsVar: v, Lhs: lhs, Expr: rhs, AssignOp: AssignSimple}
@@ -40,7 +40,7 @@ func TestVisitFactsStatementAssignSimple(t *testing.T) {
 }
 
 func TestVisitFactsStatementAssignNoWriteToIV(t *testing.T) {
-	iv := CreateVariableScalars("g_i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_i", GetIntType(), false, false)
 	lhs := &Lhs{Var: iv, Type: GetIntType()}
 	st := Stmt{
 		Kind: StmtAssign, LhsVar: iv, Lhs: lhs,
@@ -116,8 +116,8 @@ func TestMakeRandomAssignDualContext(t *testing.T) {
 }
 
 func TestVisitFactsExpressionComma(t *testing.T) {
-	a := CreateVariableScalars("g_a", GetIntType(), false, false)
-	b := CreateVariableScalars("g_b", GetIntType(), false, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntType(), false, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntType(), false, false)
 	e := &Expression{
 		Term:     TermCommaExpr,
 		CommaLHS: &Expression{Term: TermVariable, Var: a, ExprType: GetIntType()},
@@ -173,8 +173,8 @@ func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
 	// *p when p is **T: Lhs type is *T (pointer) → transfer into pointees.
 	// p : int**, q : int*, p → {q}; *p = 0 → fact for q becomes null.
 	ppT := PointerTo(PointerTo(GetIntType()))
-	p := CreateVariableScalars("g_p", ppT, false, false)
-	q := CreateVariableScalars("g_q", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", ppT, false, false)
+	q := CreateVariableScalarsSess(testAmbientSession, "g_q", PointerTo(GetIntType()), false, false)
 	fm := NewFactMgrSess(testAmbientSession, nil)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointTo(p, q)}
 	rhs := &Expression{
@@ -210,7 +210,7 @@ func TestVisitFactsStatementAssignIndirectUpdate(t *testing.T) {
 
 func TestVisitFactsStatementAssignWriteVarSet(t *testing.T) {
 	// StatementAssign.cpp:377 — write_var_set after RHS
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	// compound assign so RHS effect folds; use simple still runs write_var_set
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 9,
@@ -230,7 +230,7 @@ func TestVisitFactsStatementAssignWriteVarSet(t *testing.T) {
 func TestVisitFactsStatementAssignIncompleteAmbientFailClosed(t *testing.T) {
 	// incomplete EffectContext must not invent assign visit success under poisoned running
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 10,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -257,7 +257,7 @@ func TestVisitFactsStatementAssignWriteVarSetResidualSticky(t *testing.T) {
 	// LhsWriteVars residual soft invent was soft-empty skip WriteVarSet invent visit success.
 	// Fair: sticky fail closed false.
 	ClearErrorSess(testAmbientSession)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	st := &Stmt{
 		Kind: StmtAssign, StmID: 11,
 		LhsVar: v, Lhs: &Lhs{Var: v, Type: GetIntType()},
@@ -320,7 +320,7 @@ func TestVisitFactsInvocationUsesAnalysisBlock(t *testing.T) {
 	// Build a small callee and revisit via VisitFactsInvocation
 	callee := &Function{Name: "callee", ReturnType: GetIntType(), BuildState: BuildBuilt, IsBuilt: true}
 	callee.Body = &Block{Func: callee, StmID: AllocStmID()}
-	callee.RV = CreateVariableScalars("rv", GetIntType(), false, false)
+	callee.RV = CreateVariableScalarsSess(testAmbientSession, "rv", GetIntType(), false, false)
 	_ = callee.ensurePairedFactMgr()
 	fi := &Invocation{User: callee}
 	// Empty body visit should succeed; AddVisibleEffect must use CurrBlk not stack top
@@ -345,8 +345,8 @@ func TestAssignDerefDoesNotNoteWritePointer(t *testing.T) {
 	// no ptr-bias in SelectParentLocal choose_var).
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
-	ptr := CreateVariableScalars("l_p", PointerTo(GetIntType()), false, false)
+	pointee := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(GetIntType()), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = append(fm.GlobalFacts, MakeFactPointTo(ptr, pointee))
@@ -379,10 +379,10 @@ func TestMakeRandomAssignDoesNotUpdateFacts(t *testing.T) {
 	r := NewRng(42)
 	SetProcessRngSess(testAmbientSession, r)
 	vs := NewVariableSelector(opts)
-	g := CreateVariableScalars("g_x", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
 	vs.GlobalList = append(vs.GlobalList, g)
 	vs.AllVars = append(vs.AllVars, g)
-	p := CreateVariableScalars("p", PointerTo(GetIntType()), false, false)
+	p := CreateVariableScalarsSess(testAmbientSession, "p", PointerTo(GetIntType()), false, false)
 	p.Init = &Constant{Type: p.Type, Value: "0"}
 	vs.GlobalList = append(vs.GlobalList, p)
 	vs.AllVars = append(vs.AllVars, p)
@@ -422,9 +422,9 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 	// Seed 80: (***l_108)=… after (**l_108)=… under && must not FP-fail.
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	pointee := CreateVariableScalars("g_x", GetIntType(), false, false)
-	mid := CreateVariableScalars("l_mid", PointerTo(GetIntType()), false, false)
-	ptr := CreateVariableScalars("l_p", PointerTo(PointerTo(GetIntType())), false, false)
+	pointee := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntType(), false, false)
+	mid := CreateVariableScalarsSess(testAmbientSession, "l_mid", PointerTo(GetIntType()), false, false)
+	ptr := CreateVariableScalarsSess(testAmbientSession, "l_p", PointerTo(PointerTo(GetIntType())), false, false)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	fm.GlobalFacts = []*FactPointTo{

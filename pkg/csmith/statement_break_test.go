@@ -20,7 +20,7 @@ func TestMakeRandomBreakHasVarTest(t *testing.T) {
 	loop := &Block{Func: f, Looping: true}
 	f.Stack = []*Block{loop}
 	// StatementBreak.cpp:76 — clear effect_stm on CGContext& before condition
-	pre := CreateVariableScalars("g_pre", GetIntType(), false, false)
+	pre := CreateVariableScalarsSess(testAmbientSession, "g_pre", GetIntType(), false, false)
 	cg.EffectStm = EmptyEffect().WriteVarSess(testAmbientSession, pre)
 	st := MakeRandomBreak(NewRng(9), opts, vs, tables, &cg)
 	if st.Kind != StmtBreak {
@@ -54,7 +54,7 @@ func TestBreakOutputIsIfBreak(t *testing.T) {
 func TestForArrayOpNoInventIncompleteHeader(t *testing.T) {
 	// StatementFor always has init/test/incr + body; sticky no invent for(;;) or header-only
 	ClearErrorSess(testAmbientSession)
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	// Loop with IV only — missing InitStmt/TestExpr/IncrStmt
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 3, IncrN: 1}
 	if forHeaderOutput(lc) != "" {
@@ -264,7 +264,7 @@ func TestMakeRandomBreakContinueIncompleteAmbientFailClosed(t *testing.T) {
 
 func TestArrayOpHeaderNumeric(t *testing.T) {
 	// StatementArrayOp::output_header uses numeric init/limit/incr (not InitStmt)
-	iv := CreateVariableScalars("i", GetIntType(), false, false)
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntType(), false, false)
 	lc := &LoopControl{IV: iv, InitN: 0, LimitN: 10, IncrN: 1}
 	opts := Defaults()
 	out := arrayOpHeaderOutput(lc, opts)
@@ -385,7 +385,7 @@ func TestMakeRandomBreakNoCFGEdgeInvent(t *testing.T) {
 	vs := NewVariableSelector(opts)
 	seedTypesForTest(NewRng(1), opts, NewProbabilities(opts), vs, nil)
 	f := &Function{Name: "f", ReturnType: GetIntType()}
-	g := CreateVariableScalars("g_1", GetIntType(), false, false)
+	g := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	vs.GlobalList = []*Variable{g}
 	vs.AllVars = []*Variable{g}
 	loop := &Block{Func: f, Looping: true}

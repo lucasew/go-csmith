@@ -21,11 +21,11 @@ func TestAccessOnceMarking(t *testing.T) {
 		v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntType(), nil, r)
 		if v != nil && v.IsAccessOnce {
 			found = true
-			if !strings.Contains(v.OutputC(), "ACCESS_ONCE") {
-				t.Fatal(v.OutputC())
+			if !strings.Contains(v.OutputCSess(testAmbientSession, false), "ACCESS_ONCE") {
+				t.Fatal(v.OutputCSess(testAmbientSession, false))
 			}
 			v.IsAddrTaken = true
-			if strings.Contains(v.OutputC(), "ACCESS_ONCE") {
+			if strings.Contains(v.OutputCSess(testAmbientSession, false), "ACCESS_ONCE") {
 				t.Fatal("addr taken should clear wrap")
 			}
 			break
@@ -44,9 +44,9 @@ func TestAccessOnceWrapRequiresOption(t *testing.T) {
 	opts.AccessOnce = false
 	SetProcessOptionsSess(testAmbientSession, opts)
 	defer SetProcessOptionsSess(testAmbientSession, prev)
-	v := CreateVariableScalars("g_1", GetIntType(), false, false)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_1", GetIntType(), false, false)
 	v.IsAccessOnce = true
-	out := v.OutputC()
+	out := v.OutputCSess(testAmbientSession, false)
 	if strings.Contains(out, "ACCESS_ONCE") {
 		t.Fatal("option off must not wrap")
 	}
