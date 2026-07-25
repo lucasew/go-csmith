@@ -3200,7 +3200,7 @@ func lhsAssignPointeesSess(s *Session, facts []*FactPointTo, lhs *Variable, lhsI
 	if !FactsComplete(facts) {
 		return IncompleteVariables()
 	}
-	coll := lhs.GetCollective()
+	coll := lhs.GetCollectiveSess(s)
 	// residual ERROR sticky — no invent soft-lvars past GetCollective residual
 	if sessHasError(s) {
 		return IncompleteVariables()

@@ -195,12 +195,12 @@ func (f *Function) IsVarOOSSess(s *Session, v *Variable, stParent *Block) bool {
 			}
 			// Variable.cpp:254–258 — aggregate match includes fields when both typed
 			if loc.Type != nil && v.Type != nil {
-				agg := loc.Type.IsAggregate()
+				agg := loc.Type.IsAggregateSess(s)
 				if sessHasError(s) {
 					return true
 				}
 				if agg {
-					if loc.HasFieldVar(v) {
+					if loc.HasFieldVarSess(s, v) {
 						if sessHasError(s) {
 							return true
 						}

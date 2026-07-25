@@ -327,7 +327,7 @@ func (f *FactUnion) JoinSess(s *Session, other *FactUnion) bool {
 	if f.Var != other.Var {
 		return false
 	}
-	if f.Imply(other) {
+	if f.ImplySess(s, other) {
 		// residual ERROR sticky — no invent join no-op true past Imply hole
 		if sessHasError(s) {
 			return false
@@ -338,7 +338,7 @@ func (f *FactUnion) JoinSess(s *Session, other *FactUnion) bool {
 	if sessHasError(s) {
 		return false
 	}
-	if other.Imply(f) {
+	if other.ImplySess(s, f) {
 		// residual ERROR sticky — no invent absorb past other.Imply hole
 		if sessHasError(s) {
 			return false
@@ -349,7 +349,7 @@ func (f *FactUnion) JoinSess(s *Session, other *FactUnion) bool {
 		if sessHasError(s) {
 			return false
 		}
-		f.SetBottom()
+		f.SetBottomSess(s)
 	}
 	return true
 }
@@ -893,7 +893,7 @@ func RhsToLhsTransferUnionSess(s *Session,
 			sessNoteError(s, ErrGeneric)
 			return IncompleteUnionFactSlice()
 		}
-		coll := rhs.Var.GetCollective()
+		coll := rhs.Var.GetCollectiveSess(s)
 		// residual ERROR sticky — no invent soft-merge past GetCollective residual
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()

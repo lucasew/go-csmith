@@ -652,7 +652,7 @@ func (e *Expression) NotEqualsSess(s *Session, num int) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	ok := e.Con.NotEquals(num)
+	ok := e.Con.NotEqualsSess(s, num)
 	// residual ERROR sticky — no invent not-equal true past Con.NotEquals residual hole
 	if sessHasError(s) {
 		return false

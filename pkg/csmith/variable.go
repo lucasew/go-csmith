@@ -1237,13 +1237,13 @@ func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 		sessNoteError(s, ErrGeneric)
 		return true
 	}
-	isStruct := parent.Type.IsStruct()
+	isStruct := parent.Type.IsStructSess(s)
 	// residual ERROR sticky — no invent soft-continue packed path past IsStruct residual
 	if sessHasError(s) {
 		return true
 	}
 	if isStruct && parent.Type.Packed {
-		if !parent.FieldVarsComplete() {
+		if !parent.FieldVarsCompleteSess(s) {
 			// incomplete parent FieldVars sticky packed-after (restrictive)
 			sessNoteError(s, ErrGeneric)
 			return true
@@ -1252,7 +1252,7 @@ func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 			if f == v {
 				break
 			}
-			if parent.Type.IsBitfieldIndex(i) {
+			if parent.Type.IsBitfieldIndexSess(s, i) {
 				// residual ERROR sticky — no invent packed-true past IsBitfieldIndex hole
 				if sessHasError(s) {
 					return true
@@ -1281,7 +1281,7 @@ func (v *Variable) IsPackedAfterBitfieldSess(s *Session) bool {
 			}
 		}
 	}
-	ok := parent.IsPackedAfterBitfield()
+	ok := parent.IsPackedAfterBitfieldSess(s)
 	// residual ERROR sticky — no invent not-packed soft-skip past nested IsPackedAfterBitfield hole
 	if sessHasError(s) {
 		return true
