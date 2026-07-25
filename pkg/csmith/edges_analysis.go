@@ -69,7 +69,7 @@ func tryMergeJumpFactsSess(s *Session, facts *[]*FactPointTo, jumpFacts []*FactP
 			*facts = IncompleteFactSlice()
 			return false, false
 		}
-		merged := MergeFactInto(*facts, jumpF)
+		merged := MergeFactIntoSess(s, *facts, jumpF)
 		if !FactsComplete(merged) {
 			// mid-join incomplete — clear partial sticky, no invent keep half-merged map
 			*facts = IncompleteFactSlice()

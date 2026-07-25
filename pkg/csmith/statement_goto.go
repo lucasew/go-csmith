@@ -647,7 +647,7 @@ func MakeRandomGoto(
 	}
 	var cond *Expression
 	if len(readVars) > 0 {
-		if v := ChooseVisibleReadVarOpts(r, condBlk, readVars, GetIntType(), uf, sessOpts(cgSess(cg))); v != nil {
+		if v := ChooseVisibleReadVarOptsSess(cgSess(cg), r, condBlk, readVars, GetIntType(), uf, sessOpts(cgSess(cg))); v != nil {
 			// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only.
 			// C++ does not call read_var here; visit_facts later uses check_read_var.
 			// Soft invent was NoteRead/ReadVar during make_random, which pushed the
@@ -752,14 +752,14 @@ func MakeRandomGoto(
 		}
 		// StatementGoto.cpp:163 — update_facts_for_dest(goto_in, goto_out, stm)
 		// Full FactVec: PT half + eUnionWrite half (merge then OOS drop).
-		UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
+		UpdateFactsForDestSess(cgSess(cg), gotoIn, &gotoOut, fm.Func, blk)
 		if sessHasError(cgSess(cg)) || !FactsComplete(gotoOut) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
 			}
 			return makeGotoFailed()
 		}
-		UpdateUnionFactsForDest(gotoInU, &gotoOutU, fm.Func, blk)
+		UpdateUnionFactsForDestSess(cgSess(cg), gotoInU, &gotoOutU, fm.Func, blk)
 		if sessHasError(cgSess(cg)) || !UnionFactsComplete(gotoOutU) {
 			if !sessHasError(cgSess(cg)) {
 				sessNoteError(cgSess(cg), ErrGeneric)
@@ -1006,8 +1006,8 @@ func MakeRandomGoto(
 				}
 				gotoOut = nil
 				gotoOutU = nil
-				UpdateFactsForDest(gotoIn, &gotoOut, fm.Func, blk)
-				UpdateUnionFactsForDest(gotoInU, &gotoOutU, fm.Func, blk)
+				UpdateFactsForDestSess(cgSess(cg), gotoIn, &gotoOut, fm.Func, blk)
+				UpdateUnionFactsForDestSess(cgSess(cg), gotoInU, &gotoOutU, fm.Func, blk)
 				if sessHasError(cgSess(cg)) || !FactsComplete(gotoOut) || !UnionFactsComplete(gotoOutU) {
 					fm.RestoreStmFactMaps(dest, factsInCopy, factsOutCopy, unionInCopy, unionOutCopy)
 					cg.ResetEffectAccum(preEffect)

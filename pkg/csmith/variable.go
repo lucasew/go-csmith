@@ -288,7 +288,7 @@ func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options
 	}
 	// ArrayVariable.cpp:539 — virtual Output for array (itemized or collective)
 	if v.AsArray != nil && v.AsArray.Collective != nil {
-		out := v.AsArray.OutputAccess()
+		out := v.AsArray.OutputAccessSess(s)
 		// residual ERROR sticky — no invent soft-empty access past OutputAccess residual
 		if sessHasError(s) {
 			return ""
@@ -2085,13 +2085,21 @@ func (v *Variable) MatchSess(s *Session, other *Variable) bool {
 		sessNoteError(s, ErrGeneric)
 		return false
 	}
-	if v.Type.IsAggregate() {
-		ok := v.HasFieldVar(other)
+	if v.Type.IsAggregateSess(s) {
+		// residual ERROR sticky — no invent match path past IsAggregate residual
+		if sessHasError(s) {
+			return false
+		}
+		ok := v.HasFieldVarSess(s, other)
 		// residual ERROR sticky — no invent match/not-match soft-skip past HasFieldVar hole
 		if sessHasError(s) {
 			return false
 		}
 		return ok
+	}
+	// residual ERROR sticky — no invent not-match past IsAggregate residual false
+	if sessHasError(s) {
+		return false
 	}
 	return false
 }

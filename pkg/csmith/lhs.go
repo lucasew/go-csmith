@@ -226,7 +226,7 @@ func (l *Lhs) GetQualifiersSess(s *Session) CVQualifiers {
 		sessNoteError(s, ErrGeneric)
 		return CVQualifiers{}
 	}
-	q := l.Var.Qfer.IndirectQualifiers(n)
+	q := l.Var.Qfer.IndirectQualifiersSess(s, n)
 	// residual ERROR sticky — no invent soft-quals past IndirectQualifiers residual
 	if sessHasError(s) {
 		return CVQualifiers{}

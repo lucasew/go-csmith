@@ -180,7 +180,7 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		if sessHasError(s) {
 			return nil
 		}
-		onStack := b != nil && b.IsVarOnStack(v)
+		onStack := b != nil && b.IsVarOnStackSess(s, v)
 		// residual ERROR sticky — no invent soft-continue past IsVarOnStack hole
 		if sessHasError(s) {
 			return nil

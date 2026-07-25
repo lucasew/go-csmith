@@ -195,7 +195,7 @@ func (fi *Invocation) SaveReturnFactsSess(s *Session, facts []*FactPointTo) {
 			sessNoteError(s, ErrGeneric)
 			return
 		}
-		if fi.User.RV.Match(f.Var) {
+		if fi.User.RV.MatchSess(s, f.Var) {
 			// residual ERROR sticky — no invent soft-continue save past Match hole
 			if sessHasError(s) {
 				return
@@ -236,7 +236,7 @@ func (fi *Invocation) SaveReturnUnionFactsSess(s *Session, facts []*FactUnion) {
 			sessNoteError(s, ErrGeneric)
 			return
 		}
-		if fi.User.RV.Match(f.Var) {
+		if fi.User.RV.MatchSess(s, f.Var) {
 			if sessHasError(s) {
 				return
 			}
