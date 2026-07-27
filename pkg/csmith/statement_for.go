@@ -4,6 +4,7 @@ package csmith
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -76,14 +77,13 @@ func MakeRandomLoopControlSess(s *Session, r *Rng, opts Options, ivSigned bool) 
 		if incr == 0 {
 			incr = 1
 		}
-		if opts.FastExecution && incr != 0 && (limit-init)%incr == 0 &&
-			(testOp == BinCmpGe || testOp == BinCmpLe) {
-			if incrOp == AssignAdd {
-				limit++
-			} else {
-				limit--
-			}
-		}
+		// StatementFor.cpp:97–99 would adjust limit under fast_execution when
+		// (limit-init)%incr==0 for Ge/Le. Golden binaries (nix pin + instrumented)
+		// do not change those limits in practice (FE-only seed2: zero effective
+		// adjusts; FE+--max-array-len-per-dim 13 keeps -8 while a live adjust
+		// yields -9). Drop-in matches the binary; do not invent the tweak until
+		// a rebuild proves it is live. opts.FastExecution still drives LangCPP
+		// / no-jumps / max-array-len side effects in normalizeUpstreamFlow.
 	} else {
 		// StatementFor.cpp:102 — ERROR_RETURN after flip into ++/-- branch
 		if sessHasError(s) {
@@ -289,6 +289,17 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 	if iv == nil {
 		return nil
 	}
+	// Session-local pure-IV registry (not package ambient). Path A pure FE head
+	// fixups skip residual free that is pure for-IV of another function (seed57
+	// g_114) even when that function is not yet on the parent call tree.
+	// Register all IVs (not only IsGlobal): IsGlobal residual false at pick time
+	// dropped g_114 while FE residual free still names g_114.
+	if s := sessFromCG(cg); s != nil && !sessHasError(s) {
+		if s.PureIVGlobals == nil {
+			s.PureIVGlobals = map[*Variable]bool{}
+		}
+		s.PureIVGlobals[iv] = true
+	}
 	// StatementFor.cpp:191–194 — read_indices assert; write_var; read_var
 	var facts []*FactPointTo
 	if cg.FM != nil {
@@ -376,12 +387,11 @@ func MakeIteration(r *Rng, opts Options, probs *Probabilities, vs *VariableSelec
 		if b < 0 {
 			b = 0
 		}
-		oob := 0
-		if probs != nil {
-			oob = probs.SingleSess(sessFromCG(cg), PArrayOOBProb)
-		} else {
-			oob = opts.ArrayOOBProb
-		}
+		// StatementFor.cpp:134 — pure_rnd_flipcoin(CGOptions::array_oob_prob())
+		// CLI CGOptions, not Probabilities table. Soft invent used SingleSess
+		// (random_random rewrites table pArrayOOBProb) → first_div p=55 vs p=49
+		// (flagcamp seed 269180…).
+		oob := opts.ArrayOOBProb
 		var outBound int
 		initN, limitN, incrN, testOp, incrOp, outBound = MakeRandomArrayControlSess(sessFromCG(cg), r, b, signed, oob)
 		// C++ replaces bound with adjusted return value for IV bounds
@@ -603,6 +613,44 @@ func MakeRandomFor(
 	}
 	// post_loop_analysis (StatementFor.cpp:350–370)
 	st := &Stmt{Kind: StmtFor, Loop: lc, Then: body, StmID: AllocStmIDSess(sessFromCG(cg))}
+	if os.Getenv("DIAG_GO_G8") != "" && lc.IV != nil && lc.IV.Name == "g_8" && cg.FM != nil && body != nil {
+		bin := cg.FM.GetMapFactsIn(body.StmID)
+		bout := cg.FM.GetMapFactsOut(body.StmID)
+		fmt.Fprintf(os.Stderr, "GO_G8_AFTER_BODY for=%d body=%d nBodyIn=%d nBodyOut=%d nLive=%d nStmts=%d\n",
+			st.StmID, body.StmID, len(bin), len(bout), len(cg.FM.GlobalFacts), len(body.Stmts))
+		for i := range body.Stmts {
+			s := &body.Stmts[i]
+			ms := cg.FM.GetMapStmEffect(s.StmID)
+			sin := cg.FM.GetMapFactsIn(s.StmID)
+			sout := cg.FM.GetMapFactsOut(s.StmID)
+			fmt.Fprintf(os.Stderr, "GO_G8_BODY_STM i=%d sid=%d kind=%d nMapR=%d nMapW=%d nIn=%d nOut=%d\n",
+				i, s.StmID, int(s.Kind), len(ms.ReadVarsSess(sessFromCG(cg))), len(ms.WrittenVarsSess(sessFromCG(cg))), len(sin), len(sout))
+		}
+		// fingerprint g_2366 pointees in/out
+		for _, name := range []string{"g_2366", "g_179", "g_187"} {
+			var fi, fo *FactPointTo
+			for _, f := range bin {
+				if f != nil && f.Var != nil && f.Var.Name == name {
+					fi = f
+					break
+				}
+			}
+			for _, f := range bout {
+				if f != nil && f.Var != nil && f.Var.Name == name {
+					fo = f
+					break
+				}
+			}
+			ni, no := -1, -1
+			if fi != nil {
+				ni = len(fi.PointTo)
+			}
+			if fo != nil {
+				no = len(fo.PointTo)
+			}
+			fmt.Fprintf(os.Stderr, "GO_G8_PTR %s inPT=%d outPT=%d\n", name, ni, no)
+		}
+	}
 	postLoopAnalysis(cg.FM, st, body, preFacts, preUnion, preEffect, cg)
 	// incomplete post-loop GlobalFacts / map_stm fail closed (no invent for success)
 	if !FactsComplete(cg.FM.GlobalFacts) ||
@@ -632,6 +680,12 @@ func postLoopAnalysis(fm *FactMgr, forSt *Stmt, body *Block, preFacts []*FactPoi
 	}
 	// StatementFor.cpp:355 — global_facts = map_facts_in[&body]
 	// Full FactVec: point-to + eUnionWrite (AssignGlobalFactsFromMapIn).
+	if os.Getenv("DIAG_GO_G8") != "" && forSt != nil && forSt.Loop != nil && forSt.Loop.IV != nil && forSt.Loop.IV.Name == "g_8" {
+		bin := fm.GetMapFactsIn(body.StmID)
+		bout := fm.GetMapFactsOut(body.StmID)
+		fmt.Fprintf(os.Stderr, "GO_G8_POSTLOOP body=%d nIn=%d nOut=%d nLive=%d\n",
+			body.StmID, len(bin), len(bout), len(fm.GlobalFacts))
+	}
 	fm.AssignGlobalFactsFromMapIn(body.StmID)
 	// residual ERROR sticky — no invent soft-must-return path past map_in assign residual
 	if hasErrCG(cg) || !FactsComplete(fm.GlobalFacts) || !UnionFactsComplete(fm.UnionFacts) {
@@ -797,12 +851,13 @@ func arrayOpHeaderOutputSess(s *Session, lc *LoopControl, opts Options) string {
 		return ""
 	}
 	// StatementArrayOp.cpp:194–220 — cv->Output always live; sticky no invent for ( = 0; …)
-	iv := lc.IV.OutputCOptsWithSess(s, false, opts)
+	iv := lc.IV.OutputCOptsWithSess(s, opts.PrefixName, opts)
 	// residual ERROR sticky — no invent soft-continue header past OutputC residual
 	if sessHasError(s) {
 		return ""
 	}
-	if iv == "" {
+	// empty IV name ok under prefix_name (ctrl vars are typically local → unchanged)
+	if iv == "" && !opts.PrefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}

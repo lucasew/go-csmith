@@ -74,18 +74,28 @@ func TestStepHashOutput(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 }
 
-func TestStepHashNoInventDeclWithoutComputeHash(t *testing.T) {
-	// OutputHashFuncDef gated on ComputeHash — no invent forward decls alone
+func TestStepHashDeclsWithoutComputeHash(t *testing.T) {
+	// OutputMgr.cpp:308–311 — step_hash_by_stmt alone emits hash decls (not gated on
+	// compute_hash). compute_hash only switches transparent_crc vs csmith_sink_.
 	opts := Defaults()
 	opts.StepHashByStmt = true
 	opts.ComputeHash = false
 	g := NewProgramGenerator(NewSession(opts))
 	hdr := g.OutputHeader()
-	if strings.Contains(hdr, "csmith_compute_hash") || strings.Contains(hdr, "step_hash") {
-		t.Fatal("must not invent hash decls without ComputeHash", hdr)
+	if !strings.Contains(hdr, "csmith_compute_hash") || !strings.Contains(hdr, "step_hash") {
+		t.Fatal("step_hash_by_stmt alone must emit hash decls", hdr)
 	}
-	if def := g.OutputHashFuncDef(); def != "" {
-		t.Fatal("must not invent hash def without ComputeHash", def)
+	if def := g.OutputHashFuncDef(); def == "" {
+		t.Fatal("step_hash_by_stmt alone must emit hash defs")
+	}
+	// Neither flag → no decls.
+	opts2 := Defaults()
+	opts2.StepHashByStmt = false
+	opts2.ComputeHash = false
+	g2 := NewProgramGenerator(NewSession(opts2))
+	hdr2 := g2.OutputHeader()
+	if strings.Contains(hdr2, "step_hash") {
+		t.Fatal("must not invent step_hash without StepHashByStmt", hdr2)
 	}
 }
 

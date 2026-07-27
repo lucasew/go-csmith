@@ -136,15 +136,15 @@ func MakeRandomReturn(
 	if ev == nil || hasErrCG(cg) {
 		return Stmt{}
 	}
-	// typecast if needed (StatementReturn.cpp:64 — check_and_set_cast; lang_cpp only)
+	// typecast if needed (StatementReturn.cpp:64–65 — only check_and_set_cast).
+	// Expression.cpp:221–225: lang_cpp + needs_cast. Soft invent was also
+	// StatementAssign's ccomp+bitfield RHS cast (Assign.cpp:208–209) on return
+	// expressions — that path is assign-only; C++ return never sets cast_type
+	// for ccomp bitfield sources (flagcamp: bare `return l_11.f1` vs cast).
 	ev.CheckAndSetCastOptsSess(sessFromCG(cg), ret, opts)
 	// residual ERROR sticky — no invent Return stmt past CheckAndSetCast residual hole
 	if hasErrCG(cg) {
 		return Stmt{}
-	}
-	// ccomp + bitfield return cast (StatementAssign.cpp similar path)
-	if opts.CComp && ev.Var != nil && ev.Var.IsBitfield {
-		ev.CastType = ret
 	}
 	// StatementReturn.cpp make_random does not visit_facts — stm_visit / append_return does
 	return Stmt{Kind: StmtReturn, Expr: ev, StmID: AllocStmIDSess(sessFromCG(cg))}

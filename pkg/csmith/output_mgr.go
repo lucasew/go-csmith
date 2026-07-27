@@ -412,7 +412,7 @@ func RandomOutputVarDefsOptsSess(s *Session, globals []*Variable, nFiles int, fo
 			sessNoteError(s, ErrGeneric)
 			return nil
 		} else {
-			def = v.OutputDefFullSess(s, forceStatic, false, false, nil)
+			def = v.OutputDefFullSess(s, forceStatic, opts.PrefixName, opts.VariableAttributes, s.Rng)
 		}
 		if sessHasError(s) || def == "" {
 			if !sessHasError(s) {

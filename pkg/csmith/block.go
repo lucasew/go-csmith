@@ -3,9 +3,18 @@
 package csmith
 
 import (
+	"fmt"
+	"os"
 	"sort"
 	"strings"
 )
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 // Stmt is a minimal statement record (emit only; full Statement subclasses later).
 type Stmt struct {
@@ -107,10 +116,12 @@ type Block struct {
 	EmitLabelAttrs bool
 	// LabelAttrRng seed for attributes when EmitLabelAttrs (optional; use package gen).
 	LabelAttrRng *Rng
-	// EmitParanoid / EmitConcise / EmitFM: Statement::post_output assertions.
+	// EmitParanoid / EmitConcise / EmitQuiet / EmitFM: Statement::post_output assertions.
 	// Block.cpp Output + Statement.cpp:919–924 when CGOptions::paranoid.
+	// Quiet: OutputMgr::output_comment_line blanks fact-section headers.
 	EmitParanoid bool
 	EmitConcise  bool
+	EmitQuiet    bool
 	EmitFM       *FactMgr
 }
 
@@ -164,6 +175,9 @@ func (b *Block) PushStmtSess(s *Session, st Stmt) {
 		return
 	}
 	b.Stmts = append(b.Stmts, st)
+	if b.Func != nil {
+		b.Func.noteStmParent(st.StmID, b)
+	}
 }
 
 // FindBlockByID mirrors find_block_by_id.
@@ -220,6 +234,7 @@ func OutputStatementList(stms []Stmt, parent *Block, indent int) string {
 		tmp.LabelAttrRng = parent.LabelAttrRng
 		tmp.EmitParanoid = parent.EmitParanoid
 		tmp.EmitConcise = parent.EmitConcise
+		tmp.EmitQuiet = parent.EmitQuiet
 		tmp.EmitDepthProtect = parent.EmitDepthProtect
 	}
 	// Prefer parent FactMgr bag; else throwaway session for library emit (no ambient write).
@@ -587,9 +602,8 @@ func MakeRandomBlock(
 		Looping:          looping,
 		blockSize:        opts.MaxBlockSize,
 		EmitDepthProtect: opts.DepthProtect,
-		// step_hash def/decl/call gated with ComputeHash (hashHelpersEnabled)
-		// no invent step_hash(n) without live helper defs
-		EmitStepHash:   opts.StepHashByStmt && opts.ComputeHash,
+		// OutputMgr.cpp:160–167 — step_hash_by_stmt alone (compute_hash independent)
+		EmitStepHash:   opts.StepHashByStmt,
 		EmitLabelAttrs: opts.LabelAttributes,
 		LabelAttrRng:   r,
 		StmID:          AllocStmIDSess(sessFromCG(cg)),
@@ -597,6 +611,7 @@ func MakeRandomBlock(
 		InArrayLoop:  len(cg.IVBounds) > 0,
 		EmitParanoid: opts.Paranoid,
 		EmitConcise:  opts.Concise,
+		EmitQuiet:    opts.Quiet,
 		EmitFM:       cg.FM,
 	}
 	// Block.cpp:132–133 — stack + blocks push
@@ -671,10 +686,16 @@ func MakeRandomBlock(
 				// StmtLabel is Go emit-only; still needs a sid for map keys if visited.
 				lab := Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmIDSess(sessFromCG(cg))}
 				b.Stmts = append(b.Stmts, lab)
+				if f != nil {
+					f.noteStmParent(lab.StmID, b)
+				}
 			}
 			pendingFwd = ""
 		}
 		b.Stmts = append(b.Stmts, st)
+		if f != nil {
+			f.noteStmParent(st.StmID, b)
+		}
 		if st.Kind == StmtGoto && st.GotoForward && st.Label != "" {
 			pendingFwd = st.Label
 		}
@@ -689,7 +710,11 @@ func MakeRandomBlock(
 		}
 	}
 	if pendingFwd != "" {
-		b.Stmts = append(b.Stmts, Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmIDSess(sessFromCG(cg))})
+		lab := Stmt{Kind: StmtLabel, SourceLabel: pendingFwd, StmID: AllocStmIDSess(sessFromCG(cg))}
+		b.Stmts = append(b.Stmts, lab)
+		if f != nil {
+			f.noteStmParent(lab.StmID, b)
+		}
 	}
 	// Block.cpp:157–161 — ERROR after stmt loop → delete block
 	if hasErrCG(cg) {
@@ -722,6 +747,9 @@ func MakeRandomBlock(
 					ret.StmID = AllocStmIDSess(sessFromCG(cg))
 				}
 				b.Stmts = append(b.Stmts, ret)
+				if f != nil {
+					f.noteStmParent(ret.StmID, b)
+				}
 			}
 		}
 	}
@@ -967,6 +995,7 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 			fm.SetMapFactsOut(b.StmID, IncompleteFactSlice())
 			return
 		}
+		// Env-gated: n62 effect_accum g_8 order — whether loop-body FP runs.
 		if isLoopBody || b.NeedRevisit || hasBack {
 			selfBack := false
 			if isLoopBody {
@@ -1093,9 +1122,25 @@ func (b *Block) PostCreationAnalysis(cg *CGContext, opts Options, preEffect Effe
 						}
 						break
 					}
+					// Optional FP strip dump (mirrors UP CSMITH_DEBUG_POOL UP_FP_STRIP).
+					if os.Getenv("CSMITH_DEBUG_POOL") != "" && os.Getenv("CSMITH_DEBUG_POOL") != "0" {
+						fn := "?"
+						if b.Func != nil && b.Func.Name != "" {
+							fn = b.Func.Name
+						}
+						nb := 0
+						if b.Func != nil {
+							nb = len(b.Func.Blocks)
+						}
+						fmt.Fprintf(os.Stderr, "GO_FP_STRIP func=%s failIdx=%d nstmts=%d need_revisit=%d looping=%d blocks=%d sid=%d\n",
+							fn, failIdx, len(b.Stmts), boolInt(b.NeedRevisit), boolInt(b.Looping), nb, b.StmID)
+					}
 					// remove from fail index through end (Block.cpp:709–714)
 					if failIdx < 0 {
 						failIdx = 0
+					}
+					if b.Func != nil {
+						b.Func.InvalidateStmParentIdx()
 					}
 					for failIdx < len(b.Stmts) {
 						id := b.Stmts[failIdx].StmID
@@ -1488,16 +1533,18 @@ func makeRandomStmtForced(
 		// Statement.cpp:261–265 — clear effect_stm; expr_depth = 0
 		cg.EffectStm = EmptyEffect()
 		cg.ExprDepth = 0
+		// Statement.cpp:248–259 — stop_by_stmt BEFORE probability (and overrides forceKind).
+		// Soft invent was: draw StatementProbability first then override to Return, which
+		// burns filter retries (Continue/not_in_loop) that C++ never draws (flagcamp
+		// seed 117274… first_div @440 with --stop-by-stmt 41).
 		var kind StatementType
-		if tries == 0 && forceKind != MaxStatementType {
+		if opts.StopByStmt >= 0 && GetCurrentSIDSess(sessFromCG(cg)) >= opts.StopByStmt {
+			kind = StmtReturn
+		} else if tries == 0 && forceKind != MaxStatementType {
 			// Block.cpp:424 / Statement.cpp:259 — caller passed eFor (or other forced t)
 			kind = forceKind
 		} else {
 			kind = StatementProbabilityFilterSess(sessFromCG(cg), r, stmtTab, f)
-		}
-		// Statement.cpp:248–250 — stop_by_stmt forces return after sid threshold
-		if opts.StopByStmt >= 0 && GetCurrentSIDSess(sessFromCG(cg)) >= opts.StopByStmt {
-			kind = StmtReturn
 		}
 		// Statement.cpp:260–261 — pre_facts / pre_effect (accum) snapshot before make
 		// C++: FactVec pre_facts = fm->global_facts; shallow copy of Fact* vector
@@ -1785,7 +1832,8 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if exprOut == "" {
+			// empty expr ok under prefix_name (NDEBUG get_count_prefix → "return ;")
+			if exprOut == "" && !opts.PrefixName {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1858,7 +1906,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if test == "" {
+			if test == "" && !opts.PrefixName {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1877,7 +1925,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if test == "" {
+			if test == "" && !opts.PrefixName {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1903,7 +1951,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if hdr == "" || bodyOut == "" {
+			if (hdr == "" && !opts.PrefixName) || bodyOut == "" {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1931,7 +1979,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if test == "" || thenOut == "" || elseOut == "" {
+			if (test == "" && !opts.PrefixName) || thenOut == "" || elseOut == "" {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1952,7 +2000,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if test == "" {
+			if test == "" && !opts.PrefixName {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1972,7 +2020,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if hdr == "" {
+			if hdr == "" && !opts.PrefixName {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -2028,7 +2076,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 				child := st.Then.Stmts[0]
 				nest := &Block{Stmts: []Stmt{child}, EmitFM: b.EmitFM, EmitStepHash: b.EmitStepHash,
 					EmitLabelAttrs: b.EmitLabelAttrs, LabelAttrRng: b.LabelAttrRng,
-					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise}
+					EmitParanoid: b.EmitParanoid, EmitConcise: b.EmitConcise, EmitQuiet: b.EmitQuiet}
 				childOut := nest.outputStmtsOnlySess(s, indent+1, true, opts)
 				if sessHasError(s) {
 					return ""
@@ -2063,7 +2111,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 			if sessHasError(s) {
 				return ""
 			}
-			if out == "" {
+			if out == "" && !opts.PrefixName {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -2098,7 +2146,7 @@ func (b *Block) outputStmtsOnlySess(s *Session, indent int, skipPre bool, opts O
 		}
 		// Statement::post_output — paranoid fact assertions (Statement.cpp:919–924)
 		if b.EmitParanoid && b.EmitFM != nil {
-			post := PostOutput(&st, b, b.EmitFM, true, b.EmitConcise, inner)
+			post := PostOutput(&st, b, b.EmitFM, true, b.EmitQuiet, b.EmitConcise, inner)
 			// residual ERROR sticky — no invent soft-continue stmt emit past PostOutput hole
 			if sessHasError(s) {
 				return ""

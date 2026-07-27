@@ -35,6 +35,39 @@ func TestMakeRandomReturnIsVariable(t *testing.T) {
 	}
 }
 
+// TestMakeRandomReturnNoCCompBitfieldCast — StatementReturn.cpp:64–65 only
+// check_and_set_cast (lang_cpp). Assign.cpp:208–209 ccomp+bitfield cast is
+// assign RHS only; must not invent CastType when returning a bitfield under ccomp.
+func TestMakeRandomReturnNoCCompBitfieldCast(t *testing.T) {
+	opts := Defaults()
+	opts.CComp = true
+	opts.LangCPP = false
+	retT := GetSimpleTypeSess(testAmbientSession, EUInt128)
+	f := &Function{Name: "func_1", ReturnType: retT}
+	f.RV = CreateVariableScalarsSess(testAmbientSession, "rv", retT, false, false)
+	fm := NewFactMgrSess(testAmbientSession, f)
+	// bitfield field as return source
+	bf := CreateVariableScalarsSess(testAmbientSession, "f1", GetIntTypeSess(testAmbientSession), false, false)
+	bf.IsBitfield = true
+	vs := NewVariableSelector(testAmbientSession, opts)
+	vs.GlobalList = []*Variable{bf}
+	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
+	st := MakeRandomReturn(NewRngSess(testAmbientSession, 7), opts, vs, &cg)
+	if !stmtOK(st) || st.Expr == nil {
+		t.Skip("no return expr for seed")
+	}
+	if st.Expr.CastType != nil {
+		t.Fatalf("ccomp bitfield return must not invent CastType (got %v)", st.Expr.CastType.CNameSess(testAmbientSession))
+	}
+	out := st.Expr.OutputOptsSess(testAmbientSession, opts)
+	if strings.Contains(out, "(") && strings.Contains(out, ")") {
+		// bare field name ok; cast form "(unsigned __int128) ..." is soft invent
+		if strings.Contains(out, "__int128") {
+			t.Fatalf("emit cast under ccomp/!lang_cpp: %q", out)
+		}
+	}
+}
+
 func TestMakeRandomReturnFailsWithoutVars(t *testing.T) {
 	// StatementReturn.cpp:66 ERROR_GUARD — no soft const when select fails
 	opts := Defaults()

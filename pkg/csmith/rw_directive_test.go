@@ -89,13 +89,13 @@ func TestStepHashEmittedInBlock(t *testing.T) {
 	if !strings.Contains(out, "step_hash(") {
 		t.Fatal(out)
 	}
-	// StepHash without ComputeHash — no invent step_hash calls
+	// StepHash without ComputeHash still enables step_hash (OutputMgr.cpp:308 / 160–167)
 	opts2 := Defaults()
 	opts2.StepHashByStmt = true
 	opts2.ComputeHash = false
 	b2 := MakeRandomBlock(NewRngSess(testAmbientSession, 3), opts2, NewProbabilities(opts2), vs, NewExprTablesSess(testAmbientSession, opts2), NewStatementThresholdTableSess(testAmbientSession, opts2), &cg, false)
-	if b2 != nil && b2.EmitStepHash {
-		t.Fatal("must not invent EmitStepHash without ComputeHash")
+	if b2 == nil || !b2.EmitStepHash {
+		t.Fatal("StepHashByStmt alone must set EmitStepHash (compute_hash independent)")
 	}
 }
 
