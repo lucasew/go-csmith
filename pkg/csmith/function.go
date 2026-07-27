@@ -3031,47 +3031,71 @@ func (f *Function) generateBodyCore(
 															}
 														}
 														if !accSuccOwnerResFree {
-															// Acc-order Acc-early with gap. Keep map when gap has
-															// another free residual pure free-ref free of the same
-															// free-head owner (seed9838263505978394624 func_12
-															// g_445 Acc before l_34 with gap sibling pure residual
-															// pure free-ref free g_276 of free-head func_28; Acc-
-															// order before l_34 yanks past g_276 → UP g_445
-															// g_276). Session-local — no package mutable state.
-															gapSibPureFR := false
-															for j := ppFH + 1; j < rpFH; j++ {
-																w := ordFH[j]
-																if w == nil {
-																	continue
-																}
-																for _, invG := range calls {
-																	if invG == nil || invG.User == nil || !EffectComplete(invG.User.FEffect) {
-																		continue
-																	}
-																	if !isForIVOfFunc(invG.User, v) || !bodySyntacticFreeReadsVar(invG.User, v) {
-																		continue
-																	}
-																	if !isForIVOfFunc(invG.User, w) || !bodySyntacticFreeReadsVar(invG.User, w) {
-																		continue
-																	}
-																	frG := invG.User.FEffect.ReadVarsSess(s)
-																	if hasErrVS(vs) || !VariablesComplete(frG) {
-																		break
-																	}
-																	if len(frG) > 0 && frG[0] != nil && !isForIVOfFunc(invG.User, frG[0]) {
-																		gapSibPureFR = true
+															// Keep map when gap has free residual pure free-ref free of
+															// same free-head that is Acc-after pure (Acc-order pure
+															// before Acc succ would reverse Acc sibling order —
+															// seed9838263505978394624 func_12 g_445 Acc before l_34
+															// with gap g_276 Acc-after pure). Acc-order when gap pure
+															// residual pure free-ref free siblings are Acc-before pure
+															// (seed3682766 g_1548 Acc-early gap pollution Acc-before
+															// pure; Acc before g_769). Session-local — no package mutable state.
+															gapSibAccAfter := false
+															if cg.EffectAccum != nil && EffectComplete(*cg.EffectAccum) {
+																acc := cg.EffectAccum.ReadVarsSess(s)
+																pureAcc := -1
+																for i, x := range acc {
+																	if x != nil && (x == v || (v != nil && x.Name == v.Name)) {
+																		pureAcc = i
 																		break
 																	}
 																}
-																if gapSibPureFR {
-																	break
+																if pureAcc >= 0 {
+																	for j := ppFH + 1; j < rpFH; j++ {
+																		w := ordFH[j]
+																		if w == nil {
+																			continue
+																		}
+																		isSib := false
+																		for _, invG := range calls {
+																			if invG == nil || invG.User == nil || !EffectComplete(invG.User.FEffect) {
+																				continue
+																			}
+																			if !isForIVOfFunc(invG.User, v) || !bodySyntacticFreeReadsVar(invG.User, v) {
+																				continue
+																			}
+																			if !isForIVOfFunc(invG.User, w) || !bodySyntacticFreeReadsVar(invG.User, w) {
+																				continue
+																			}
+																			frG := invG.User.FEffect.ReadVarsSess(s)
+																			if hasErrVS(vs) || !VariablesComplete(frG) {
+																				break
+																			}
+																			if len(frG) > 0 && frG[0] != nil && !isForIVOfFunc(invG.User, frG[0]) {
+																				isSib = true
+																				break
+																			}
+																		}
+																		if hasErrVS(vs) {
+																			abortUnbuilt()
+																			return
+																		}
+																		if !isSib {
+																			continue
+																		}
+																		for k := pureAcc + 1; k < len(acc); k++ {
+																			x := acc[k]
+																			if x != nil && (x == w || x.Name == w.Name) {
+																				gapSibAccAfter = true
+																				break
+																			}
+																		}
+																		if gapSibAccAfter {
+																			break
+																		}
+																	}
 																}
 															}
-															if hasErrVS(vs) {
-																abortUnbuilt()
-																return
-															}
-															if !gapSibPureFR {
+															if !gapSibAccAfter {
 																accOrderFH = true
 															}
 														}
@@ -3099,20 +3123,6 @@ func (f *Function) generateBodyCore(
 													}
 												}
 											}
-										}
-										if os.Getenv("DIAG_S9838") != "" && f != nil && f.Name == "func_12" && v != nil && (v.Name == "g_445" || v.Name == "g_276") {
-											bn := ""
-											if before != nil {
-												bn = before.Name
-											}
-											fmt.Fprintf(os.Stderr, "S9838 freeHead path %s before=%s accOrderFH=%v pp=%d rp=%d\n", v.Name, bn, accOrderFH, ppFH, rpFH)
-											fmt.Fprint(os.Stderr, "S9838 sum cluster:")
-											for i, x := range ordFH {
-												if x != nil && (x.Name == "g_445" || x.Name == "g_276" || x.Name == "g_236" || x.Name == "g_742" || x.Name == "l_34" || x.Name == "g_139") {
-													fmt.Fprintf(os.Stderr, " %s@%d", x.Name, i)
-												}
-											}
-											fmt.Fprintln(os.Stderr)
 										}
 										if accOrderFH {
 											rebuilt := EmptyEffect()
