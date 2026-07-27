@@ -118,6 +118,30 @@ func TestSetupInOutMaps(t *testing.T) {
 	}
 }
 
+// Fact.cpp:225–236 combine_facts via join_visits keeps first-visit pointee order.
+// Soft invent MergeFacts rewrote order to the later visit (seed-2 paranoid rv).
+func TestSetupInOutMapsCombineKeepsFirstVisitPointeeOrder(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	fm := NewFactMgrSess(testAmbientSession, nil)
+	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), true, false)
+	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), true, false)
+	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), true, false)
+	// first visit: a then b
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{a, b})})
+	fm.SetupInOutMaps(true)
+	// second visit: same set, reverse order
+	fm.SetMapFactsOut(1, []*FactPointTo{MakeFactPointToSetSess(testAmbientSession, p, []*Variable{b, a})})
+	fm.SetupInOutMaps(false)
+	final := FindRelatedPointToSess(testAmbientSession, fm.MapFactsOutFinal[1], p)
+	if final == nil || len(final.PointTo) != 2 {
+		t.Fatalf("want 2 pointees, got %v", final)
+	}
+	if final.PointTo[0] != a || final.PointTo[1] != b {
+		t.Fatalf("combine_facts must keep first-visit order a||b, got %s||%s",
+			final.PointTo[0].Name, final.PointTo[1].Name)
+	}
+}
+
 func TestSetupInOutMapsFirstTimeIncompleteFailClosed(t *testing.T) {
 	// FactMgr.cpp:208–222 — first_time copy_facts; Fact* always live
 	// incomplete hole must not invent cleaned final map entry — sticky

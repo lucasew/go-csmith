@@ -73,6 +73,22 @@ func TestFactPointToOutputCondition(t *testing.T) {
 	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{&arr.Variable}}).OutputConditionSess(testAmbientSession); !strings.Contains(cond, "g_p >= &g_a") {
 		t.Fatal("want array range form", cond)
 	}
+	// FactPointTo.cpp:637 — is_array_field() for struct field of array member
+	// (seed-1764: g_206.f3 → (p >= &g_206[0].f3 && p <= &g_206[3].f3))
+	ClearErrorSess(testAmbientSession)
+	arrS := &ArrayVariable{
+		Variable: Variable{Name: "g_206", Type: GetIntTypeSess(testAmbientSession), IsArray: true, ArraySizes: []int{4}},
+		Sizes:    []int{4},
+	}
+	arrS.AsArray = arrS
+	fld := &Variable{Name: "g_206.f3", Type: GetIntTypeSess(testAmbientSession), FieldVarOf: &arrS.Variable}
+	condAF := (&FactPointTo{Var: p, PointTo: []*Variable{fld}}).OutputConditionSess(testAmbientSession)
+	if !strings.Contains(condAF, "g_p >= &g_206[0].f3") || !strings.Contains(condAF, "g_p <= &g_206[3].f3") {
+		t.Fatalf("want array-field range form, got %q", condAF)
+	}
+	if strings.Contains(condAF, "g_p == &g_206.f3") {
+		t.Fatal("must not use bare == for array field pointee", condAF)
+	}
 	// sticky no invent bare "&" pointee
 	ClearErrorSess(testAmbientSession)
 	if cond := (&FactPointTo{Var: p, PointTo: []*Variable{{Type: GetIntTypeSess(testAmbientSession)}}}).OutputConditionSess(testAmbientSession); cond != "" {
@@ -167,28 +183,41 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	fm.SetMapFactsOut(5, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm.SetupInOutMaps(true)
 	st := &Stmt{Kind: StmtAssign, StmID: 5}
-	out := fm.OutputAssertions(st, nil, "    ", true)
+	out := fm.OutputAssertions(st, nil, "    ", true, false, false)
 	if !strings.Contains(out, "statement id: 5") {
 		t.Fatal(out)
 	}
 	if !strings.Contains(out, "assert") {
 		t.Fatal(out)
 	}
-	// global fact neither read nor written → no invent comment-only shell
+	// FactMgr.cpp:625–635 — comments emit whenever updated facts non-empty; unused
+	// globals are filtered only in the assert loop (statement id still printed).
 	f2 := &Function{Name: "func_2", ReturnType: GetIntTypeSess(testAmbientSession)}
-	// empty effect: skip globals
+	// empty effect: skip globals in assert loop
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.SetMapFactsIn(6, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)})
 	fm2.SetMapFactsOut(6, []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm2.SetupInOutMaps(true)
 	st2 := &Stmt{Kind: StmtAssign, StmID: 6}
-	if s := fm2.OutputAssertions(st2, nil, "    ", true); s != "" {
-		t.Fatal("filtered facts must not invent comment-only shell", s)
+	s2 := fm2.OutputAssertions(st2, nil, "    ", true, false, false)
+	if !strings.Contains(s2, "statement id: 6") {
+		t.Fatal("unused-global updated facts must still emit statement id", s2)
+	}
+	if strings.Contains(s2, "assert") {
+		t.Fatal("unused global must not emit assert", s2)
+	}
+	// OutputMgr.cpp:314–320 — quiet blanks the comment but keeps indent+newline
+	quietOut := fm.OutputAssertions(st, nil, "    ", true, true, false)
+	if strings.Contains(quietOut, "statement id") {
+		t.Fatalf("quiet must suppress statement id text: %q", quietOut)
+	}
+	if !strings.Contains(quietOut, "assert") {
+		t.Fatalf("quiet must still emit asserts: %q", quietOut)
 	}
 	// StmID 0 sticky — no invent empty assertion section past incomplete stmt id
 	ClearErrorSess(testAmbientSession)
 	st0 := &Stmt{Kind: StmtAssign, StmID: IncompleteStmID}
-	if s := fm.OutputAssertions(st0, nil, "    ", true); s != "" {
+	if s := fm.OutputAssertions(st0, nil, "    ", true, false, false); s != "" {
 		t.Fatal("StmID 0 OutputAssertions must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -196,12 +225,12 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// nil FM / Statement sticky
-	if s := (*FactMgr)(nil).OutputAssertions(st, nil, "    ", true); s != "" {
+	if s := (*FactMgr)(nil).OutputAssertions(st, nil, "    ", true, false, false); s != "" {
 		t.Fatal("nil FM OutputAssertions must fail closed", s)
 	}
 	// nil FM OutputAssertions must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
-	if s := fm.OutputAssertions(nil, nil, "    ", true); s != "" {
+	if s := fm.OutputAssertions(nil, nil, "    ", true, false, false); s != "" {
 		t.Fatal("nil Stmt OutputAssertions must fail closed", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -226,7 +255,7 @@ func TestOutputAssertionsParanoid(t *testing.T) {
 	fm3.SetMapFactsOut(8, []*FactPointTo{MakeFactPointToSess(testAmbientSession, shell, tgt), MakeFactPointToSess(testAmbientSession, p, tgt)})
 	fm3.SetupInOutMaps(true)
 	st8 := &Stmt{Kind: StmtAssign, StmID: 8}
-	if s := fm3.OutputAssertions(st8, nil, "    ", true); s != "" {
+	if s := fm3.OutputAssertions(st8, nil, "    ", true, false, false); s != "" {
 		t.Fatal("OutputAssertion residual must fail closed whole OutputAssertions", s)
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -410,6 +439,31 @@ func TestOutputFactVarGetActualNameResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 }
 
+func TestOutputFactVarAccessOnceWrap(t *testing.T) {
+	// FactPointTo.cpp:612–621 output_var → Variable::Output — ACCESS_ONCE when
+	// option on && isAccessOnce && !isAddrTaken (flagcamp n91).
+	ClearErrorSess(testAmbientSession)
+	opts := Defaults()
+	opts.AccessOnce = true
+	SetProcessOptionsSess(testAmbientSession, opts)
+	v := CreateVariableScalarsSess(testAmbientSession, "g_54", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
+	v.IsAccessOnce = true
+	if s := outputFactVarSess(testAmbientSession, v); s != "ACCESS_ONCE(g_54)" {
+		t.Fatalf("assert lhs must ACCESS_ONCE: %q", s)
+	}
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("complete ACCESS_ONCE outputFactVar must not sticky")
+	}
+	// pointee Output likewise (FactPointTo.cpp:655–656)
+	fact := &FactPointTo{Var: v, PointTo: []*Variable{NullPtr}}
+	cond := fact.OutputConditionSess(testAmbientSession)
+	if !strings.Contains(cond, "ACCESS_ONCE(g_54) == 0") {
+		t.Fatalf("condition: %q", cond)
+	}
+	ClearErrorSess(testAmbientSession)
+	SetProcessOptionsSess(testAmbientSession, Defaults())
+}
+
 func TestOutputAssertionsIsGlobalIsReadResidualSticky(t *testing.T) {
 	// IsRead residual soft invent was invent soft-skip then partial assert section.
 	// Type-nil fact subject already sticky earlier; complete unused global soft-skip hygiene.
@@ -420,7 +474,7 @@ func TestOutputAssertionsIsGlobalIsReadResidualSticky(t *testing.T) {
 	// unused global fact — IsGlobal true, not read/written → soft skip empty body
 	fm.GlobalFacts = []*FactPointTo{{Var: v, PointTo: []*Variable{NullPtr}}}
 	st := &Stmt{Kind: StmtAssign, StmID: 1}
-	out := fm.OutputAssertions(st, nil, "    ", false)
+	out := fm.OutputAssertions(st, nil, "    ", false, false, false)
 	// may emit nothing (all skipped) or assert — complete path no sticky
 	if HasErrorSess(testAmbientSession) {
 		t.Fatal("complete unused global skip must not sticky", out)
@@ -437,7 +491,7 @@ func TestPostOutputOutputAssertionsResidualSticky(t *testing.T) {
 	// incomplete final out map for st → FindUpdatedFinalFacts residual sticky
 	fm.MapFactsOutFinal = map[int][]*FactPointTo{1: IncompleteFactSlice()}
 	st := &Stmt{Kind: StmtAssign, StmID: 1}
-	if PostOutput(st, nil, fm, true, false, "    ") != "" {
+	if PostOutput(st, nil, fm, true, false, false, "    ") != "" {
 		t.Fatal("incomplete final facts PostOutput must fail closed empty")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -445,7 +499,7 @@ func TestPostOutputOutputAssertionsResidualSticky(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// options off soft empty (must not re-enter OutputAssertions)
-	if PostOutput(st, nil, fm, false, false, "    ") != "" {
+	if PostOutput(st, nil, fm, false, false, false, "    ") != "" {
 		t.Fatal("paranoid off must soft empty")
 	}
 	if HasErrorSess(testAmbientSession) {

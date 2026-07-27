@@ -54,6 +54,13 @@ func ClearMetaFactsSess(s *Session) {
 	s.MetaFactUnionEnabled = true
 }
 
+// factVecEnt is one C++ Fact* identity in global_facts order (ePointTo or eUnionWrite).
+// Used only for paranoid output_assertions interleave of silent output_tab.
+type factVecEnt struct {
+	IsUnion bool
+	Var     *Variable
+}
+
 // FactMgr mirrors FactMgr for a function — global_facts + stm maps.
 // GlobalFacts holds FactPointTo; UnionFacts holds FactUnion.
 type FactMgr struct {
@@ -65,6 +72,10 @@ type FactMgr struct {
 	GlobalFacts []*FactPointTo
 	// UnionFacts is FactUnion subset of global_facts.
 	UnionFacts []*FactUnion
+	// FactVecOrder is first-introduction order of fact subjects in this FM's
+	// lattice (C++ FactVec: append on new related subject, replace in place on
+	// renew/join). Bag-local on FactMgr — not package ambient.
+	FactVecOrder []factVecEnt
 	// CFGEdges mirrors cfg_edges.
 	CFGEdges []*CFGEdge
 	// MapStmEffect mirrors map_stm_effect — keyed by Statement::stm_id.
@@ -80,14 +91,46 @@ type FactMgr struct {
 	// UnionFacts at post-body last-writes → IsNonreadableField over-filters choose_var.
 	MapUnionFactsIn  map[int][]*FactUnion
 	MapUnionFactsOut map[int][]*FactUnion
+	// MapFactInOrder / MapFactOutOrder snapshot FactVecOrder filtered to subjects
+	// present in the corresponding in/out maps (C++ FactVec order at set_fact_*).
+	MapFactInOrder  map[int][]factVecEnt
+	MapFactOutOrder map[int][]factVecEnt
 	// MapFactsInFinal / MapFactsOutFinal mirror map_facts_in/out_final.
 	// FactMgr.h — combined across revisits via setup_in_out_maps.
 	MapFactsInFinal  map[int][]*FactPointTo
 	MapFactsOutFinal map[int][]*FactPointTo
+	// MapUnionFactsInFinal / MapUnionFactsOutFinal are the eUnionWrite partition of
+	// C++ map_facts_in/out_final (FactMgr.cpp:208–246 full FactVec setup_in_out_maps).
+	// Soft invent omitted union finals so find_updated_final_facts never saw rv
+	// union facts → missing paranoid `/* statement id */` + orphan indent (seed-3).
+	MapUnionFactsInFinal  map[int][]*FactUnion
+	MapUnionFactsOutFinal map[int][]*FactUnion
+	// MapFactInOrderFinal / MapFactOutOrderFinal — FactVec order across revisits
+	// (first visit wins; combine_facts does not reorder).
+	MapFactInOrderFinal  map[int][]factVecEnt
+	MapFactOutOrderFinal map[int][]factVecEnt
 	// MapAccumEffect mirrors map_accum_effect — accum after each statement.
 	MapAccumEffect map[int]Effect
 	// MapVisited mirrors map_visited — statement analyzed this pass.
 	MapVisited map[int]bool
+	// PureMissInvented records pure for-IVs re-inserted into map_stm because
+	// visit dropped them (pureWasMissing). FactMgr/session-local — used by
+	// FixupFunc1PureIVFEHeads so FE-head moves only apply to membership
+	// invents (n35 g_108), not in-visit pureMiss reorders (seed57 g_1597).
+	// No package mutable state.
+	PureMissInvented map[int]map[*Variable]bool
+	// PureMissTouched records every pure IV pureMiss re-placed (invent or
+	// reorder) on any func_1 assign. fixupFunc1DeferNestedPureOnlyFEHeads
+	// must not late-jump these (n35 g_50 pureMiss@2 vs defer to g_245.f2).
+	// Acc-early pollution never pureMiss'd still defers (seed9895936 g_1580).
+	// FactMgr/session-local — no package mutable state.
+	PureMissTouched map[*Variable]bool
+	// PurePrefixMoved records pure FE heads reordered by pure-prefix-before-free
+	// on this FM. exclusive residual must not jump those pure IVs past same-FE
+	// free residual free-ref both (LC seed 15934573825443220977 g_150). Acc-early
+	// pure heads never pure-prefix'd still exclusive-residual (seed2918 g_182.f4).
+	// FactMgr/session-local — no package mutable state.
+	PurePrefixMoved map[*Variable]bool
 }
 
 // fmSess returns fm.Sess. Nil fm → unit-test ambient.
@@ -110,19 +153,130 @@ func NewFactMgrSess(s *Session, f *Function) *FactMgr {
 	if s == nil {
 		panic("NewFactMgrSess: nil Session (pass run bag)")
 	}
-	return &FactMgr{
-		Sess:             s,
-		Func:             f,
-		MapStmEffect:     make(map[int]Effect),
-		MapFactsIn:       make(map[int][]*FactPointTo),
-		MapFactsOut:      make(map[int][]*FactPointTo),
-		MapUnionFactsIn:  make(map[int][]*FactUnion),
-		MapUnionFactsOut: make(map[int][]*FactUnion),
-		MapFactsInFinal:  make(map[int][]*FactPointTo),
-		MapFactsOutFinal: make(map[int][]*FactPointTo),
-		MapAccumEffect:   make(map[int]Effect),
-		MapVisited:       make(map[int]bool),
+	fm := &FactMgr{
+		Sess:                  s,
+		Func:                  f,
+		MapStmEffect:          make(map[int]Effect),
+		MapFactsIn:            make(map[int][]*FactPointTo),
+		MapFactsOut:           make(map[int][]*FactPointTo),
+		MapUnionFactsIn:       make(map[int][]*FactUnion),
+		MapUnionFactsOut:      make(map[int][]*FactUnion),
+		MapFactInOrder:        make(map[int][]factVecEnt),
+		MapFactOutOrder:       make(map[int][]factVecEnt),
+		MapFactsInFinal:       make(map[int][]*FactPointTo),
+		MapFactsOutFinal:      make(map[int][]*FactPointTo),
+		MapUnionFactsInFinal:  make(map[int][]*FactUnion),
+		MapUnionFactsOutFinal: make(map[int][]*FactUnion),
+		MapFactInOrderFinal:   make(map[int][]factVecEnt),
+		MapFactOutOrderFinal:  make(map[int][]factVecEnt),
+		MapAccumEffect:        make(map[int]Effect),
+		MapVisited:            make(map[int]bool),
+		PureMissInvented:      make(map[int]map[*Variable]bool),
+		PureMissTouched:       make(map[*Variable]bool),
+		PurePrefixMoved:       make(map[*Variable]bool),
 	}
+	// Last-created FM is active for unit tests / generation until nested callee swaps.
+	s.ActiveFM = fm
+	return fm
+}
+
+// notePT records first introduction of an ePointTo subject on this FM.
+func (fm *FactMgr) notePT(v *Variable) {
+	if fm == nil || v == nil {
+		return
+	}
+	for _, e := range fm.FactVecOrder {
+		if !e.IsUnion && e.Var == v {
+			return
+		}
+	}
+	fm.FactVecOrder = append(fm.FactVecOrder, factVecEnt{Var: v, IsUnion: false})
+}
+
+// noteUW records first introduction of an eUnionWrite subject on this FM.
+func (fm *FactMgr) noteUW(v *Variable) {
+	if fm == nil || v == nil {
+		return
+	}
+	for _, e := range fm.FactVecOrder {
+		if e.IsUnion && e.Var == v {
+			return
+		}
+	}
+	fm.FactVecOrder = append(fm.FactVecOrder, factVecEnt{Var: v, IsUnion: true})
+}
+
+// noteFactVecPT records on Session.ActiveFM (lattice merge path without *FactMgr).
+func noteFactVecPT(s *Session, v *Variable) {
+	if s == nil || s.ActiveFM == nil {
+		return
+	}
+	s.ActiveFM.notePT(v)
+}
+
+// noteFactVecUW records on Session.ActiveFM.
+func noteFactVecUW(s *Session, v *Variable) {
+	if s == nil || s.ActiveFM == nil {
+		return
+	}
+	s.ActiveFM.noteUW(v)
+}
+
+// snapshotFactVecOrder filters live FactVecOrder to subjects present in pts∪unions.
+// Missing subjects (order not tracked) append PT then UW (soft fallthrough).
+func snapshotFactVecOrder(order []factVecEnt, pts []*FactPointTo, unions []*FactUnion) []factVecEnt {
+	ptSet := make(map[*Variable]bool, len(pts))
+	for _, f := range pts {
+		if f != nil && f.Var != nil {
+			ptSet[f.Var] = true
+		}
+	}
+	uSet := make(map[*Variable]bool, len(unions))
+	for _, f := range unions {
+		if f != nil && f.Var != nil {
+			uSet[f.Var] = true
+		}
+	}
+	out := make([]factVecEnt, 0, len(pts)+len(unions))
+	seenPT := make(map[*Variable]bool)
+	seenU := make(map[*Variable]bool)
+	for _, e := range order {
+		if e.Var == nil {
+			continue
+		}
+		if !e.IsUnion {
+			if ptSet[e.Var] && !seenPT[e.Var] {
+				out = append(out, e)
+				seenPT[e.Var] = true
+			}
+		} else if uSet[e.Var] && !seenU[e.Var] {
+			out = append(out, e)
+			seenU[e.Var] = true
+		}
+	}
+	for _, f := range pts {
+		if f != nil && f.Var != nil && !seenPT[f.Var] {
+			out = append(out, factVecEnt{Var: f.Var, IsUnion: false})
+			seenPT[f.Var] = true
+		}
+	}
+	for _, f := range unions {
+		if f != nil && f.Var != nil && !seenU[f.Var] {
+			out = append(out, factVecEnt{Var: f.Var, IsUnion: true})
+			seenU[f.Var] = true
+		}
+	}
+	return out
+}
+
+// cloneFactVecOrder copies an order snapshot.
+func cloneFactVecOrder(order []factVecEnt) []factVecEnt {
+	if order == nil {
+		return nil
+	}
+	out := make([]factVecEnt, len(order))
+	copy(out, order)
+	return out
 }
 
 // factHasL233MayNull reports whether facts contain may-null for variable l_233.
@@ -167,6 +321,10 @@ func (fm *FactMgr) SetGlobalFacts(facts []*FactPointTo, tag string) {
 		}
 		fmt.Fprintln(os.Stderr)
 	}
+	// Do not bulk-note PT here: wholesale GlobalFacts replace (map restore / handover
+	// clone) would stamp PT-slice order onto an empty FactVecOrder and push all UW
+	// to the end (seed-123 silent-tab interleave). Chronology is only on true
+	// merge/renew push_back (noteFactVecPT/UW) or explicit seed from caller order.
 	fm.GlobalFacts = facts
 }
 
@@ -190,14 +348,24 @@ func (fm *FactMgr) SetMapFactsInPair(stmID int, facts []*FactPointTo, unionFacts
 		noteErrFM(fm, ErrGeneric)
 		return
 	}
+	// Env-gated: track map_in rewrites for n62 for(g_8) sid=1562 (no package state).
+	if os.Getenv("DIAG_GO_G8") != "" && stmID == 1562 {
+		fmt.Fprintf(os.Stderr, "GO_SET_MAPIN sid=%d nPT=%d nU=%d\n", stmID, len(facts), len(unionFacts))
+	}
 	if fm.MapFactsIn == nil {
 		fm.MapFactsIn = make(map[int][]*FactPointTo)
 	}
 	if fm.MapUnionFactsIn == nil {
 		fm.MapUnionFactsIn = make(map[int][]*FactUnion)
 	}
+	if fm.MapFactInOrder == nil {
+		fm.MapFactInOrder = make(map[int][]factVecEnt)
+	}
 	fm.MapFactsIn[stmID] = storeFactMapEntrySess(sessFromFM(fm), facts)
 	fm.MapUnionFactsIn[stmID] = storeUnionFactMapEntrySess(sessFromFM(fm), unionFacts)
+	if FactsComplete(facts) && UnionFactsComplete(unionFacts) {
+		fm.MapFactInOrder[stmID] = snapshotFactVecOrder(fm.FactVecOrder, facts, unionFacts)
+	}
 }
 
 // SetMapFactsOut records post-statement facts.
@@ -304,8 +472,14 @@ func (fm *FactMgr) SetMapFactsOutPair(stmID int, facts []*FactPointTo, unionFact
 	if fm.MapUnionFactsOut == nil {
 		fm.MapUnionFactsOut = make(map[int][]*FactUnion)
 	}
+	if fm.MapFactOutOrder == nil {
+		fm.MapFactOutOrder = make(map[int][]factVecEnt)
+	}
 	fm.MapFactsOut[stmID] = storeFactMapEntrySess(sessFromFM(fm), facts)
 	fm.MapUnionFactsOut[stmID] = storeUnionFactMapEntrySess(sessFromFM(fm), unionFacts)
+	if FactsComplete(facts) && UnionFactsComplete(unionFacts) {
+		fm.MapFactOutOrder[stmID] = snapshotFactVecOrder(fm.FactVecOrder, facts, unionFacts)
+	}
 }
 
 // storeFactMapEntry normalizes fact-map values so incomplete is not confused with
@@ -741,6 +915,22 @@ func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
+	// Function-local index (C++ Statement::parent). No package globals.
+	// Hit O(1). Miss: early-return walk fills index; after a clean full miss scan
+	// stmParentIdxComplete makes further absences O(1) (hang under --random-random
+	// was O(n) per missing/edge lookup). Incomplete get_blocks arm still sticky.
+	if f.stmParentIdx != nil {
+		if p, ok := f.stmParentIdx[stmID]; ok {
+			return p
+		}
+		if f.stmParentIdxComplete {
+			return nil
+		}
+	}
+	if f.stmParentIdx == nil {
+		f.stmParentIdx = make(map[int]*Block)
+	}
+	errBefore := sessHasError(s)
 	var walk func(b *Block) *Block
 	walk = func(b *Block) *Block {
 		if b == nil {
@@ -748,6 +938,9 @@ func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
 		}
 		for i := range b.Stmts {
 			st := &b.Stmts[i]
+			if !StmIDUnset(st.StmID) {
+				f.stmParentIdx[st.StmID] = b
+			}
 			if st.StmID == stmID {
 				return b
 			}
@@ -764,12 +957,16 @@ func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
 				if p := walk(nb); p != nil {
 					return p
 				}
+				// residual ERROR from nested walk sticky
+				if !errBefore && sessHasError(s) {
+					return nil
+				}
 			}
 		}
 		return nil
 	}
 	for _, b := range f.Blocks {
-		// Block* always live on Function.Blocks; nil hole sticky miss (no invent soft-success)
+		// Block* always live on Function.Blocks; nil hole sticky miss
 		if b == nil {
 			sessNoteError(s, ErrGeneric)
 			return nil
@@ -777,6 +974,13 @@ func FindParentBlockOfStmIDSess(s *Session, f *Function, stmID int) *Block {
 		if p := walk(b); p != nil {
 			return p
 		}
+		if !errBefore && sessHasError(s) {
+			return nil
+		}
+	}
+	// Clean exhaustive miss: whole tree indexed; further misses O(1).
+	if !sessHasError(s) || errBefore {
+		f.stmParentIdxComplete = true
 	}
 	return nil
 }
@@ -1489,16 +1693,34 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 	if fm.MapFactsOutFinal == nil {
 		fm.MapFactsOutFinal = make(map[int][]*FactPointTo)
 	}
+	if fm.MapUnionFactsInFinal == nil {
+		fm.MapUnionFactsInFinal = make(map[int][]*FactUnion)
+	}
+	if fm.MapUnionFactsOutFinal == nil {
+		fm.MapUnionFactsOutFinal = make(map[int][]*FactUnion)
+	}
+	if fm.MapFactInOrderFinal == nil {
+		fm.MapFactInOrderFinal = make(map[int][]factVecEnt)
+	}
+	if fm.MapFactOutOrderFinal == nil {
+		fm.MapFactOutOrderFinal = make(map[int][]factVecEnt)
+	}
 	// fail closed whole setup on residual: wipe finals (no invent partial complete clones
 	// under random map iteration order past a hard IR hole on another id)
 	failClosedWipe := func(badIn, badOut int) {
 		fm.MapFactsInFinal = make(map[int][]*FactPointTo)
 		fm.MapFactsOutFinal = make(map[int][]*FactPointTo)
+		fm.MapUnionFactsInFinal = make(map[int][]*FactUnion)
+		fm.MapUnionFactsOutFinal = make(map[int][]*FactUnion)
+		fm.MapFactInOrderFinal = make(map[int][]factVecEnt)
+		fm.MapFactOutOrderFinal = make(map[int][]factVecEnt)
 		if badIn != 0 {
 			fm.MapFactsInFinal[badIn] = IncompleteFactSlice()
+			fm.MapUnionFactsInFinal[badIn] = IncompleteUnionFactSlice()
 		}
 		if badOut != 0 {
 			fm.MapFactsOutFinal[badOut] = IncompleteFactSlice()
+			fm.MapUnionFactsOutFinal[badOut] = IncompleteUnionFactSlice()
 		}
 		noteErrFM(fm, ErrGeneric)
 	}
@@ -1518,19 +1740,51 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			}
 			fm.MapFactsOutFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts)
 		}
+		// eUnionWrite partition of map_facts_in/out_final (FactMgr.cpp full FactVec)
+		for id, facts := range fm.MapUnionFactsIn {
+			if !UnionFactsComplete(facts) {
+				failClosedWipe(id, 0)
+				return
+			}
+			fm.MapUnionFactsInFinal[id] = storeUnionFactMapEntrySess(sessFromFM(fm), facts)
+		}
+		for id, facts := range fm.MapUnionFactsOut {
+			if !UnionFactsComplete(facts) {
+				failClosedWipe(0, id)
+				return
+			}
+			fm.MapUnionFactsOutFinal[id] = storeUnionFactMapEntrySess(sessFromFM(fm), facts)
+		}
+		// FactVec order snapshots (first visit = final until combine)
+		for id, ord := range fm.MapFactInOrder {
+			fm.MapFactInOrderFinal[id] = cloneFactVecOrder(ord)
+		}
+		for id, ord := range fm.MapFactOutOrder {
+			fm.MapFactOutOrderFinal[id] = cloneFactVecOrder(ord)
+		}
 		return
 	}
-	// combine current maps into final
+	// combine current maps into final — Fact.cpp:225–236 combine_facts (join_visits).
+	// Soft invent used MergeFacts (merge_fact: new-first join) which rewrote pointee
+	// order to the later visit when both visits carried the same multi-set (seed-2
+	// --paranoid: func_49_rv &p_15||&g_99 vs UP &g_99||&p_15). C++ keeps first-visit
+	// order via old_fact->join_visits(new).
+	// FactMgr.cpp:224–242 iterates final keys only (not current-only stm ids).
 	// Fact* always live; incomplete maps or failed merge fail closed sticky
 	// (no invent partial join or bare-nil complete empty / soft-continue other ids)
-	for id, facts2 := range fm.MapFactsIn {
-		facts1 := fm.MapFactsInFinal[id]
+	for id, facts1 := range fm.MapFactsInFinal {
+		facts2, ok := fm.MapFactsIn[id]
+		if !ok {
+			// stm absent on this visit — keep prior final (C++ map[] default empty
+			// would join_visits nothing useful; missing key ≈ empty facts2)
+			continue
+		}
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
 			failClosedWipe(id, 0)
 			return
 		}
-		// MergeFacts clears *facts sticky on incomplete mid-join
-		_ = MergeFactsSess(sessFromFM(fm), &facts1, facts2)
+		// CombineFacts = join_visits (old first); not MergeFacts (new-first)
+		CombineFactsSess(sessFromFM(fm), &facts1, facts2)
 		if !FactsComplete(facts1) {
 			if !hasErrFM(fm) {
 				noteErrFM(fm, ErrGeneric)
@@ -1540,13 +1794,16 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 		}
 		fm.MapFactsInFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts1)
 	}
-	for id, facts2 := range fm.MapFactsOut {
-		facts1 := fm.MapFactsOutFinal[id]
+	for id, facts1 := range fm.MapFactsOutFinal {
+		facts2, ok := fm.MapFactsOut[id]
+		if !ok {
+			continue
+		}
 		if !FactsComplete(facts1) || !FactsComplete(facts2) {
 			failClosedWipe(0, id)
 			return
 		}
-		_ = MergeFactsSess(sessFromFM(fm), &facts1, facts2)
+		CombineFactsSess(sessFromFM(fm), &facts1, facts2)
 		if !FactsComplete(facts1) {
 			if !hasErrFM(fm) {
 				noteErrFM(fm, ErrGeneric)
@@ -1555,6 +1812,45 @@ func (fm *FactMgr) SetupInOutMaps(firstTime bool) {
 			return
 		}
 		fm.MapFactsOutFinal[id] = storeFactMapEntrySess(sessFromFM(fm), facts1)
+	}
+	// combine eUnionWrite finals (Fact::join_visits defaults to join for FactUnion)
+	for id, facts1 := range fm.MapUnionFactsInFinal {
+		facts2, ok := fm.MapUnionFactsIn[id]
+		if !ok {
+			continue
+		}
+		if !UnionFactsComplete(facts1) || !UnionFactsComplete(facts2) {
+			failClosedWipe(id, 0)
+			return
+		}
+		CombineUnionFactsSess(sessFromFM(fm), &facts1, facts2)
+		if !UnionFactsComplete(facts1) {
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
+			}
+			failClosedWipe(id, 0)
+			return
+		}
+		fm.MapUnionFactsInFinal[id] = storeUnionFactMapEntrySess(sessFromFM(fm), facts1)
+	}
+	for id, facts1 := range fm.MapUnionFactsOutFinal {
+		facts2, ok := fm.MapUnionFactsOut[id]
+		if !ok {
+			continue
+		}
+		if !UnionFactsComplete(facts1) || !UnionFactsComplete(facts2) {
+			failClosedWipe(0, id)
+			return
+		}
+		CombineUnionFactsSess(sessFromFM(fm), &facts1, facts2)
+		if !UnionFactsComplete(facts1) {
+			if !hasErrFM(fm) {
+				noteErrFM(fm, ErrGeneric)
+			}
+			failClosedWipe(0, id)
+			return
+		}
+		fm.MapUnionFactsOutFinal[id] = storeUnionFactMapEntrySess(sessFromFM(fm), facts1)
 	}
 }
 
@@ -1810,7 +2106,7 @@ func (fm *FactMgr) FindUpdatedFacts(stmID int) []*FactPointTo {
 	return updated
 }
 
-// FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts.
+// FindUpdatedFinalFacts mirrors FactMgr::find_updated_final_facts for ePointTo.
 // FactMgr.cpp:667–686 — final maps; always include rv facts.
 // Incomplete FactMgr/StmID sticky IncompleteFactSlice (not bare nil —
 // FactsComplete(nil)==true invents empty-update success / soft re-pick past holes).
@@ -1864,6 +2160,87 @@ func (fm *FactMgr) FindUpdatedFinalFacts(stmID int) []*FactPointTo {
 			updated = append(updated, f)
 		} else if hasErrFM(fm) {
 			return IncompleteFactSlice()
+		}
+	}
+	return updated
+}
+
+// GetMapUnionFactsInFinal returns eUnionWrite map_facts_in_final[stm].
+// Missing key is complete empty (not incomplete).
+func (fm *FactMgr) GetMapUnionFactsInFinal(stmID int) []*FactUnion {
+	if fm == nil || StmIDUnset(stmID) {
+		noteErrFM(fm, ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if fm.MapUnionFactsInFinal == nil {
+		return nil
+	}
+	if facts, ok := fm.MapUnionFactsInFinal[stmID]; ok {
+		return facts
+	}
+	return nil
+}
+
+// GetMapUnionFactsOutFinal returns eUnionWrite map_facts_out_final[stm].
+func (fm *FactMgr) GetMapUnionFactsOutFinal(stmID int) []*FactUnion {
+	if fm == nil || StmIDUnset(stmID) {
+		noteErrFM(fm, ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	if fm.MapUnionFactsOutFinal == nil {
+		return nil
+	}
+	if facts, ok := fm.MapUnionFactsOutFinal[stmID]; ok {
+		return facts
+	}
+	return nil
+}
+
+// FindUpdatedFinalUnionFacts is find_updated_final_facts for eUnionWrite.
+// FactMgr.cpp:667–686 — same rv-always / changed-vs-in rules on the union partition.
+func (fm *FactMgr) FindUpdatedFinalUnionFacts(stmID int) []*FactUnion {
+	if fm == nil || StmIDUnset(stmID) {
+		noteErrFM(fm, ErrGeneric)
+		return IncompleteUnionFactSlice()
+	}
+	in := fm.GetMapUnionFactsInFinal(stmID)
+	out := fm.GetMapUnionFactsOutFinal(stmID)
+	if !UnionFactsComplete(in) || !UnionFactsComplete(out) {
+		if !hasErrFM(fm) {
+			noteErrFM(fm, ErrGeneric)
+		}
+		return IncompleteUnionFactSlice()
+	}
+	var updated []*FactUnion
+	for _, f := range out {
+		if f == nil || f.Var == nil {
+			noteErrFM(fm, ErrGeneric)
+			return IncompleteUnionFactSlice()
+		}
+		if fm.Func != nil && fm.Func.RV != nil && fm.Func.RV.MatchSess(sessFromFM(fm), f.Var) {
+			if hasErrFM(fm) {
+				return IncompleteUnionFactSlice()
+			}
+			updated = append(updated, f)
+			continue
+		}
+		if hasErrFM(fm) {
+			return IncompleteUnionFactSlice()
+		}
+		prev := FindRelatedUnionSess(sessFromFM(fm), in, f.Var)
+		if hasErrFM(fm) {
+			return IncompleteUnionFactSlice()
+		}
+		if prev == nil {
+			continue
+		}
+		if !f.EqualSess(sessFromFM(fm), prev) {
+			if hasErrFM(fm) {
+				return IncompleteUnionFactSlice()
+			}
+			updated = append(updated, f)
+		} else if hasErrFM(fm) {
+			return IncompleteUnionFactSlice()
 		}
 	}
 	return updated
@@ -2179,6 +2556,36 @@ func (fm *FactMgr) SetMapStmEffect(stmID int, eff Effect) {
 	}
 	if fm.MapStmEffect == nil {
 		fm.MapStmEffect = make(map[int]Effect)
+	}
+	if os.Getenv("DIAG_GO_HANDOFF") != "" && !eff.incomplete {
+		// Detect pure-IV loss on rewrite (n94 func_1 map_stm drop after gen).
+		if old, ok := fm.MapStmEffect[stmID]; ok && EffectComplete(old) {
+			want := []string{"g_903.f3", "g_2087.f0", "g_408", "g_2486", "g_2615"}
+			had, has := false, false
+			for _, n := range want {
+				for _, v := range old.ReadVarsSess(sessFromFM(fm)) {
+					if v != nil && v.Name == n {
+						had = true
+						break
+					}
+				}
+				for _, v := range eff.ReadVarsSess(sessFromFM(fm)) {
+					if v != nil && v.Name == n {
+						has = true
+						break
+					}
+				}
+			}
+			if had && !has {
+				// caller file:line for rewrite site (+1 more frame)
+				_, file, line, _ := runtime.Caller(1)
+				_, file2, line2, _ := runtime.Caller(2)
+				_, file3, line3, _ := runtime.Caller(3)
+				fmt.Fprintf(os.Stderr, "GO_MAPSTM_LOST sid=%d oldNR=%d newNR=%d via=%s:%d <- %s:%d <- %s:%d\n",
+					stmID, len(old.ReadVarsSess(sessFromFM(fm))), len(eff.ReadVarsSess(sessFromFM(fm))),
+					filepath.Base(file), line, filepath.Base(file2), line2, filepath.Base(file3), line3)
+			}
+		}
 	}
 	if eff.incomplete {
 		fm.MapStmEffect[stmID] = IncompleteEffect()
@@ -3383,10 +3790,13 @@ func MergeUnionFactSess(s *Session, facts []*FactUnion, f *FactUnion) []*FactUni
 		if sessHasError(s) {
 			return IncompleteUnionFactSlice()
 		}
+
 		facts[i] = cp
 		return facts
 	}
 	// Fact.cpp:167–169 — not found: push_back(new_fact)
+
+	noteFactVecUW(s, f.Var)
 	return append(facts, f)
 }
 

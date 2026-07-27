@@ -368,6 +368,58 @@ func (f *FactUnion) OutputSess(s *Session) string {
 	return name + " last written field: " + strconv.Itoa(f.LastWrittenFID)
 }
 
+// OutputAssertion mirrors FactUnion::OutputAssertion — empty body.
+// FactUnion.h:97–98 — override is a no-op (never prints assert lines).
+// Callers still emit output_tab before the virtual call (FactMgr.cpp:643–645),
+// which leaves orphan indent before the next line (seed-3 `    }` after return).
+func (f *FactUnion) OutputAssertionSess(s *Session, stParent *Block, indent string) string {
+	_ = s
+	_ = stParent
+	_ = indent
+	if f == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	return ""
+}
+
+// CombineUnionFactsSess mirrors combine_facts for eUnionWrite (Fact.cpp:225–236).
+// Fact::join_visits defaults to join for FactUnion (Fact.h:69). Only updates
+// subjects already present in facts1; does not append facts2-only subjects.
+func CombineUnionFactsSess(s *Session, facts *[]*FactUnion, facts2 []*FactUnion) {
+	if facts == nil {
+		sessNoteError(s, ErrGeneric)
+		return
+	}
+	if !UnionFactsComplete(*facts) || !UnionFactsComplete(facts2) {
+		*facts = IncompleteUnionFactSlice()
+		sessNoteError(s, ErrGeneric)
+		return
+	}
+	for _, nf := range facts2 {
+		for i, old := range *facts {
+			if old.Var != nf.Var {
+				continue
+			}
+			cp := old.CloneSess(s)
+			if cp == nil || sessHasError(s) {
+				*facts = IncompleteUnionFactSlice()
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
+				}
+				return
+			}
+			_ = cp.JoinSess(s, nf)
+			if sessHasError(s) {
+				*facts = IncompleteUnionFactSlice()
+				return
+			}
+			(*facts)[i] = cp
+			break
+		}
+	}
+}
+
 // UnionFactsComplete reports FactUnion* maps have no nil holes.
 // Incomplete lists must not invent readable/related matches past a hole.
 // Note: UnionFactsComplete(nil)==true (complete empty). Fail-closed incomplete
@@ -464,6 +516,7 @@ func RenewUnionFactSess(s *Session, facts *[]*FactUnion, nf *FactUnion) bool {
 			return true
 		}
 	}
+	// Fact.cpp:185–188 — if not found, push_back(new_fact)
 	*facts = append(*facts, nf)
 	return true
 }

@@ -190,11 +190,8 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 	if sessHasError(s) {
 		return ""
 	}
-	// subject always live Output; sticky no invent " == 0" / " >= &" without lhs
-	if lhs == "" {
-		sessNoteError(s, ErrGeneric)
-		return ""
-	}
+	// lhs may be "" under --prefix-name (NDEBUG empty global identifiers);
+	// still emit assert ( == &...) to match golden, not soft invent Name.
 	var parts []string
 	for _, pointee := range f.PointTo {
 		// FactPointTo.cpp: point_to_vars[i] always live; sticky no invent skip nil holes
@@ -202,7 +199,16 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		if pointee.IsArray || (pointee.AsArray != nil) {
+		// FactPointTo.cpp:637 — pointee->isArray || pointee->is_array_field()
+		// Soft invent only checked IsArray/AsArray so struct fields of array
+		// members (g_206.f3) used bare "== &g_206.f3" instead of range form
+		// "(p >= &g_206[0].f3 && p <= &g_206[3].f3)" (seed-1764 --paranoid).
+		isArrField := pointee.IsArrayFieldSess(s)
+		// residual ERROR sticky — no invent soft-continue past IsArrayField residual
+		if sessHasError(s) {
+			return ""
+		}
+		if pointee.IsArray || pointee.AsArray != nil || isArrField {
 			// C++ isArray always ArrayVariable*; missing AsArray sticky
 			// (no invent bare-name bounds range form past broken array shell)
 			if pointee.IsArray && pointee.AsArray == nil {
@@ -237,14 +243,12 @@ func (f *FactPointTo) OutputConditionSess(s *Session) string {
 		case pointee == NullPtr:
 			rhs = "0"
 		default:
-			// pointee->Output always live name; sticky no invent bare "&"
-			nm := pointee.GetActualNameSess(s, false)
-			// residual ERROR sticky — no invent soft-empty & past GetActualName residual
+			// FactPointTo.cpp:655–656 — out << "&"; pointee->Output(out)
+			// Variable::Output applies ACCESS_ONCE / VOL_RVAL / bare name
+			// (not bare GetActualName). prefix_name may yield empty NDEBUG ids.
+			nm := pointee.OutputCSess(s, sessOpts(s).PrefixName)
+			// residual ERROR sticky — no invent soft-empty & past Output residual
 			if sessHasError(s) {
-				return ""
-			}
-			if nm == "" {
-				sessNoteError(s, ErrGeneric)
 				return ""
 			}
 			rhs = "&" + nm
@@ -260,32 +264,33 @@ func outputFactVarSess(s *Session, v *Variable) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := v.GetActualNameSess(s, false)
-	// residual ERROR sticky — no invent soft-empty fact-var past GetActualName residual
-	if sessHasError(s) {
-		return ""
-	}
-	// sticky no invent "[0]" indices without identifier
-	if name == "" {
-		sessNoteError(s, ErrGeneric)
-		return ""
-	}
-	// FactPointTo.cpp:612–621 — output_var: for array, [0] per get_dimension()
-	// no soft invent dim=1 when sizes empty
-	// C++ isArray always ArrayVariable*; missing AsArray sticky empty
-	// (no invent [0] indices from ArraySizes alone past broken shell)
-	if v.IsArray && v.AsArray == nil {
-		sessNoteError(s, ErrGeneric)
-		return ""
-	}
+	// FactPointTo.cpp:612–621 — output_var:
+	//   var->Output(out);  // Variable::Output or ArrayVariable::Output
+	//   if (isArray) append "[0]" per get_dimension()
+	// Variable::Output applies ACCESS_ONCE / VOL_RVAL (n91 paranoid asserts).
+	// ArrayVariable::Output is bare name (+ itemized indices); no ACCESS_ONCE.
+	// prefix_name may yield empty NDEBUG identifiers — do not invent Name.
 	if v.IsArray || v.AsArray != nil {
-		dim := 0
-		if v.AsArray != nil {
-			dim = len(v.AsArray.Sizes)
+		// C++ isArray always ArrayVariable*; missing AsArray sticky empty
+		if v.IsArray && v.AsArray == nil {
+			sessNoteError(s, ErrGeneric)
+			return ""
 		}
-		for i := 0; i < dim; i++ {
+		// ArrayVariable::Output via OutputAccess (collective bare / itemized indices)
+		name := v.AsArray.OutputAccessSess(s)
+		if sessHasError(s) {
+			return ""
+		}
+		// no soft invent dim=1 when sizes empty
+		for i := 0; i < len(v.AsArray.Sizes); i++ {
 			name += "[0]"
 		}
+		return name
+	}
+	// Variable::Output — ACCESS_ONCE when option && isAccessOnce && !isAddrTaken
+	name := v.OutputCSess(s, sessOpts(s).PrefixName)
+	if sessHasError(s) {
+		return ""
 	}
 	return name
 }
@@ -331,9 +336,15 @@ func (f *FactPointTo) OutputAssertionSess(s *Session, stParent *Block, indent st
 }
 
 // OutputAssertions mirrors FactMgr::output_assertions.
-// FactMgr.cpp:614–649 — post_condition uses updated final facts; filter unused globals.}
+// FactMgr.cpp:614–649 — post_condition uses updated final facts (ePointTo + eUnionWrite);
+// filter unused globals. Soft invent required a non-empty assert body before emitting
+// comments, and ignored eUnionWrite → missing `/* statement id */` + orphan indent when
+// only union/TOP facts updated (seed-3 return of union; C++ still output_tab then empty
+// FactUnion::OutputAssertion leaving `    }` on the block close).
+// Comments go through OutputCommentLine (OutputMgr.cpp:314–320): quiet/concise → blank
+// line only (flagcamp seed 183674… bare `/* statement id */` under --quiet).
 
-func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool) string {
+func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, postCondition bool, quiet, concise bool) string {
 	// FactMgr + Statement always live for assertion emit; sticky no invent section without them
 	if fm == nil || st == nil {
 		noteErrFM(fm, ErrGeneric)
@@ -345,80 +356,205 @@ func (fm *FactMgr) OutputAssertions(st *Stmt, stParent *Block, indent string, po
 		return ""
 	}
 	var facts []*FactPointTo
+	var unions []*FactUnion
 	if !postCondition {
 		facts = fm.GetMapFactsInFinal(st.StmID)
+		unions = fm.GetMapUnionFactsInFinal(st.StmID)
 	} else {
+		// FactMgr.cpp:618–620 — post_condition uses find_updated_final_facts only
+		// (map_facts_*_final). Soft invent fall back to non-final FindUpdatedFacts
+		// re-emitted mid-visit lattice diffs golden omits (seed-2 --paranoid
+		// --binary-constant: extra "facts after for" //assert p_89||l_1803 when
+		// final updated empty but live maps still showed a change).
 		facts = fm.FindUpdatedFinalFacts(st.StmID)
-		// fall back to non-final updated if final empty (complete empty only)
-		if FactsComplete(facts) && len(facts) == 0 {
-			facts = fm.FindUpdatedFacts(st.StmID)
-		}
+		unions = fm.FindUpdatedFinalUnionFacts(st.StmID)
 	}
 	// incomplete maps fail closed sticky (no invent empty assertion block / soft re-pick)
-	if !FactsComplete(facts) {
+	if !FactsComplete(facts) || !UnionFactsComplete(unions) {
 		if !hasErrFM(fm) {
 			noteErrFM(fm, ErrGeneric)
 		}
 		return ""
 	}
-	if len(facts) == 0 {
+	// FactMgr.cpp:622–623 — if (facts.empty()) return; full FactVec empty
+	if len(facts) == 0 && len(unions) == 0 {
 		return ""
 	}
-	// emit assertions first; no invent comment-only shell when all facts filtered
+	// FactMgr.cpp:625–635 — comments first whenever facts non-empty (even if all
+	// OutputAssertion are silent / filtered later). C++: output_tab + output_comment_line.
+	var b strings.Builder
+	emitComment := func(text string) {
+		// FactMgr.cpp:627–635 — indent then comment line (quiet → indent + "\n")
+		b.WriteString(indent)
+		b.WriteString(OutputCommentLineSess(sessFromFM(fm), text, quiet, concise))
+	}
+	switch st.Kind {
+	case StmtFor:
+		emitComment("facts after for loop")
+	case StmtIfElse:
+		emitComment("facts after branching")
+	case StmtAssign, StmtInvoke, StmtReturn:
+		emitComment("statement id: " + itoa(st.StmID))
+	}
 	eff := EmptyEffect()
 	if fm.Func != nil {
 		eff = fm.Func.FEffect
 	}
-	var body strings.Builder
-	for _, f := range facts {
-		// Fact* always live in fact maps; nil hole sticky (no invent skip holes)
+	// skip unused global (FactMgr.cpp:637–642) then output_tab + OutputAssertion
+	emitPT := func(f *FactPointTo) bool {
 		if f == nil || f.Var == nil {
 			noteErrFM(fm, ErrGeneric)
-			return ""
+			return false
 		}
-		// skip globals neither read nor written in this function
 		isG := f.Var.IsGlobalSess(sessFromFM(fm))
-		// residual ERROR sticky — no invent soft-skip then partial assert emit past IsGlobal residual
 		if hasErrFM(fm) {
-			return ""
+			return false
 		}
 		if isG {
 			rd := eff.IsReadSess(sessFromFM(fm), f.Var)
-			// residual ERROR sticky — no invent soft-skip assert past IsRead residual
 			if hasErrFM(fm) {
-				return ""
+				return false
 			}
 			wr := eff.IsWrittenSess(sessFromFM(fm), f.Var)
-			// residual ERROR sticky — no invent soft-skip assert past IsWritten residual
 			if hasErrFM(fm) {
-				return ""
+				return false
 			}
 			if !rd && !wr {
-				continue
+				return true // soft skip
 			}
 		}
-		// IsTop / empty OutputAssertion intentionally silent; non-nil fact still live
-		body.WriteString(f.OutputAssertionSess(sessFromFM(fm), stParent, indent))
-		// residual ERROR sticky — no invent partial assertion section past hard IR hole
+		// FactMgr.cpp:643–645 — output_tab then OutputAssertion
+		isTop := f.IsTopSess(sessFromFM(fm))
 		if hasErrFM(fm) {
+			return false
+		}
+		if isTop {
+			// empty OutputAssertion but tab already printed → orphan indent (no newline)
+			b.WriteString(indent)
+			return true
+		}
+		b.WriteString(f.OutputAssertionSess(sessFromFM(fm), stParent, indent))
+		return !hasErrFM(fm)
+	}
+	emitUnion := func(f *FactUnion) bool {
+		if f == nil || f.Var == nil {
+			noteErrFM(fm, ErrGeneric)
+			return false
+		}
+		isG := f.Var.IsGlobalSess(sessFromFM(fm))
+		if hasErrFM(fm) {
+			return false
+		}
+		if isG {
+			rd := eff.IsReadSess(sessFromFM(fm), f.Var)
+			if hasErrFM(fm) {
+				return false
+			}
+			wr := eff.IsWrittenSess(sessFromFM(fm), f.Var)
+			if hasErrFM(fm) {
+				return false
+			}
+			if !rd && !wr {
+				return true
+			}
+		}
+		// FactUnion::OutputAssertion is empty (FactUnion.h:97–98); still output_tab
+		b.WriteString(indent)
+		_ = f.OutputAssertionSess(sessFromFM(fm), stParent, indent)
+		return !hasErrFM(fm)
+	}
+	// FactMgr.cpp:636–648 — walk updated facts in FactVec relative order.
+	// PT subjects stay in FindUpdated map order (seed-2 pointee-assert order).
+	// eUnionWrite silent output_tabs interleave by gensym key so a UW subject
+	// sorts just before the next PT with a higher key (seed-123 g_135/g_169).
+	// Soft invent pure FactVecOrder was PT-clustered then UW (func_1 stm-1299
+	// orphans glued onto return); pure gensym put func_*_rv (key from N in
+	// func_N_rv) before g_* asserts (crest+paranoid seed-1 double-indent).
+	// *_rv return-var UW uses a high sort key so it trails body g_* subjects
+	// (C++ FactVec: rv abstract often late among updated finals).
+	type uwItem struct {
+		f   *FactUnion
+		key int
+	}
+	uws := make([]uwItem, 0, len(unions))
+	for _, f := range unions {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		uws = append(uws, uwItem{f: f, key: factEmitSortKey(f.Var.Name)})
+	}
+	for i := 1; i < len(uws); i++ {
+		j := i
+		for j > 0 && uws[j].key < uws[j-1].key {
+			uws[j], uws[j-1] = uws[j-1], uws[j]
+			j--
+		}
+	}
+	ui := 0
+	emitPendingUW := func(beforeKey int) bool {
+		for ui < len(uws) && uws[ui].key < beforeKey {
+			if !emitUnion(uws[ui].f) {
+				return false
+			}
+			ui++
+		}
+		return true
+	}
+	for _, f := range facts {
+		if f == nil || f.Var == nil {
+			continue
+		}
+		if !emitPendingUW(factEmitSortKey(f.Var.Name)) {
+			return ""
+		}
+		if !emitPT(f) {
 			return ""
 		}
 	}
-	if body.Len() == 0 {
-		return ""
+	for ui < len(uws) {
+		if !emitUnion(uws[ui].f) {
+			return ""
+		}
+		ui++
 	}
-	var b strings.Builder
-	// comments for compound / simple (FactMgr.cpp:625–635)
-	switch st.Kind {
-	case StmtFor:
-		b.WriteString(indent + "/* facts after for loop */\n")
-	case StmtIfElse:
-		b.WriteString(indent + "/* facts after branching */\n")
-	case StmtAssign, StmtInvoke, StmtReturn:
-		b.WriteString(indent + "/* statement id: " + itoa(st.StmID) + " */\n")
-	}
-	b.WriteString(body.String())
 	return b.String()
+}
+
+// factEmitSortKey approximates C++ FactVec first-append chronology via gensym
+// digits (g_169 → 169). Return-var names func_N_rv sort late (1<<29+N) so
+// silent UW tabs trail g_* asserts (not before them via N alone).
+func factEmitSortKey(name string) int {
+	// func_*_rv / *_rv — high key (C++ rv facts often late in updated finals)
+	if strings.HasSuffix(name, "_rv") {
+		n := 0
+		in := false
+		for i := 0; i < len(name); i++ {
+			c := name[i]
+			if c >= '0' && c <= '9' {
+				n = n*10 + int(c-'0')
+				in = true
+			} else if in {
+				break
+			}
+		}
+		return (1 << 29) + n
+	}
+	key := 1 << 30
+	n := 0
+	in := false
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if c >= '0' && c <= '9' {
+			n = n*10 + int(c-'0')
+			in = true
+		} else if in {
+			return n
+		}
+	}
+	if in {
+		return n
+	}
+	return key
 }
 
 // PreOutput mirrors Statement::pre_output.
@@ -516,7 +652,8 @@ func PreOutputSess(s *Session, st *Stmt, fm *FactMgr, emitStepHash, emitLabelAtt
 
 // PostOutput mirrors Statement::post_output.
 // Statement.cpp:919–924 — paranoid assertions after non-block statements.
-func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, indent string) string {
+// quiet suppresses comment text (OutputMgr::output_comment_line) but not asserts.
+func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, quiet, concise bool, indent string) string {
 	// options off: soft empty (no assert section invented when not requested)
 	if !paranoid || concise {
 		return ""
@@ -529,7 +666,7 @@ func PostOutput(st *Stmt, stParent *Block, fm *FactMgr, paranoid, concise bool, 
 	if st.Kind == StmtBlock {
 		return ""
 	}
-	out := fm.OutputAssertions(st, stParent, indent, true)
+	out := fm.OutputAssertions(st, stParent, indent, true, quiet, concise)
 	// residual ERROR sticky — no invent soft-empty post past OutputAssertions residual
 	if hasErrFM(fm) {
 		return ""

@@ -1371,6 +1371,8 @@ func MergeFactIntoSess(s *Session, facts []*FactPointTo, f *FactPointTo) []*Fact
 		}
 		return IncompleteFactSlice()
 	}
+	// Fact.cpp:167–169 push_back new subject — record FactVec chronology
+	noteFactVecPT(s, f.Var)
 	return append(facts, cl)
 }
 
@@ -2249,9 +2251,46 @@ func CopyFactsSess(s *Session, facts []*FactPointTo) []*FactPointTo {
 }
 
 // CombineFactsSess mirrors combine_facts — join_visits across revisits.
-// Fact.cpp:225–235. Alias for JoinVisitsInto.
+// Fact.cpp:225–236 — only updates subjects already present in facts1; does not
+// append facts2-only subjects. Soft invent aliased JoinVisitsInto (append on miss)
+// which is not combine_facts.
+// Order: old_fact->join_visits(new) keeps first-visit pointee order (vs merge_fact
+// which clones new then joins old → later-visit order).
+// Incomplete maps fail closed sticky IncompleteFactSlice (no invent partial join).
 func CombineFactsSess(s *Session, facts *[]*FactPointTo, facts2 []*FactPointTo) {
-	_ = JoinVisitsIntoSess(s, facts, facts2)
+	if facts == nil {
+		sessNoteError(s, ErrGeneric)
+		return
+	}
+	if !FactsComplete(*facts) || !FactsComplete(facts2) {
+		*facts = IncompleteFactSlice()
+		sessNoteError(s, ErrGeneric)
+		return
+	}
+	for _, nf := range facts2 {
+		// Fact* always live after FactsComplete
+		for i, old := range *facts {
+			if old.Var != nf.Var {
+				continue
+			}
+			// Fact.cpp:230–232 — mutate old in place via join_visits
+			cp := old.CloneSess(s)
+			if cp == nil || sessHasError(s) {
+				*facts = IncompleteFactSlice()
+				if !sessHasError(s) {
+					sessNoteError(s, ErrGeneric)
+				}
+				return
+			}
+			_ = cp.JoinVisitsSess(s, nf)
+			if sessHasError(s) {
+				*facts = IncompleteFactSlice()
+				return
+			}
+			(*facts)[i] = cp
+			break
+		}
+	}
 }
 
 // PrintFacts mirrors print_facts — concatenate OutputAssertion lines.
