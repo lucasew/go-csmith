@@ -215,7 +215,7 @@ func TestDefaultRndKind(t *testing.T) {
 }
 
 func TestDefaultGetPrefixedNameIdentity(t *testing.T) {
-	// DefaultRndNumGenerator.cpp:105–107 — returns name unchanged
+	// DefaultRndNumGenerator.cpp:105–107 — returns name unchanged (sequence_name_prefix path)
 	if got := GetPrefixedNameDefault("g_42"); got != "g_42" {
 		t.Fatalf("get_prefixed_name: got %q", got)
 	}
@@ -223,9 +223,9 @@ func TestDefaultGetPrefixedNameIdentity(t *testing.T) {
 	if got := GetPrefixedName("g_42", false); got != "g_42" {
 		t.Fatalf("prefix off: got %q", got)
 	}
-	// prefix on + default RNG still identity
-	if got := GetPrefixedName("g_42", true); got != "g_42" {
-		t.Fatalf("prefix on default: got %q", got)
+	// prefix on without bag: !sequence_name_prefix → Default get_count_prefix → "" (NDEBUG)
+	if got := GetPrefixedName("g_42", true); got != "" {
+		t.Fatalf("prefix on bag-less Default count-prefix: got %q want empty", got)
 	}
 }
 

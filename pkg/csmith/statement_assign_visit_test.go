@@ -454,3 +454,4 @@ func TestVisitFactsStatementAssignRHSEffectStmFresh(t *testing.T) {
 		t.Fatalf("visit must succeed with fresh rhs EffectStm; err=%v", GetErrorSess(testAmbientSession))
 	}
 }
+

@@ -2,6 +2,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+)
+
 // VisitFactsStmt dispatches Statement::visit_facts by kind.
 // Statement subclasses — assign/if/for/block/return/jump/expr.
 // Incomplete IR fails closed sticky (no soft invent true / soft re-pick past holes).
@@ -617,6 +622,9 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 		noteErrCG(cg, ErrGeneric)
 		return false
 	}
+	if os.Getenv("DIAG_GO_IV") != "" && st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.Name == os.Getenv("DIAG_GO_IV") {
+		fmt.Fprintf(os.Stderr, "GO_VISIT_FOR_ENTER sid=%d\n", st.StmID)
+	}
 	// StatementFor.cpp:430+ — always has init StatementAssign, body Block, IV sticky
 	if st.Loop == nil || st.Loop.IV == nil || st.Then == nil {
 		noteErrCG(cg, ErrGeneric)
@@ -805,6 +813,11 @@ func VisitFactsStatementFor(st *Stmt, cg *CGContext, opts Options) bool {
 			noteErrCG(cg, ErrGeneric)
 		}
 		return false
+	}
+	if os.Getenv("DIAG_GO_IV") != "" && st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.Name == os.Getenv("DIAG_GO_IV") {
+		ms := cg.FM.GetMapStmEffect(st.StmID)
+		fmt.Fprintf(os.Stderr, "GO_VISIT_FOR sid=%d iv=%s mapReadsIV=%v nMapR=%d\n",
+			st.StmID, st.Loop.IV.Name, ms.IsReadSess(sessFromCG(cg), st.Loop.IV), len(ms.ReadVarsSess(sessFromCG(cg))))
 	}
 	return true
 }

@@ -299,6 +299,8 @@ func RenewFactSess(s *Session, facts *[]*FactPointTo, nf *FactPointTo) bool {
 		(*facts)[i] = nf
 		return true
 	}
+	// Fact.cpp:185–187 push_back when not found
+	noteFactVecPT(s, nf.Var)
 	*facts = append(*facts, nf)
 	return true
 }
@@ -696,7 +698,10 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 	bodyCG := cg.CloneSubcontext()
 	bodyCG.CurrentFunc = f
 	bodyCG.FM = fm
+	prevActive := sessFromCG(cg).ActiveFM
+	sessFromCG(cg).ActiveFM = fm
 	ok := VisitFactsBlock(f.Body, &bodyCG, opts)
+	sessFromCG(cg).ActiveFM = prevActive
 	if !ok {
 		// policy / body visit fail — restore maps; analysis fail is soft (C++ log_analysis_fail
 		// returns false without leaving permanent Error for caller generation). Sticky
@@ -734,6 +739,10 @@ func RevisitUserInvocation(fi *Invocation, facts *[]*FactPointTo, cg *CGContext,
 		}
 		return false
 	}
+	// map_stm_effect[body] after visit (FunctionInvocationUser.cpp:336). Pure-IV
+	// globals lost by full-walk fors are restored at the caller assign map_stm
+	// rewrite (VisitFactsStatementAssign) when EffectAccum still holds them —
+	// not here: re-adding into caller EffectAccum mid-gen broke n62 body stream.
 	cg.AddEffect(bodyEff, false)
 	// residual ERROR sticky — no invent soft-continue ret-facts past AddEffect residual
 	if hasErrCG(cg) {

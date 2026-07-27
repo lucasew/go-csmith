@@ -402,3 +402,22 @@ func TestMakeExpressionCommaNilLHSType(t *testing.T) {
 		t.Fatal("sides")
 	}
 }
+
+func TestGenerateBodyBuiltinAppendReturn(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	opts := Defaults()
+	f := &Function{
+		Name:       "__builtin_clz",
+		ReturnType: GetIntTypeSess(testAmbientSession),
+		IsBuiltin:  true,
+		RV:         CreateVariableQferSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})),
+	}
+	_ = f.ensurePairedFactMgrSess(testAmbientSession)
+	f.GenerateBody(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), NewVariableSelector(testAmbientSession, opts), NewExprTablesSess(testAmbientSession, opts), NewStatementThresholdTableSess(testAmbientSession, opts), EmptyCGContext().WithSession(testAmbientSession))
+	if f.Body == nil || f.BuildState != BuildBuilt {
+		t.Fatalf("body/built err=%v", HasErrorSess(testAmbientSession))
+	}
+	if len(f.Body.Stmts) == 0 || f.Body.Stmts[0].Kind != StmtReturn {
+		t.Fatalf("want append_return, got %#v out=%s", f.Body.Stmts, f.Body.OutputSess(testAmbientSession, 0))
+	}
+}

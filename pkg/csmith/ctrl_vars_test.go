@@ -140,6 +140,8 @@ func TestOutputArrayInitializersCtrlDecl(t *testing.T) {
 	if !strings.Contains(out, "int i") {
 		t.Fatal(out)
 	}
+	// post_incr_operator false path covered by TestArrayOutputInitNoPostIncr +
+	// OutputArrayInitializers → OutputInitOptsSess(…, opts.PostIncrOperator).
 	// nil hole fails closed sticky (GetMaxArrayDimension + OutputArrayInitializers)
 	ClearErrorSess(testAmbientSession)
 	if GetMaxArrayDimensionSess(testAmbientSession, []*Variable{v, nil}) >= 0 {

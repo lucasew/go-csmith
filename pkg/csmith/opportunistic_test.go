@@ -133,7 +133,8 @@ func TestOpportunisticValidateUsesCollective(t *testing.T) {
 func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	opts.CompatibleCheck = true
+	// CompatibleChecker static only via EnableCompatibleCheckSess (DFS resolve path)
+	EnableCompatibleCheckSess(testAmbientSession)
 	// enabled + incomplete IR rejects sticky (no invent non-error)
 	if !CompatibleCheckExprVarSess(testAmbientSession, opts, nil, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
 		t.Fatal("nil var must reject when compatible-check on")
@@ -149,7 +150,7 @@ func TestCompatibleCheckNilHoleFailClosed(t *testing.T) {
 		t.Fatal("nil expr CompatibleCheck must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
-	opts.CompatibleCheck = false
+	ResetCompatibleCheckSess(testAmbientSession)
 	if CompatibleCheckExprVarSess(testAmbientSession, opts, nil, nil) {
 		t.Fatal("disabled must not reject")
 	}
@@ -202,23 +203,28 @@ func TestVariableCompatible(t *testing.T) {
 
 func TestCompatibleCheckerDisabled(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
+	ResetCompatibleCheckSess(testAmbientSession)
 	opts := Defaults()
 	a := CreateVariableScalarsSess(testAmbientSession, "g_a", GetIntTypeSess(testAmbientSession), false, false)
 	e := &Expression{Term: TermVariable, Var: a}
-	if CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
-		t.Fatal("disabled")
-	}
+	// CLI flag alone does not enable checker (random mode); only Session static
 	opts.CompatibleCheck = true
-	// CompatibleChecker.cpp:49 assert(0) — Variable* overload always rejects when enabled
-	if !CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
-		t.Fatal("enabled Variable* overload must fail closed reject")
+	if CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
+		t.Fatal("opts.CompatibleCheck alone must not enable checker without DFS Enable")
 	}
-	// unrelated var still rejected (assert(0), not invent compatible)
+	EnableCompatibleCheckSess(testAmbientSession)
+	// NDEBUG CompatibleChecker.cpp:49–52 — assert(0) elided → exp->compatible(v)
+	// same-var ExpressionVariable is compatible → reject assignment
+	if !CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
+		t.Fatal("enabled same-var ExpressionVariable must reject (compatible)")
+	}
+	// unrelated var: Variable::compatible false without expand_struct → do not reject
 	b := CreateVariableScalarsSess(testAmbientSession, "g_b", GetIntTypeSess(testAmbientSession), false, false)
 	eb := &Expression{Term: TermVariable, Var: b}
-	if !CompatibleCheckExprVarSess(testAmbientSession, opts, a, eb) {
-		t.Fatal("enabled Variable* overload always rejects")
+	if CompatibleCheckExprVarSess(testAmbientSession, opts, a, eb) {
+		t.Fatal("enabled unrelated vars without expand_struct must not reject")
 	}
+	ResetCompatibleCheckSess(testAmbientSession)
 }
 
 func TestHasDereferenceableVar(t *testing.T) {
@@ -450,12 +456,14 @@ func TestEnableCompatibleCheckProcess(t *testing.T) {
 	defer ResetCompatibleCheckSess(testAmbientSession)
 	opts := Defaults()
 	opts.CompatibleCheck = false
-	if CompatibleCheckExprVarSess(testAmbientSession, opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
+	a := CreateVariableScalarsSess(testAmbientSession, "g_en", GetIntTypeSess(testAmbientSession), false, false)
+	e := &Expression{Term: TermVariable, Var: a}
+	if CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
 		t.Fatal("disabled must be false")
 	}
 	EnableCompatibleCheckSess(testAmbientSession)
-	// process static on even when opts.CompatibleCheck false
-	if !CompatibleCheckExprVarSess(testAmbientSession, opts, &Variable{}, &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 0)}) {
-		t.Fatal("EnableCompatibleCheck must activate checker")
+	// Session static on even when opts.CompatibleCheck false; NDEBUG → exp.compatible(v)
+	if !CompatibleCheckExprVarSess(testAmbientSession, opts, a, e) {
+		t.Fatal("EnableCompatibleCheck must activate checker (same-var reject)")
 	}
 }
