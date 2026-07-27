@@ -89,3 +89,36 @@ func TestForSafeIncrEmit(t *testing.T) {
 		t.Log("no safe_ in for sample", out)
 	}
 }
+
+func TestHashOutputAccessOnceWrap(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	opts := Defaults()
+	opts.AccessOnce = true
+	v := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
+	if v == nil {
+		t.Fatal("create")
+	}
+	v.IsAccessOnce = true
+	out := v.hashOutputOptsSess(testAmbientSession, nil, nil, opts)
+	if !strings.Contains(out, "ACCESS_ONCE(g_x)") {
+		t.Fatalf("hash must wrap ACCESS_ONCE: %q", out)
+	}
+	if !strings.Contains(out, `transparent_crc(ACCESS_ONCE(g_x), "g_x"`) {
+		t.Fatalf("crc form: %q", out)
+	}
+	opts.ComputeHash = false
+	sink := v.hashOutputOptsSess(testAmbientSession, nil, nil, opts)
+	if !strings.Contains(sink, "csmith_sink_ = ACCESS_ONCE(g_x);") {
+		t.Fatalf("sink form: %q", sink)
+	}
+	// addr-taken disables wrap
+	v.IsAddrTaken = true
+	out2 := v.hashOutputOptsSess(testAmbientSession, nil, nil, Defaults())
+	// AccessOnce option still on defaults false — set opts.AccessOnce but addr taken
+	opts.AccessOnce = true
+	opts.ComputeHash = true
+	out2 = v.hashOutputOptsSess(testAmbientSession, nil, nil, opts)
+	if strings.Contains(out2, "ACCESS_ONCE") {
+		t.Fatalf("isAddrTaken must disable ACCESS_ONCE: %q", out2)
+	}
+}

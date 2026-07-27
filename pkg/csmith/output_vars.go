@@ -42,7 +42,9 @@ func OutputVariableListSess(s *Session, vars []*Variable, indent string, forceSt
 			}
 			def = v.AsArray.OutputDefSess(s, opts)
 		} else {
-			def = v.OutputDefFullSess(s, forceStatic, false, false, nil)
+			// Variable.cpp:649–660 — always var_attr_generator.Output (empty when flag off).
+			// Locals and globals both get attrs when VariableAttributes is on.
+			def = v.OutputDefFullSess(s, forceStatic, opts.PrefixName, opts.VariableAttributes, s.Rng)
 		}
 		// residual ERROR sticky — no invent soft-continue later vars past OutputDef residual
 		if sessHasError(s) {

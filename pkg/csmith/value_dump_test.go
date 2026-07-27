@@ -14,6 +14,22 @@ func TestOutputValueDumpSimple(t *testing.T) {
 	}
 }
 
+// Variable.cpp:1173–1203 has no ePointer branch — pointer globals omit dump lines.
+func TestOutputValueDumpPointerEmitsNothing(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	pt := PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession))
+	v := CreateVariableQferSess(testAmbientSession, "g_p", pt, NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	if v == nil {
+		t.Fatal("create ptr")
+	}
+	if out := v.OutputValueDumpSess(testAmbientSession, "checksum ", 1, nil); out != "" {
+		t.Fatalf("pointer dump must be empty (no invent 0x%%0x), got %q", out)
+	}
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("pointer dump empty is complete, not sticky")
+	}
+}
+
 func TestOutputValueDumpNilFieldHoleFailClosed(t *testing.T) {
 	// Variable* always live in FieldVars sticky; soft invent skip would dump later fields
 	ClearErrorSess(testAmbientSession)
@@ -137,7 +153,7 @@ func TestOutputValueDumpTypeNilSticky(t *testing.T) {
 	}
 	// Type-nil OutputValueDump must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
-	if outputValueDumpArraySess(testAmbientSession, &Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil) != "" {
+	if outputValueDumpArraySess(testAmbientSession, &Variable{Name: "g_a", IsArray: true, ArraySizes: []int{2}}, "c ", 0, nil, false) != "" {
 		t.Fatal("Type-nil outputValueDumpArray must fail closed empty")
 	}
 	// Type-nil outputValueDumpArray must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
@@ -246,5 +262,38 @@ func TestOutputMainNoInventWithoutFirstInvoke(t *testing.T) {
 	g.Rng = nil
 	if out := g.OutputMain(); out != "" {
 		t.Fatal("nil RNG first invoke must fail closed main", out)
+	}
+}
+
+// TestOutputValueDumpPrefixName — Variable.cpp to_string → get_actual_name under
+// prefix_name (NDEBUG empty); still emit printf lines (flagcamp seed 108379…).
+func TestOutputValueDumpPrefixName(t *testing.T) {
+	// GetPrefixedNameSess needs ProgramGen (assert instance); NDEBUG Default → "".
+	s := NewSession(Defaults())
+	s.ProgramGen = NewProgramGenerator(s)
+	s.Opts.PrefixName = true
+	// Internal Name keeps g_1; emit uses get_actual_name → empty under prefix_name.
+	v := &Variable{Name: "g_1", Type: GetIntTypeSess(s)}
+	out := v.OutputValueDumpOptsSess(s, "checksum ", 1, nil, true)
+	if out == "" {
+		t.Fatal("prefix_name empty name must still emit dump line")
+	}
+	// util.cpp:157–160 — empty str_value omits ", value"
+	if !strings.Contains(out, `printf("checksum  = `) || !strings.Contains(out, `\n");`) {
+		t.Fatalf("want empty-name dump without value arg, got %q", out)
+	}
+	if strings.Contains(out, "g_1") || strings.Contains(out, ", );") {
+		t.Fatalf("prefix_name must empty identifier / no empty arg, got %q", out)
+	}
+	// array expand (g_ prefix → is_global for get_actual_name)
+	av := &ArrayVariable{Variable: Variable{Name: "g_a", Type: GetIntTypeSess(s), IsArray: true}, Sizes: []int{2}}
+	av.Variable.AsArray = av
+	av.Variable.ArraySizes = []int{2}
+	out = av.Variable.OutputValueDumpOptsSess(s, "checksum ", 1, nil, true)
+	if !strings.Contains(out, "checksum [0]") || !strings.Contains(out, "checksum [1]") {
+		t.Fatalf("array expand under prefix_name: %q", out)
+	}
+	if strings.Contains(out, "g_a") {
+		t.Fatalf("array base must empty under prefix_name: %q", out)
 	}
 }

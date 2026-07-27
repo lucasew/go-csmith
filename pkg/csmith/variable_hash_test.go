@@ -177,6 +177,7 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 		t.Fatal("complete BOTTOM facts must not sticky", GetErrorSess(testAmbientSession))
 	}
 	// without facts (nil) still has type leaves → would hash both fields
+	// Defaults ComputeHash=true → transparent_crc leaves.
 	all := hashArrayVariableSess(testAmbientSession, &av.Variable, nil, nil)
 	if !strings.Contains(all, "for (i = 0") || !strings.Contains(all, "g_336[i].f0") {
 		t.Fatal("nil facts must hash all leaves", all)
@@ -189,6 +190,18 @@ func TestHashArrayUnionAllUnreadableSkipsLoops(t *testing.T) {
 	}
 	if !strings.Contains(part, "for (i = 0") {
 		t.Fatal("readable payload must still emit loops", part)
+	}
+	// !compute_hash + union array: open loops when any field readable, but no sink body
+	// (ArrayVariable.cpp:791–798 only sinks eSimple elements).
+	optsNoCRC := Defaults()
+	optsNoCRC.ComputeHash = false
+	SetProcessOptionsSess(testAmbientSession, optsNoCRC)
+	noCRC := hashArrayVariableOptsSess(testAmbientSession, &av.Variable, nil, f0, optsNoCRC)
+	if !strings.Contains(noCRC, "for (i = 0") {
+		t.Fatal("readable union array still opens loops under !compute_hash", noCRC)
+	}
+	if strings.Contains(noCRC, "csmith_sink_") {
+		t.Fatal("!compute_hash must not sink union subfields", noCRC)
 	}
 	ClearErrorSess(testAmbientSession)
 	CtrlVarsDoFinalizationSess(testAmbientSession)

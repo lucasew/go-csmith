@@ -45,9 +45,10 @@ type Variable struct {
 }
 
 // GetActualName mirrors Variable::get_actual_name.
-// Variable.cpp:678–686 — globals may get_prefixed_name; default RNG returns name as-is.
-// Variable always has live name for emit; empty Name sticky (no invent empty
-// identifier soft-skip past incomplete name shell; callers previously sticky only).
+// Variable.cpp:678–686 — globals go through get_prefixed_name (random.cpp:44–54).
+// Variable always has live internal Name; empty Name sticky (incomplete shell).
+// With prefix_name and !sequence_name_prefix, Default get_count_prefix yields ""
+// (NDEBUG: empty identifier emitted; see GetPrefixedNameSess).
 
 func (v *Variable) GetActualNameSess(s *Session, prefixName bool) string {
 	// Variable* always live for name emit; sticky no invent empty identifier
@@ -64,7 +65,7 @@ func (v *Variable) GetActualNameSess(s *Session, prefixName bool) string {
 		if sessHasError(s) {
 			return ""
 		}
-		return GetPrefixedName(v.Name, prefixName)
+		return GetPrefixedNameSess(s, v.Name, prefixName)
 	}
 	// residual ERROR sticky — no invent soft-bare name past IsGlobal residual false
 	if sessHasError(s) {
@@ -73,15 +74,53 @@ func (v *Variable) GetActualNameSess(s *Session, prefixName bool) string {
 	return v.Name
 }
 
-// GetPrefixedName mirrors get_prefixed_name (random.cpp:44–54).
-// DefaultRndNumGenerator returns name unchanged when prefix is on (DefaultRndNumGenerator.cpp:105–106).}
-
+// GetPrefixedName is the bag-less convenience for tests (prefix off → identity;
+// prefix on without session bag → Default count-prefix empty, matching NDEBUG
+// DefaultProgramGenerator::get_count_prefix when !sequence_name_prefix).
+// Prefer GetPrefixedNameSess for emit (random.cpp:44–54 full wiring).
 func GetPrefixedName(name string, prefixName bool) string {
 	if !prefixName {
 		return name
 	}
-	// sequence_name_prefix / DFS count prefix not used in default random mode
-	return name
+	// No bag: cannot reach DFS RandomNumber path; Default count-prefix is "".
+	return ""
+}
+
+// GetPrefixedNameSess mirrors get_prefixed_name (random.cpp:44–54):
+//
+//	if !prefix_name → name
+//	if !sequence_name_prefix → AbsProgramGenerator::get_count_prefix(name)
+//	  DefaultProgramGenerator.cpp:62–65 assert(0); return ""  (NDEBUG: empty)
+//	  DFSProgramGenerator.cpp:65–68 "p_" + good_count_ + "_" + name
+//	else → RandomNumber::get_prefixed_name (Default identity / DFS sequence prefix)
+//
+// sequence_name_prefix is CLI-valid only with dfs-exhaustive (options Validate).
+func GetPrefixedNameSess(s *Session, name string, prefixName bool) string {
+	if !prefixName {
+		return name
+	}
+	opts := sessOpts(s)
+	if !opts.SequenceNamePrefix {
+		// random.cpp:48–50 — AbsProgramGenerator::GetInstance()->get_count_prefix
+		if s == nil || s.ProgramGen == nil {
+			// assert(instance) — sticky empty
+			sessNoteError(s, ErrGeneric)
+			return ""
+		}
+		// Default: assert(0);return "" under NDEBUG → empty without process abort.
+		// Do not route through GetCountPrefix sticky ERROR (that would abort Generate);
+		// bodyparity golden is release-style empty identifiers.
+		if s.ProgramGen.OutputKind != OutputMgrKindDFS {
+			return ""
+		}
+		return s.ProgramGen.GetCountPrefix(name)
+	}
+	// sequence_name_prefix → RandomNumber::get_prefixed_name
+	if s == nil || s.RandomNumber == nil {
+		sessNoteError(s, ErrGeneric)
+		return name
+	}
+	return s.RandomNumber.GetPrefixedNameSess(s, name)
 }
 
 // OutputDeclSess mirrors Variable::OutputDecl — static? + qualified type + name
@@ -113,8 +152,10 @@ func (v *Variable) OutputDeclWithSess(s *Session, forceStatic, prefixName bool, 
 	if sessHasError(s) {
 		return ""
 	}
-	// name always live; sticky no invent "int " without identifier
-	if name == "" {
+	// name may be empty when prefix_name + !sequence_name_prefix (Default get_count_prefix
+	// NDEBUG empty). Variable.cpp:675–676 streams get_actual_name() even if empty.
+	// Incomplete shell (empty v.Name / nil) already sticky above via GetActualName.
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -215,12 +256,10 @@ func (v *Variable) OutputDefFullSess(s *Session, forceStatic, prefixName, withAt
 			if sessHasError(s) {
 				return ""
 			}
-			if nm != "" {
-				// immediately "/* " + comment + " */" (no invent space before /*)
-				b.WriteString("/* VOLATILE GLOBAL ")
-				b.WriteString(nm)
-				b.WriteString(" */")
-			}
+			// Variable.cpp:662–667 — always emit; prefix_name empty → "/* VOLATILE GLOBAL  */"
+			b.WriteString("/* VOLATILE GLOBAL ")
+			b.WriteString(nm)
+			b.WriteString(" */")
 		}
 	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent complete def past IsVolatile residual false path
@@ -266,8 +305,8 @@ func (v *Variable) OutputCOptsWithSess(s *Session, prefixName bool, opts Options
 	if sessHasError(s) {
 		return ""
 	}
-	// Variable always has live get_actual_name; sticky no invent VOL_RVAL(, T) / ACCESS_ONCE()
-	if name == "" {
+	// empty get_actual_name ok under prefix_name (Default get_count_prefix NDEBUG)
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -340,8 +379,8 @@ func (v *Variable) OutputLhsCOptsSess(s *Session, prefixName bool) string {
 	if sessHasError(s) {
 		return ""
 	}
-	// sticky no invent VOL_LVAL(, T) / empty LHS identifier
-	if name == "" {
+	// empty LHS ok under prefix_name (Default get_count_prefix NDEBUG)
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -387,8 +426,8 @@ func (v *Variable) OutputAddrOfSess(s *Session, prefixName bool) string {
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
-		// sticky no invent bare "&"
+	// prefix_name empty → bare "&" (matches NDEBUG get_count_prefix emit)
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -409,7 +448,8 @@ func (v *Variable) OutputForCommentSess(s *Session, prefixName bool) string {
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
+	// empty comment name ok under prefix_name
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -463,7 +503,7 @@ func (v *Variable) OutputUpperBoundSess(s *Session, prefixName bool) string {
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -518,7 +558,7 @@ func (v *Variable) OutputLowerBoundSess(s *Session, prefixName bool) string {
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
+	if name == "" && !prefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -760,9 +800,10 @@ func OutputArrayInitializersSess(s *Session, vars []*Variable, opts Options, ind
 		if sessHasError(s) {
 			return ""
 		}
-		// OutputInit defaults postIncr true (Variable.cpp output_init); CGOptions
-		// post_incr is applied on forced/reset paths that read opts explicitly.
-		initOut := av.OutputInitOptsSess(s, indent, names, true)
+		// ArrayVariable.cpp:640–645 — CGOptions::post_incr_operator() → "i++" else
+		// "i = i + 1". Soft invent hard-coded true broke --no-post-incr-operator
+		// (flagcamp seed448… i0++ vs UP i0 = i0 + 1).
+		initOut := av.OutputInitOptsSess(s, indent, names, opts.PostIncrOperator)
 		// residual ERROR sticky — no invent soft-continue later arrays past OutputInit residual
 		if sessHasError(s) {
 			return ""
@@ -2272,7 +2313,7 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 				return
 			}
 			base = v.AsArray.OutputAccessSess(s)
-			if sessHasError(s) || base == "" {
+			if sessHasError(s) || (base == "" && !sessOpts(s).PrefixName) {
 				fail()
 				return
 			}
@@ -2391,12 +2432,33 @@ func (v *Variable) CreateFieldVarsSess(s *Session) {
 	}
 }
 
+// valueDumpAccessNameSess mirrors Variable::to_string for eSimple dump names:
+// ostringstream + Variable::Output (ACCESS_ONCE / VOL_RVAL / bare name), not
+// get_actual_name alone. With --prefix-name + --enable-access-once, C++ emits
+// ACCESS_ONCE() (empty name inside); bare GetActualName soft-invented empty
+// and output_print_str dropped the value arg (flagcamp n73).
+// Variable.cpp:1184–1188 + 689–700; ArrayVariable.cpp:525–556.
+func valueDumpAccessNameSess(s *Session, v *Variable, prefixName bool) string {
+	if v == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	// to_string → Output (includes ACCESS_ONCE / itemized indices)
+	return v.OutputCOptsWithSess(s, prefixName, sessOpts(s))
+}
+
 // OutputValueDump mirrors Variable::output_value_dump.
 // Variable.cpp:1173–1203 — printf checksum lines for simples; recurse aggregates;
 // arrays expand all index combinations; unions only readable fields.
+// Names use to_string → Output → get_actual_name (CGOptions::prefix_name).
 
 // OutputValueDumpSess is OutputValueDump with sticky errors on bag s.
 func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, unionFacts []*FactUnion) string {
+	return v.OutputValueDumpOptsSess(s, prefix, indent, unionFacts, sessOpts(s).PrefixName)
+}
+
+// OutputValueDumpOptsSess is OutputValueDump with explicit prefix_name.
+func (v *Variable) OutputValueDumpOptsSess(s *Session, prefix string, indent int, unionFacts []*FactUnion, prefixName bool) string {
 	// Variable + Type always live at dump emit; sticky no invent empty dump shell
 	if v == nil || v.Type == nil {
 		sessNoteError(s, ErrGeneric)
@@ -2429,17 +2491,19 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 			return ""
 		}
 		if v.IsArray || (v.AsArray != nil && len(v.AsArray.Sizes) > 0) {
-			return outputValueDumpArraySess(s, v, prefix, indent, unionFacts)
+			return outputValueDumpArraySess(s, v, prefix, indent, unionFacts, prefixName)
 		}
 	} else if sessHasError(s) {
 		// residual ERROR sticky — no invent soft-continue dump past IsVirtual residual false
 		return ""
 	}
 	if v.Type.IsSimpleSess(s) {
-		// Variable.cpp:1184–1188 — name + printf_directive always live sticky
-		// no invent printf with empty name/directive
-		name := v.GetActualNameSess(s, false)
-		// residual ERROR sticky — no invent dump past GetActualName residual hole
+		// Variable.cpp:1184–1188 — to_string() → Output:
+		// itemized ArrayVariable::Output appends [indices]; scalars use get_actual_name.
+		// Soft invent GetActualName-only dropped indices (seed-2 --check-global:
+		// last GlobalList item g_62[1][3][4] emitted as bare g_62).
+		name := valueDumpAccessNameSess(s, v, prefixName)
+		// residual ERROR sticky — no invent dump past access-name residual hole
 		if sessHasError(s) {
 			return ""
 		}
@@ -2448,9 +2512,15 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		if sessHasError(s) {
 			return ""
 		}
-		if name == "" || dir == "" {
+		// prefix_name NDEBUG may empty name; still emit (C++ "checksum [0] = …")
+		if dir == "" {
 			sessNoteError(s, ErrGeneric)
 			return ""
+		}
+		// util.cpp:151–162 output_print_str — omit ", value" when str_value empty
+		// (prefix_name → empty to_string → `printf("checksum  = %d\n");` not `, );`)
+		if name == "" {
+			return OutputTab(indent) + "printf(\"" + prefix + " = " + dir + "\\n\");\n"
 		}
 		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
 	}
@@ -2466,7 +2536,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		}
 		var b strings.Builder
 		for _, f := range v.FieldVars {
-			part := f.OutputValueDumpSess(s, prefix, indent, unionFacts)
+			part := f.OutputValueDumpOptsSess(s, prefix, indent, unionFacts, prefixName)
 			// residual ERROR sticky — no invent partial field dump past hard IR hole
 			if sessHasError(s) {
 				return ""
@@ -2503,7 +2573,7 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 			if sessHasError(s) {
 				return ""
 			}
-			part := f.OutputValueDumpSess(s, prefix, indent, unionFacts)
+			part := f.OutputValueDumpOptsSess(s, prefix, indent, unionFacts, prefixName)
 			// residual ERROR sticky — no invent partial field dump past hard IR hole
 			if sessHasError(s) {
 				return ""
@@ -2512,134 +2582,69 @@ func (v *Variable) OutputValueDumpSess(s *Session, prefix string, indent int, un
 		}
 		return b.String()
 	}
-	// pointers: dump as pointer directive
-	if v.Type.IsPointerLikeSess(s) {
-		name := v.GetActualNameSess(s, false)
-		dir := v.Type.PrintfDirectiveSess(s)
-		if name == "" || dir == "" {
+	// residual ERROR sticky — no invent soft-continue past IsUnion residual false
+	if sessHasError(s) {
+		return ""
+	}
+	// Variable.cpp:1173–1203 — no ePointer case; pointer (and other) types emit nothing.
+	// Soft invent printf("…0x%0x", ptr) desynced --check-global (seed-2 g_36/g_38 dumps).
+	return ""
+}
+
+// outputValueDumpArraySess mirrors Variable.cpp:1175–1182 is_virtual array expand:
+// itemize each index tuple then recurse output_value_dump on the member.
+// Soft invent collective-keyed IsFieldReadable / synthetic "g_a[i].f0" names made
+// union array dumps under --check-global (seed 135151… g_5) while golden keys
+// readability on the itemized member (no related FactUnion → no dump).
+// Zero-rank ArraySizes is complete empty (not incomplete IR).
+func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int, unionFacts []*FactUnion, prefixName bool) string {
+	if v == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	av := v.AsArray
+	if av == nil {
+		// C++ isArray always ArrayVariable*; missing AsArray sticky
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	sizes := av.Sizes
+	if len(sizes) == 0 {
+		sizes = v.ArraySizes
+	}
+	if len(sizes) == 0 {
+		return ""
+	}
+	// residual Type-nil: CreateFieldVars / simple dump need Type
+	if v.Type == nil {
+		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	all := expandWithinRanges(sizes)
+	var b strings.Builder
+	for _, idx := range all {
+		// Variable.cpp:1180 — av->itemize(indices); no VS (do not GlobalList dual-register)
+		member := av.ItemizeConstIndices(idx, nil)
+		if member == nil {
+			// residual sticky from Itemize on throwaway bag — re-sticky on run bag
 			if !sessHasError(s) {
 				sessNoteError(s, ErrGeneric)
 			}
 			return ""
 		}
-		return OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n"
-	}
-	return ""
-}
-
-// outputValueDumpArray expands array into all index combinations and dumps elements.
-// outputValueDumpArray expands array into all index combinations and dumps elements.
-// Variable always live; sticky empty (no invent soft-skip dump past hole).
-// Zero-rank ArraySizes is complete empty (not incomplete IR).
-
-// outputValueDumpArraySess is outputValueDumpArray with sticky errors on bag s.
-func outputValueDumpArraySess(s *Session, v *Variable, prefix string, indent int, unionFacts []*FactUnion) string {
-	if v == nil {
-		sessNoteError(s, ErrGeneric)
-		return ""
-	}
-	if len(v.ArraySizes) == 0 {
-		return ""
-	}
-	// base name always live sticky; no invent printf with bare "[0]" access
-	base := v.GetActualNameSess(s, false)
-	// residual ERROR sticky — no invent soft-empty dump past GetActualName residual
-	if sessHasError(s) {
-		return ""
-	}
-	if base == "" {
-		sessNoteError(s, ErrGeneric)
-		return ""
-	}
-	// Type always live for dump dispatch; sticky no invent empty dump past Type-nil shell
-	if v.Type == nil {
-		sessNoteError(s, ErrGeneric)
-		return ""
-	}
-	all := expandWithinRanges(v.ArraySizes)
-	var b strings.Builder
-	for _, idx := range all {
-		// build access name g_a[0][1]
-		name := base
-		for _, i := range idx {
-			name += "[" + itoa(i) + "]"
-		}
-		if v.Type.IsSimpleSess(s) {
-			// residual ERROR sticky — no invent soft-dump past IsSimple residual true
+		// Itemize used a throwaway bag for CreateFieldVars; re-run on s if needed
+		if member.Type != nil && member.Type.IsAggregateSess(s) && len(member.FieldVars) == 0 {
+			member.CreateFieldVarsSess(s)
 			if sessHasError(s) {
 				return ""
 			}
-			dir := v.Type.PrintfDirectiveSess(s)
-			if dir == "" {
-				if !sessHasError(s) {
-					sessNoteError(s, ErrGeneric)
-				}
-				return ""
-			}
-			b.WriteString(OutputTab(indent) + "printf(\"" + prefix + name + " = " + dir + "\\n\", " + name + ");\n")
-			continue
 		}
-		// residual ERROR sticky — no invent soft-continue past IsSimple residual false
+		part := member.Variable.OutputValueDumpOptsSess(s, prefix, indent, unionFacts, prefixName)
+		// residual ERROR sticky — no invent soft-continue later indices past member dump hole
 		if sessHasError(s) {
 			return ""
 		}
-		if v.Type.IsAggregateSess(s) && len(v.FieldVars) > 0 {
-			// residual ERROR sticky — no invent soft-dump past IsAggregate residual true
-			if sessHasError(s) {
-				return ""
-			}
-			// dump fields with indexed prefix path via synthetic names
-			// Variable* always live in FieldVars; nil hole sticky whole dump
-			for fi, f := range v.FieldVars {
-				if f == nil || f.Type == nil {
-					sessNoteError(s, ErrGeneric)
-					return ""
-				}
-				if v.Type.IsUnionSess(s) && !IsFieldReadableSess(s, v, fi, unionFacts) {
-					// residual ERROR sticky — no invent soft-skip then partial dump past hole
-					if sessHasError(s) {
-						return ""
-					}
-					continue
-				}
-				// residual ERROR sticky — no invent soft-continue past IsFieldReadable/IsUnion residual
-				if sessHasError(s) {
-					return ""
-				}
-				if !f.Type.IsSimpleSess(s) {
-					// residual ERROR sticky — no invent soft-skip field past IsSimple residual
-					if sessHasError(s) {
-						return ""
-					}
-					continue
-				}
-				// residual ERROR sticky — no invent soft-continue field dump past IsSimple residual true
-				if sessHasError(s) {
-					return ""
-				}
-				// field name is typically g_a.f0 — replace base with indexed access
-				fname := f.Name
-				// f.Name like "g_a.f0" → use name + ".f" + idx
-				suffix := ""
-				if dot := lastDot(fname); dot >= 0 {
-					suffix = fname[dot:]
-				} else {
-					suffix = ".f" + itoa(fi)
-				}
-				acc := name + suffix
-				dir := f.Type.PrintfDirectiveSess(s)
-				if dir == "" {
-					// residual ERROR sticky — no invent soft-skip then partial dump past hole
-					if sessHasError(s) {
-						return ""
-					}
-					// empty directive without residual: fail closed whole dump (no invent skip field)
-					sessNoteError(s, ErrGeneric)
-					return ""
-				}
-				b.WriteString(OutputTab(indent) + "printf(\"" + prefix + acc + " = " + dir + "\\n\", " + acc + ");\n")
-			}
-		}
+		b.WriteString(part)
 	}
 	return b.String()
 }
@@ -2838,32 +2843,39 @@ func (v *Variable) hashOutputOptsSess(s *Session, ctrl []*Variable, unionFacts [
 		if sessHasError(s) {
 			return ""
 		}
-		// Variable.cpp:900–920 — name always live sticky; no invent empty transparent_crc
-		name := v.GetActualNameSess(s, false)
-		// residual ERROR sticky — no invent soft-empty name past GetActualName residual hole
+		// Variable.cpp:900–920 — Output() for the expression (ACCESS_ONCE / VOL_RVAL /
+		// itemized indices). Soft invent GetActualName-only dropped ACCESS_ONCE on
+		// hash/sink (seed 176573… --enable-access-once transparent_crc(g_2878)).
+		// Quoted label is raw Variable::name (always internal id).
+		expr := v.OutputCOptsWithSess(s, opts.PrefixName, opts)
+		// residual ERROR sticky — no invent soft-empty expr past Output residual hole
 		if sessHasError(s) {
 			return ""
 		}
-		if name == "" || v.Name == "" {
+		if v.Name == "" {
+			sessNoteError(s, ErrGeneric)
+			return ""
+		}
+		if expr == "" && !opts.PrefixName {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		// Variable.cpp:902–919 — compute_hash → transparent_crc*; else csmith_sink_ =
 		if !opts.ComputeHash {
-			return "    csmith_sink_ = " + name + ";\n"
+			return "    csmith_sink_ = " + expr + ";\n"
 		}
 		if v.Type.IsFloatSess(s) {
 			// residual ERROR sticky — no invent crc_bytes past IsFloat residual hole
 			if sessHasError(s) {
 				return ""
 			}
-			return "    transparent_crc_bytes (&" + name + ", sizeof(" + name + "), \"" + v.Name + "\", print_hash_value);\n"
+			return "    transparent_crc_bytes (&" + expr + ", sizeof(" + expr + "), \"" + v.Name + "\", print_hash_value);\n"
 		}
 		// residual ERROR sticky — no invent transparent_crc past IsFloat residual false path
 		if sessHasError(s) {
 			return ""
 		}
-		return "    transparent_crc(" + name + ", \"" + v.Name + "\", print_hash_value);\n"
+		return "    transparent_crc(" + expr + ", \"" + v.Name + "\", print_hash_value);\n"
 	}
 	// ePointer: no hash (Variable.cpp:921–922)
 	return ""
@@ -2993,13 +3005,13 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	// array name always live sticky; no invent transparent_crc([i], …) / for ( = 0; …)
-	access := v.GetActualNameSess(s, false)
+	// ArrayVariable::hash — Output() / get_actual_name for access expression
+	access := v.GetActualNameSess(s, opts.PrefixName)
 	// residual ERROR sticky — no invent soft-empty hash past GetActualName residual
 	if sessHasError(s) {
 		return ""
 	}
-	if access == "" {
+	if access == "" && !opts.PrefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -3010,13 +3022,13 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
-		names[i] = ctrl[i].GetActualNameSess(s, false)
+		// ctrl vars are locals — prefix_name does not rewrite (is_global only)
+		names[i] = ctrl[i].GetActualNameSess(s, opts.PrefixName)
 		// residual ERROR sticky — no invent soft-continue later indices past GetActualName residual
 		if sessHasError(s) {
 			return ""
 		}
-		if names[i] == "" {
-			// ctrl get_actual_name always live sticky; no invent empty index id
+		if names[i] == "" && !opts.PrefixName {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -3045,8 +3057,15 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 		access += "[" + iv + "]"
 		nameStr += "[" + iv + "]"
 	}
-	// ArrayVariable.cpp:770–794 — transparent_crc* when compute_hash, else csmith_sink_ =
-	// (nested struct fields expand: .f0.f0 not top-level .f0 only — seed-51 g_359).
+	// ArrayVariable.cpp:770–798 — compute_hash → transparent_crc* on simple/subfields;
+	// else sink only when element type is eSimple. Aggregate element arrays
+	// (union/struct) open the index loops when field_names non-empty but emit
+	// no sink body (flagcamp n62: empty for-l loops vs invent csmith_sink_=.f0).
+	//
+	// Newline discipline (util.cpp:171–176 output_close_encloser always outputln first):
+	//   - sink eSimple: write ";" without endl; first close finishes the line
+	//   - crc lines end with endl; first close inserts a blank line before `}`
+	//   - empty aggregate !compute_hash body: open already endl'd → first close blanks
 	if useSimple {
 		isF := v.Type.IsFloatSess(s)
 		// residual ERROR sticky — no invent soft-hash past IsFloat residual
@@ -3054,14 +3073,16 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			return ""
 		}
 		if !opts.ComputeHash {
-			b.WriteString(indent + "csmith_sink_ = " + access + ";\n")
+			// ArrayVariable.cpp:792–796 — sink only eSimple; no endl after ';'
+			b.WriteString(indent + "csmith_sink_ = " + access + ";")
 		} else if isF {
 			// ArrayVariable.cpp:775 — no space before '(&' (scalar Variable has space)
 			b.WriteString(indent + "transparent_crc_bytes(&" + access + ", sizeof(" + access + "), \"" + nameStr + "\", print_hash_value);\n")
 		} else {
 			b.WriteString(indent + "transparent_crc(" + access + ", \"" + nameStr + "\", print_hash_value);\n")
 		}
-	} else {
+	} else if opts.ComputeHash {
+		// Nested struct fields expand: .f0.f0 not top-level .f0 only (seed-51 g_359).
 		for _, sub := range subs {
 			if sub.Type == nil {
 				sessNoteError(s, ErrGeneric)
@@ -3073,9 +3094,7 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 				return ""
 			}
 			fn := sub.Name
-			if !opts.ComputeHash {
-				b.WriteString(indent + "csmith_sink_ = " + access + fn + ";\n")
-			} else if isF {
+			if isF {
 				// ArrayVariable.cpp:775 — no space before '(&'
 				b.WriteString(indent + "transparent_crc_bytes(&" + access + fn + ", sizeof(" + access + fn + "), \"" + nameStr + fn + "\", print_hash_value);\n")
 			} else {
@@ -3083,17 +3102,14 @@ func hashArrayVariableOptsSess(s *Session, v *Variable, ctrl []*Variable, unionF
 			}
 		}
 	}
+	// !ComputeHash && aggregate: empty body (ArrayVariable.cpp:791–798).
 	// ArrayVariable.cpp:786–788 — if (hash_value_printf) if (print_hash_value) printf(index…)
 	// Only meaningful with compute_hash (transparent_crc path).
 	if opts.ComputeHash && opts.HashValuePrintf {
 		b.WriteString(indent + "if (print_hash_value) " + makePrintIndexStr(names) + "\n")
 	}
-	// ArrayVariable.cpp:799–804 — output_close_encloser: if body ended with endl
-	// (crc path), first close inserts a blank line; sink path has no endl after ';'
-	// so the first close's outputln only finishes the sink line (no blank).
-	if opts.ComputeHash {
-		b.WriteString("\n")
-	}
+	// First close always starts with outputln (util.cpp:171–176).
+	b.WriteString("\n")
 	for range v.ArraySizes {
 		indent = indent[:len(indent)-4]
 		b.WriteString(indent + "}\n")
