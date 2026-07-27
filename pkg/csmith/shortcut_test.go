@@ -350,6 +350,118 @@ func TestShortcutAnalysisReuse(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 }
 
+// TestShortcutAnalysisForGenPureIVEarly — SC_OK keeps gen map_stm (FEffect) but
+// strips pure IV from AddEffect when EffectAccum is small AND map_stm is
+// gen-light (nMapR < 50): n62 goto pools (g_8 nMapR=25). Large map_stm
+// (seed-42 g_804 nMapR=63) keeps pure IV in AddEffect so CVRV order matches C++.
+// Force-full-visit rewrote map_stm and dropped early IV from FEffect (seed-2 g_96).
+func TestShortcutAnalysisForGenPureIVEarly(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntTypeSess(testAmbientSession), false, false)
+	other := CreateVariableScalarsSess(testAmbientSession, "g_o", GetIntTypeSess(testAmbientSession), false, false)
+	st := &Stmt{
+		Kind:  StmtFor,
+		StmID: 77,
+		Loop:  &LoopControl{IV: iv, InitStmt: &Stmt{Kind: StmtAssign, StmID: 78, LhsVar: iv}},
+		Then:  &Block{StmID: 79},
+	}
+	fm := NewFactMgrSess(testAmbientSession, nil)
+	facts := []*FactPointTo{}
+	fm.SetMapFactsIn(77, facts)
+	fm.SetMapFactsOut(77, facts)
+	// Gen-light map_stm: pure IV first + few body reads (nMapR < 50 → strip).
+	mapStm := EmptyEffect().ReadVarSess(testAmbientSession, iv).ReadVarSess(testAmbientSession, other)
+	fm.SetMapStmEffect(77, mapStm)
+	cg := EmptyCGContext().WithSession(testAmbientSession).WithFactMgr(fm)
+	// Small EffectAccum (after post_creation reset) — pure IV not yet present.
+	eff := EmptyEffect().ReadVarSess(testAmbientSession, other)
+	cg.EffectAccum = &eff
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatal("gen pure IV first + small accum must SC_OK (keep map_stm for FEffect)")
+	}
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("SC_OK strip-add must stay non-sticky soft re-pick")
+	}
+	// map_stm still has pure IV (not rewritten by visit)
+	if !fm.GetMapStmEffect(77).IsReadSess(testAmbientSession, iv) {
+		t.Fatal("SC_OK must not rewrite map_stm pure IV")
+	}
+	// EffectAccum must not gain pure IV at early nPrev (stripped from AddEffect)
+	if cg.EffectAccum.IsReadSess(testAmbientSession, iv) {
+		t.Fatal("SC_OK with small accum must strip pure IV from AddEffect into EffectAccum")
+	}
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, other) {
+		t.Fatal("SC_OK strip-add must still merge non-IV reads")
+	}
+	// Large EffectAccum (late walk): SC_OK may re-add pure IV at a late index.
+	ClearErrorSess(testAmbientSession)
+	fm.SetMapFactsIn(77, facts)
+	fm.SetMapFactsOut(77, facts)
+	fm.SetMapStmEffect(77, mapStm)
+	for i := 0; i < 20; i++ {
+		v := CreateVariableScalarsSess(testAmbientSession, "g_pad"+string(rune('a'+i%26)), GetIntTypeSess(testAmbientSession), false, false)
+		eff = eff.ReadVarSess(testAmbientSession, v)
+	}
+	cg.EffectAccum = &eff
+	facts = []*FactPointTo{}
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatal("gen pure IV first + large accum must still allow SC_OK")
+	}
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, iv) {
+		t.Fatal("large accum SC_OK must AddEffect pure IV (no strip)")
+	}
+	// nMapR==1 (IV-only for): C++ AddEffects pure IV — do not strip (seed17 g_15).
+	ClearErrorSess(testAmbientSession)
+	solo := EmptyEffect().ReadVarSess(testAmbientSession, iv)
+	fm.SetMapStmEffect(77, solo)
+	fm.SetMapFactsIn(77, facts)
+	fm.SetMapFactsOut(77, facts)
+	effSolo := EmptyEffect().ReadVarSess(testAmbientSession, other)
+	cg.EffectAccum = &effSolo
+	facts = []*FactPointTo{}
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatal("IV-only map_stm must SC_OK")
+	}
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, iv) {
+		t.Fatal("nMapR==1 must keep pure IV in AddEffect (seed17 g_15)")
+	}
+	// Gen-heavy map_stm (nMapR ≥ 50): keep pure IV in AddEffect even with small
+	// EffectAccum (seed-42 g_804: strip shifted CVRV if (g_128)→if (g_1054)).
+	ClearErrorSess(testAmbientSession)
+	heavy := EmptyEffect().ReadVarSess(testAmbientSession, iv)
+	for i := 0; i < 55; i++ {
+		v := CreateVariableScalarsSess(testAmbientSession, "g_body"+string(rune('a'+i%26))+string(rune('0'+i/26)), GetIntTypeSess(testAmbientSession), false, false)
+		heavy = heavy.ReadVarSess(testAmbientSession, v)
+	}
+	if n := len(heavy.ReadVarsSess(testAmbientSession)); n < 50 {
+		t.Fatalf("need nMapR≥50 for heavy case, got %d", n)
+	}
+	fm.SetMapStmEffect(77, heavy)
+	fm.SetMapFactsIn(77, facts)
+	fm.SetMapFactsOut(77, facts)
+	effHeavy := EmptyEffect().ReadVarSess(testAmbientSession, other)
+	cg.EffectAccum = &effHeavy
+	facts = []*FactPointTo{}
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatal("gen pure IV + heavy map_stm must SC_OK")
+	}
+	if !cg.EffectAccum.IsReadSess(testAmbientSession, iv) {
+		t.Fatal("heavy map_stm SC_OK must AddEffect pure IV (no strip; seed-42)")
+	}
+	// After visit rewrite, map_stm no longer leads with pure IV — SC_OK with small accum.
+	ClearErrorSess(testAmbientSession)
+	fm.SetMapStmEffect(77, EmptyEffect().ReadVarSess(testAmbientSession, other).WriteVarSess(testAmbientSession, iv))
+	eff2 := EmptyEffect().ReadVarSess(testAmbientSession, other)
+	cg.EffectAccum = &eff2
+	facts = []*FactPointTo{}
+	fm.SetMapFactsIn(77, facts)
+	fm.SetMapFactsOut(77, facts)
+	if ShortcutAnalysis(st, &facts, &cg, Defaults()) != ShortcutOK {
+		t.Fatal("visit-rewritten map_stm (no leading pure IV) must SC_OK even with small accum")
+	}
+	ClearErrorSess(testAmbientSession)
+}
+
 func TestShortcutConflict(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	g := CreateVariableScalarsSess(testAmbientSession, "g_x", GetIntTypeSess(testAmbientSession), false, false)
