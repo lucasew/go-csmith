@@ -51,6 +51,13 @@ func (s *Session) Generate(ctx context.Context) (string, error) {
 		return "", err
 	}
 	ClearErrorSess(s)
+	// CGOptions.cpp:410–417 — enable CompatibleChecker static only under dfs_exhaustive
+	// when --compatible-check is set (not for random mode CLI alone).
+	if opts.DFSExhaustive && opts.CompatibleCheck {
+		EnableCompatibleCheckSess(s)
+	} else {
+		ResetCompatibleCheckSess(s)
+	}
 	SetPlatformSizesSess(s, opts.IntSize, opts.PointerSize)
 	if !InitPartialExpanderFromOptionsSess(s, opts) {
 		return "", fmt.Errorf("invalid partial-expand: %q", opts.PartialExpand)

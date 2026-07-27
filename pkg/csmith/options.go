@@ -682,11 +682,18 @@ func (o Options) Validate() error {
 }
 
 func (o Options) normalizeUpstreamFlow() Options {
-	// Upstream fast-execution turns on C++ mode and tightens options.
+	// Upstream --fast-execution (RandomProgramGenerator.cpp:1854–1861) sets
+	// lang_cpp, jumps(false), max_array_length_per_dimension(5) at parse time.
+	// CLIArgs emits --fast-execution before int flags, so a non-default
+	// MaxArrayLenPerDim is the post-flag override (e.g. 13 after fast sets 5).
+	// When still at Defaults (10), apply the side effect so Generate matches
+	// golden which only saw --fast-execution.
 	if o.FastExecution {
 		o.LangCPP = true
 		o.Jumps = false
-		o.MaxArrayLenPerDim = min(o.MaxArrayLenPerDim, 5)
+		if o.MaxArrayLenPerDim == Defaults().MaxArrayLenPerDim {
+			o.MaxArrayLenPerDim = 5
+		}
 	}
 	// Upstream C++ normalization.
 	if o.LangCPP {
@@ -696,9 +703,8 @@ func (o Options) normalizeUpstreamFlow() Options {
 	}
 	// Upstream DFS mode forces fixed struct fields.
 	// CGOptions.cpp:410–417 resolve_exhaustive_options side effects.
-	// CompatibleCheck: C++ also sets CompatibleChecker static; Go reads
-	// opts.CompatibleCheck (and Session.CompatibleCheck when set via *Sess).
-	// No EnableCompatibleCheck process write here — keeps normalize pure.
+	// CompatibleChecker static is enabled only under dfs_exhaustive (same block);
+	// EnableCompatibleCheckSess is applied in Generate when both flags are set.
 	if o.DFSExhaustive {
 		o.FixedStructFields = true
 	}

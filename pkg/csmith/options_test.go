@@ -280,4 +280,15 @@ func TestNormalizeUpstreamFlow(t *testing.T) {
 	if !o.LangCPP || o.Jumps {
 		t.Fatal("fast_execution must enable lang_cpp and disable jumps")
 	}
+	if o.MaxArrayLenPerDim != 5 {
+		t.Fatalf("fast_execution with default max_array_len_per_dim want 5 got %d", o.MaxArrayLenPerDim)
+	}
+	// Later CLI override: MaxArrayLenPerDim already non-default → keep it.
+	o = Defaults()
+	o.FastExecution = true
+	o.MaxArrayLenPerDim = 13
+	o = o.normalizeUpstreamFlow()
+	if o.MaxArrayLenPerDim != 13 {
+		t.Fatalf("fast_execution must not clamp explicit max_array_len_per_dim: got %d", o.MaxArrayLenPerDim)
+	}
 }
