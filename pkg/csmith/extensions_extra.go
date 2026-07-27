@@ -64,11 +64,25 @@ func KleeOutputTail() string {
 const CrestInputBaseName = "CREST_"
 
 // CrestTypeToString mirrors CrestExtension::type_to_string.
-// CrestExtension.cpp:52–78 — simple types only; sticky "" on non-simple.
+// CrestExtension.cpp:49–74 — simple types only; default assert(0);return "" is
+// NDEBUG no-op → empty suffix (emits CREST_(x) for longlong/float/int128).
+// Soft invent sticky-abort on default desynced --crest --uint128 (seed-1 x4).
 // CrestTypeToStringSess is CrestTypeToString with explicit session residual sticky.
 func CrestTypeToStringSess(s *Session, t *Type) string {
-	if t == nil || !t.IsSimpleSess(s) {
+	if t == nil {
 		sessNoteError(s, ErrGeneric)
+		return ""
+	}
+	if !t.IsSimpleSess(s) {
+		// residual ERROR sticky — no invent empty suffix past IsSimple residual
+		if sessHasError(s) {
+			return ""
+		}
+		// C++ assert(t->eType == eSimple); NDEBUG continues to switch default → ""
+		return ""
+	}
+	// residual ERROR sticky after IsSimple residual true
+	if sessHasError(s) {
 		return ""
 	}
 	switch t.SimpleSess(s) {
@@ -89,7 +103,8 @@ func CrestTypeToStringSess(s *Session, t *Type) string {
 	case EULong:
 		return "unsigned_int"
 	default:
-		sessNoteError(s, ErrGeneric)
+		// CrestExtension.cpp:69–73 — assert(0); break; assert(0); return "";
+		// Release golden: empty type token, still emit CREST_(name).
 		return ""
 	}
 }
@@ -103,8 +118,15 @@ func CrestOutputSymbolicsSess(s *Session, values []*ExtensionValue) string {
 	}
 	var b strings.Builder
 	for _, value := range values {
+		// value.Type always live (extensionValuesComplete)
 		ts := CrestTypeToStringSess(s, value.Type)
-		if sessHasError(s) || ts == "" {
+		// residual ERROR sticky — no invent soft-skip later symbolics past type residual
+		if sessHasError(s) {
+			return ""
+		}
+		// empty ts is complete NDEBUG path (CREST_(x4) for int128 etc.)
+		if value.Name == "" {
+			sessNoteError(s, ErrGeneric)
 			return ""
 		}
 		b.WriteString(AbsExtensionTab)
@@ -174,24 +196,35 @@ func CoverageGenerateValuesSess(s *Session, values []*ExtensionValue, inputsSize
 }
 
 // CoverageOutputArrayInit mirrors output_array_init for one value's row.
-// count is the value index; tests layout is [v0_t0, v0_t1, ..., v1_t0, ...].
+// CoverageTestExtension.cpp:60–81 — sliding window over flat test_values_:
+//
+//	last_index = inputs_size + count - 1
+//	emit test_values_[count .. last_index]  (length inputs_size)
+//
+// GenerateValues still packs [v0×N][v1×N]…; emit does NOT use base:=count*N
+// (that invents non-overlapping rows; golden slides by one each array).
 func CoverageOutputArrayInitSess(s *Session, tests []*Constant, count, inputsSize int) string {
 	if inputsSize <= 0 || count < 0 {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	base := count * inputsSize
-	if base+inputsSize > len(tests) {
+	// CoverageTestExtension.cpp:61–63 — single element at index count
+	if inputsSize == 1 {
+		if count >= len(tests) {
+			sessNoteError(s, ErrGeneric)
+			return ""
+		}
+		return tests[count].OutputOptsSess(s, sessOpts(s))
+	}
+	// CoverageTestExtension.cpp:66–80 — last_index = inputs_size + count - 1
+	last := inputsSize + count - 1
+	if last >= len(tests) || count > last {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if inputsSize == 1 {
-		return tests[base].OutputOptsSess(s, sessOpts(s))
-	}
 	var b strings.Builder
 	lenN := 0
-	last := base + inputsSize - 1
-	for i := base; i < last; i++ {
+	for i := count; i < last; i++ {
 		if lenN%10 == 0 {
 			b.WriteString("\n")
 			b.WriteString(AbsExtensionTab)
@@ -337,7 +370,9 @@ func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilit
 		return // null extension
 	}
 
-	// AbsExtension::Initialize(func1_max_params, values)
+	// AbsExtension::Initialize(func1_max_params, values) only at CreateExtension.
+	// CoverageTestExtension::GenerateValues runs later (Function.cpp:809) so
+	// Constant::make_random does not burn generation RNG before types/functions.
 	s.ExtValues = AbsExtensionInitializeSess(s, opts.Func1MaxParams, r, probs)
 	if s.ExtValues == nil || sessHasError(s) {
 		if !sessHasError(s) {
@@ -345,14 +380,6 @@ func CreateExtensionFullSess(s *Session, opts Options, r *Rng, probs *Probabilit
 		}
 		s.ExtKind = ""
 		return
-	}
-	if s.ExtKind == "coverage" {
-		s.CoverageTests = CoverageGenerateValuesSess(s, s.ExtValues, s.CoverageSize, r, opts, probs)
-		if s.CoverageTests == nil || sessHasError(s) {
-			s.ExtKind = ""
-			s.ExtValues = nil
-			return
-		}
 	}
 	s.ExtensionActive = true
 }

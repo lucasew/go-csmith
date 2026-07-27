@@ -176,15 +176,19 @@ func AbsExtensionMakeFuncInvocationSess(s *Session, f *Function, values []*Exten
 		return nil
 	}
 	// Build a FunctionInvocationUser with fixed ExpressionVariable params.
+	// AbsExtension.cpp:70–72 — VariableSelector::new_variable(name, type, nullptr, &qfer).
+	// Must pass null init (CreateVariableQfer / CreateVariableWithInit nil): CreateVariableScalars
+	// always Constant::make_random and would burn RNG after forward-decl attrs, desyncing
+	// FunctionInvocationUser alias flipcoin (func_1 vs func_1_alias under --coverage-test).
 	fi := &Invocation{User: f}
 	for _, ev := range values {
-		// VariableSelector::new_variable(name, type, null init, qfer)
-		v := CreateVariableScalarsSess(s, ev.Name, ev.Type, false, false)
-		if v == nil {
-			sessNoteError(s, ErrGeneric)
+		v := CreateVariableQferSess(s, ev.Name, ev.Type, ev.Qfer)
+		if v == nil || sessHasError(s) {
+			if !sessHasError(s) {
+				sessNoteError(s, ErrGeneric)
+			}
 			return nil
 		}
-		v.Qfer = ev.Qfer
 		// ExpressionVariable
 		e := &Expression{
 			Term:     TermVariable,
@@ -248,11 +252,37 @@ func DestroyExtensionSess(s *Session) {
 func ExtensionActiveSess(s *Session) bool { return sessOrAmbient(s).ExtensionActive }
 
 // ExtensionMgrGenerateValuesSess is ExtensionMgrGenerateValues on an explicit bag.
+// ExtensionMgr.cpp:84–88 / Function.cpp:809 — after all function bodies.
+// Klee/Crest GenerateValues are empty; CoverageTestExtension fills test_values_
+// via Constant::make_random (must not run at CreateExtension).
 func ExtensionMgrGenerateValuesSess(s *Session) {
-	if !ExtensionActiveSess(s) {
+	s = sessOrAmbient(s)
+	if !s.ExtensionActive {
 		return
 	}
-	// Klee/Crest GenerateValues are empty; Coverage fills at Create
+	if s.ExtKind != "coverage" {
+		return
+	}
+	if s.CoverageSize <= 0 || s.ExtValues == nil {
+		sessNoteError(s, ErrGeneric)
+		s.ExtensionActive = false
+		return
+	}
+	// Prefer live generation RNG/probs (post-CreateInstance).
+	r, probs := s.Rng, s.Probs
+	if r == nil || probs == nil {
+		sessNoteError(s, ErrGeneric)
+		s.ExtensionActive = false
+		return
+	}
+	s.CoverageTests = CoverageGenerateValuesSess(s, s.ExtValues, s.CoverageSize, r, s.Opts, probs)
+	if s.CoverageTests == nil || sessHasError(s) {
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
+		}
+		s.ExtensionActive = false
+		s.CoverageTests = nil
+	}
 }
 
 // ExtensionMgrGenerateFirstParameterList mirrors GenerateFirstParameterList.

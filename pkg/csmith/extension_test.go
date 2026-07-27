@@ -95,3 +95,31 @@ func TestInitPartialExpanderEmptyFail(t *testing.T) {
 		t.Fatal("from empty opts ok")
 	}
 }
+
+func TestAbsExtensionMakeFuncInvocationNoRNGBurn(t *testing.T) {
+	// AbsExtension.cpp:70–72 new_variable(..., nullptr init) — must not Constant::make_random.
+	ClearErrorSess(testAmbientSession)
+	r := NewRngSess(testAmbientSession, 42)
+	SetProcessRngSess(testAmbientSession, r)
+	SetProcessProbabilitiesSess(testAmbientSession, NewProbabilities(Defaults()))
+	SetProcessOptionsSess(testAmbientSession, Defaults())
+	// Snapshot stream by cloning via sequential flip after make
+	before := r.RndUptoSess(testAmbientSession, 1000)
+	// re-seed same stream
+	r2 := NewRngSess(testAmbientSession, 42)
+	SetProcessRngSess(testAmbientSession, r2)
+	f := &Function{Name: "func_1", AliasName: "func_1_alias"}
+	ev0 := NewExtensionValueSess(testAmbientSession, GetIntTypeSess(testAmbientSession), "x0")
+	ev1 := NewExtensionValueSess(testAmbientSession, GetIntTypeSess(testAmbientSession), "x1")
+	inv := AbsExtensionMakeFuncInvocationSess(testAmbientSession, f, []*ExtensionValue{ev0, ev1})
+	if inv == nil || HasErrorSess(testAmbientSession) {
+		t.Fatal(inv, HasErrorSess(testAmbientSession))
+	}
+	if inv.Args[0].Var.Init != nil || inv.Args[1].Var.Init != nil {
+		t.Fatal("nil init required; got", inv.Args[0].Var.Init, inv.Args[1].Var.Init)
+	}
+	after := r2.RndUptoSess(testAmbientSession, 1000)
+	if after != before {
+		t.Fatalf("MakeFuncInvocation burned RNG: before draw=%d after draw=%d", before, after)
+	}
+}
