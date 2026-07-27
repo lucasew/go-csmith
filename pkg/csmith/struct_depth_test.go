@@ -103,11 +103,14 @@ func TestOkStructUnionSkipsVolatile(t *testing.T) {
 	if typesComplete(bad) {
 		t.Fatal("StructTypes hole must IncompleteTypes")
 	}
+	// Type.cpp:545–558 walks AllTypes via get_all_ok_struct_union_types
+	ClearErrorSess(testAmbientSession)
+	env.AllTypes = []*Type{okt, nil}
 	if chooseRandomStructFromType(env, GetIntTypeSess(testAmbientSession), true, NewRngSess(testAmbientSession, 1)) != nil {
-		t.Fatal("incomplete ok pool must fail closed nil, not invent keep original")
+		t.Fatal("incomplete AllTypes ok pool must fail closed nil, not invent keep original")
 	}
 	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("incomplete ok pool must SetError sticky")
+		t.Fatal("incomplete AllTypes ok pool must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 }

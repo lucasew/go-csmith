@@ -243,52 +243,45 @@ func ChooseRandomStructUnionTypeSess(s *Session, r *Rng, ok []*Type) *Type {
 }
 
 // ChooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
-// Type.cpp:570–586 — if type is struct return it; else random from env.
+// Type.cpp:545–558 — always re-pick from ok structs when pool non-empty (does not
+// keep input typ just because it is already a struct).
 func (env *TypeEnv) ChooseRandomStructFromType(r *Rng, typ *Type, noVolatile bool) *Type {
 	return env.ChooseRandomStructFromTypeOpts(r, typ, noVolatile, sessOpts(sessFromEnv(env)))
 }
 
 // ChooseRandomStructFromTypeOpts is ChooseRandomStructFromType with explicit Options.
+// Type.cpp:545–558 — get_all_ok_struct_union_types(ok, no_volatile, false, true, true).
 func (env *TypeEnv) ChooseRandomStructFromTypeOpts(r *Rng, typ *Type, noVolatile bool, opts Options) *Type {
-	if typ != nil && typ.IsStructSess(sessFromEnv(env)) {
-		// residual ERROR sticky — no invent soft-return typ past IsStruct residual hole
-		if hasErrEnv(env) {
-			return nil
-		}
-		if noVolatile && typ.IsVolatileStructUnionSess(sessFromEnv(env)) {
-			// residual ERROR sticky — no invent soft-fallthrough past IsVolatileStructUnion residual
-			if hasErrEnv(env) {
-				return nil
-			}
-			// fall through to pick another
-		} else if hasErrEnv(env) {
-			// residual ERROR sticky — no invent soft-return typ past IsVolatileStructUnion residual false
-			return nil
-		} else {
-			return typ
-		}
-	} else if hasErrEnv(env) {
-		// residual ERROR sticky — no invent soft-continue pool pick past IsStruct residual false
+	// Type.cpp:547–548
+	if typ == nil {
 		return nil
 	}
-	ok := env.GetAllOKStructUnionTypes(false, noVolatile, false, true)
-	// residual ERROR sticky — no invent soft-pick past GetAllOK residual hole
+	if env == nil || r == nil {
+		noteErrEnv(env, ErrGeneric)
+		return nil
+	}
+	// Type.cpp:551–553 — (no_const=noVolatile, no_volatile=false, need_int=true, bStruct=true)
+	ok := env.GetAllOKStructUnionTypes(noVolatile, false, true, true)
 	if hasErrEnv(env) {
 		return nil
 	}
-	// incomplete AllTypes pool — fail closed sticky (no invent pick from partial)
 	if !typesComplete(ok) {
 		noteErrEnv(env, ErrGeneric)
 		return nil
 	}
-	// Type.cpp:581 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
-	// session CGOptions (dfs_exhaustive / max_exhaustive_depth); no Defaults invent
-	if len(ok) > 0 {
-		if DepthGuardByDepthSess(sessFromEnv(env), opts, 1) == BadDepth {
-			return nil
-		}
+	if len(ok) == 0 {
+		return typ
 	}
-	return ChooseRandomStructUnionTypeSess(sessFromEnv(env), r, ok)
+	// Type.cpp:554–555 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr)
+	if DepthGuardByDepthSess(sessFromEnv(env), opts, 1) == BadDepth {
+		return nil
+	}
+	// Type.cpp:557–558
+	picked := ChooseRandomStructUnionTypeSess(sessFromEnv(env), r, ok)
+	if hasErrEnv(env) || picked == nil {
+		return nil
+	}
+	return picked
 }
 
 // ChooseRandomPointerType mirrors Type::choose_random_pointer_type.
@@ -322,19 +315,21 @@ func (env *TypeEnv) ChooseRandomPointerType(r *Rng) *Type {
 // Type* always live on AllTypes; nil hole fails closed (nil — no invent filter-out
 // hole as absent and still pick from remaining types).
 func (env *TypeEnv) ChooseRandom(r *Rng, opts Options, probs *Probabilities, forFieldVar bool) *Type {
-	return env.chooseRandomTypeFilter(r, opts, probs, forFieldVar, true)
+	// Type.cpp:1182 — ChooseRandomTypeFilter(/*for_field_var*/ false) default assign-ops=false
+	return env.chooseRandomTypeFilter(r, opts, probs, forFieldVar, true, false)
 }
 
 // chooseRandomForStructField mirrors Type::make_one_struct_field type pick:
-// Type.cpp:658–666 — rnd_upto(AllTypes, ChooseRandomTypeFilter for_field_var=true)
-// without marking used (only Type::choose_random sets used).
-func (env *TypeEnv) chooseRandomForStructField(r *Rng, opts Options, probs *Probabilities) *Type {
-	return env.chooseRandomTypeFilter(r, opts, probs, true, false)
+// Type.cpp:658–666 — rnd_upto(AllTypes, ChooseRandomTypeFilter for_field_var=true,
+// struct_has_assign_ops) without marking used (only Type::choose_random sets used).
+func (env *TypeEnv) chooseRandomForStructField(r *Rng, opts Options, probs *Probabilities, structHasAssignOps bool) *Type {
+	return env.chooseRandomTypeFilter(r, opts, probs, true, false, structHasAssignOps)
 }
 
 // chooseRandomTypeFilter is ChooseRandomTypeFilter + rnd_upto (Type.cpp:223–244, 1181–1191).
 // markUsed mirrors Type::choose_random (true) vs make_one_struct_field (false).
-func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabilities, forFieldVar, markUsed bool) *Type {
+// structHasAssignOps is ChooseRandomTypeFilter's second ctor arg (default false).
+func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabilities, forFieldVar, markUsed, structHasAssignOps bool) *Type {
 	if r == nil {
 		// Type.cpp always has RNG; sticky no invent AllTypes[0]
 		noteErrEnv(env, ErrGeneric)
@@ -378,6 +373,11 @@ func (env *TypeEnv) chooseRandomTypeFilter(r *Rng, opts Options, probs *Probabil
 		}
 		// residual ERROR sticky — no invent soft-continue filter past IsStruct residual false
 		if hasErrEnv(env) {
+			return true
+		}
+		// Type.cpp:234–238 — parent struct with assign ops cannot nest types without has_assign_ops_
+		// (simple types already returned above; applies to struct/union fields under lang_cpp).
+		if forFieldVar && structHasAssignOps && !t.HasAssignOps {
 			return true
 		}
 		// Type.cpp ChooseRandomTypeFilter has no return_unions gate (unlike arg_unions on NonVoidNonVolatile)

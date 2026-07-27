@@ -59,7 +59,7 @@ func TestMakeOneStructFieldDoesNotMarkUsed(t *testing.T) {
 	for seed := uint64(1); seed < 80; seed++ {
 		ClearErrorSess(testAmbientSession)
 		s0.Used = false
-		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
+		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, false)
 		if f.Type == nil {
 			continue
 		}
@@ -230,12 +230,12 @@ func TestTypeGenNoInventNilRngOrProbs(t *testing.T) {
 	}
 	// nil RNG MoreTypesProbability must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
-	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0); f.Type != nil {
+	if f := MakeOneStructField(nil, opts, NewProbabilities(opts), &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0, false); f.Type != nil {
 		t.Fatal("nil RNG MakeOneStructField must fail closed")
 	}
 	// nil RNG MakeOneStructField must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
-	if f := MakeOneStructField(NewRngSess(testAmbientSession, 1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0); f.Type != nil {
+	if f := MakeOneStructField(NewRngSess(testAmbientSession, 1), opts, nil, &TypeEnv{Sess: testAmbientSession, AllTypes: []*Type{GetIntTypeSess(testAmbientSession)}}, 0, false); f.Type != nil {
 		t.Fatal("nil probs MakeOneStructField must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {

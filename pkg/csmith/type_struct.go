@@ -32,8 +32,10 @@ func MoreTypesProbabilitySess(s *Session, r *Rng, probs *Probabilities, typeCoun
 // MakeOneStructField mirrors Type::make_one_struct_field.
 // Type.cpp:683–697 + ChooseRandomTypeFilter depth gate (Type.cpp:240–242).
 // Nested prior structs allowed when StructDepth < MaxNestedStructLevel.
+// structHasAssignOps is Type.cpp make_one_struct_field's structHasAssignOps
+// (ChooseRandomTypeFilter second arg; only matters under lang_cpp).
 // On ERROR_RETURN / choose fail returns zero field (Type==nil); callers abort.
-func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int) StructField {
+func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv, fieldIdx int, structHasAssignOps bool) StructField {
 	// Type.cpp always has RNG + Probabilities sticky; no invent field shell without them
 	if r == nil || probs == nil {
 		noteErrEnv(env, ErrGeneric)
@@ -43,7 +45,7 @@ func MakeOneStructField(r *Rng, opts Options, probs *Probabilities, env *TypeEnv
 	// without marking used (Type.cpp:1186–1190 used only in choose_random).
 	var ft *Type
 	if env != nil {
-		ft = env.chooseRandomForStructField(r, opts, probs)
+		ft = env.chooseRandomForStructField(r, opts, probs, structHasAssignOps)
 	}
 	// Type.cpp:661 — ERROR_RETURN when AllTypes empty / choose fails; no soft invent simple
 	if ft == nil || hasErrEnv(env) {
@@ -149,8 +151,14 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		return nil
 	}
 	// is_bitfields = bitfields && flipcoin(BitFieldsCreationProb)
-	// Type.cpp:1086–1088 — ERROR_GUARD after flip
+	// Type.cpp:1061–1063 — ERROR_GUARD after flip
 	fullBitfields := opts.Bitfields && r.RndFlipcoinSess(sessFromEnv(env), uint32(probs.SingleSess(sessFromEnv(env), PBitFieldsCreationProb)))
+	if hasErrEnv(env) {
+		return nil
+	}
+	// Type.cpp:1064 — if_struct_will_have_assign_ops BEFORE make_*_struct_fields
+	// (lang_cpp burns RegularVolatileProb; filter uses hasAssign for nested fields).
+	hasAssign := IfStructWillHaveAssignOpsSess(sessFromEnv(env), r, opts, probs)
 	if hasErrEnv(env) {
 		return nil
 	}
@@ -164,7 +172,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 				if hasErrEnv(env) {
 					return nil
 				}
-				f = MakeOneStructField(r, opts, probs, env, i)
+				f = MakeOneStructField(r, opts, probs, env, i, hasAssign)
 				prevZero = false
 			} else {
 				if hasErrEnv(env) {
@@ -184,7 +192,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 			if hasErrEnv(env) {
 				return nil
 			}
-			f = MakeOneStructField(r, opts, probs, env, i)
+			f = MakeOneStructField(r, opts, probs, env, i, hasAssign)
 			prevZero = false
 		}
 		// Type.cpp:1090 ERROR_GUARD after make_*_struct_fields; no soft invent nil-type field
@@ -193,7 +201,7 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 		}
 		fields = append(fields, f)
 	}
-	// Type.cpp:1100–1110 — packed_struct; ccomp skips when aggregate/longlong fields
+	// Type.cpp:1076–1082 — packed_struct; ccomp skips when aggregate/longlong fields
 	packed := false
 	if opts.PackedStruct {
 		if opts.CComp && (HasAggregateFieldSess(sessFromEnv(env), fields) || HasLongLongFieldSess(sessFromEnv(env), fields)) {
@@ -204,10 +212,6 @@ func MakeRandomStructType(r *Rng, opts Options, probs *Probabilities, env *TypeE
 				return nil
 			}
 		}
-	}
-	hasAssign := IfStructWillHaveAssignOpsSess(sessFromEnv(env), r, opts, probs)
-	if hasErrEnv(env) {
-		return nil
 	}
 	// Type.cpp:1088–1091 make_random_struct_type — does not set used or record_type_with_bitfields.
 	// used + Bookkeeper::record_type_with_bitfields only when first chosen (choose_random*, filters).
@@ -286,13 +290,13 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	}
 	// struct/union generation draws RNG + probs; no invent fixed S0 shells without them
 	// Tag names come from Type.cpp shared sid sequence (env.AggregateSeq), not per-kind 0-based.
+	// Type.cpp:1166–1176 — while (MoreTypesProbability()) only; no soft invent
+	// StructTypes/UnionTypes count cap (that cut early under random_random and
+	// diverged used-type sets: missing S0/S7 vs upstream).
 	if opts.Structs && r != nil && probs != nil {
 		for MoreTypesProbabilitySess(sessFromEnv(env), r, probs, len(env.AllTypes)) {
-			// Type.cpp:1191–1193 — make_random_struct_type; sticky ERROR_RETURN aborts further
+			// Type.cpp:1168–1169 — make_random_struct_type; sticky ERROR_RETURN aborts further
 			if MakeRandomStructType(r, opts, probs, env, "") == nil || hasErrEnv(env) {
-				break
-			}
-			if len(env.StructTypes) > 20 {
 				break
 			}
 		}
@@ -300,9 +304,6 @@ func GenerateAllTypesEnv(r *Rng, opts Options, probs *Probabilities, env *TypeEn
 	if opts.Unions && r != nil && probs != nil {
 		for MoreTypesProbabilitySess(sessFromEnv(env), r, probs, len(env.AllTypes)) {
 			if MakeRandomUnionType(r, opts, probs, env, "") == nil || hasErrEnv(env) {
-				break
-			}
-			if len(env.UnionTypes) > 20 {
 				break
 			}
 		}
@@ -453,6 +454,9 @@ func (t *Type) OutputStructDeclBothAttrsSess(s *Session, r *Rng, structAttr, uni
 		b.WriteString(";\n")
 		j++
 	}
+	// Type.cpp:1863–1865 — OutputStructAssignOp non-vol then vol (lang_cpp + HasAssignOps)
+	b.WriteString(outputStructAssignOp(t, opts, false))
+	b.WriteString(outputStructAssignOp(t, opts, true))
 	// Type.cpp:1871–1875 — "}" then both type attr generators then ";"
 	b.WriteString("}")
 	if r != nil {
@@ -482,6 +486,90 @@ func (t *Type) OutputStructDeclBothAttrsSess(s *Session, r *Rng, structAttr, uni
 	}
 	// Type.cpp:1887 really_outputln after printed=true — blank line after each aggregate decl
 	b.WriteString("\n")
+	return b.String()
+}
+
+// outputStructAssignOp mirrors Type.cpp OutputStructAssignOp (1704–1746).
+// Empty when !lang_cpp or !HasAssignOps. vol=true emits volatile overload.
+// Field names use the same j skip as field emit (zero-width bitfields omitted).
+func outputStructAssignOp(t *Type, opts Options, vol bool) string {
+	if t == nil || !opts.LangCPP || !t.HasAssignOps || !t.isStruct {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("    ")
+	if vol {
+		b.WriteString("volatile ")
+	}
+	b.WriteString("struct ")
+	b.WriteString(t.StructName)
+	b.WriteString("& operator=(const ")
+	if vol {
+		b.WriteString("volatile ")
+	}
+	b.WriteString("struct ")
+	b.WriteString(t.StructName)
+	b.WriteString("& val) ")
+	if vol {
+		b.WriteString("volatile ")
+	}
+	b.WriteString("{\n")
+	b.WriteString("        if (this == &val) {\n")
+	b.WriteString("            return *this;\n")
+	b.WriteString("        }\n")
+	j := 0
+	for _, f := range t.Fields {
+		// Type.cpp:1740–1746 — length != 0 (non-bitfield is -1) advances j
+		if f.BitWidth == 0 {
+			continue
+		}
+		b.WriteString(fmt.Sprintf("         f%d= val.f%d;\n", j, j))
+		j++
+	}
+	b.WriteString("        return *this;\n")
+	b.WriteString("    }\n")
+	return b.String()
+}
+
+// outputUnionAssignOps mirrors Type.cpp OutputUnionAssignOps (1764–1808).
+func outputUnionAssignOps(t *Type, opts Options, vol bool) string {
+	if t == nil || !opts.LangCPP || !t.HasAssignOps || !t.isUnion {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("    ")
+	if vol {
+		b.WriteString("volatile ")
+	}
+	b.WriteString("union ")
+	b.WriteString(t.StructName)
+	b.WriteString("& operator=(const ")
+	if vol {
+		b.WriteString("volatile ")
+	}
+	b.WriteString("union ")
+	b.WriteString(t.StructName)
+	b.WriteString("& val) ")
+	if vol {
+		b.WriteString("volatile ")
+	}
+	b.WriteString("{\n")
+	b.WriteString("        if (this == &val) {\n")
+	b.WriteString("            return *this;\n")
+	b.WriteString("        }\n")
+	// Type.cpp:1790–1798 — memcpy with optional volatile casts
+	b.WriteString("        memcpy((")
+	b.WriteString("union ")
+	b.WriteString(t.StructName)
+	b.WriteString("*)this, (const ")
+	b.WriteString("union ")
+	b.WriteString(t.StructName)
+	b.WriteString("*)(&val), sizeof(")
+	b.WriteString("union ")
+	b.WriteString(t.StructName)
+	b.WriteString(")); \n")
+	b.WriteString("        return *this;\n")
+	b.WriteString("    }\n")
 	return b.String()
 }
 
@@ -986,6 +1074,9 @@ func (t *Type) OutputUnionDeclBothAttrsSess(s *Session, r *Rng, structAttr, unio
 		b.WriteString(";\n")
 		j++
 	}
+	// Type.cpp:1866–1868 — OutputUnionAssignOps non-vol then vol
+	b.WriteString(outputUnionAssignOps(t, opts, false))
+	b.WriteString(outputUnionAssignOps(t, opts, true))
 	// Type.cpp:1871–1875 — "}" then both type attr generators then ";"
 	b.WriteString("}")
 	if r != nil {

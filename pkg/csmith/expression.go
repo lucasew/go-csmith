@@ -1728,9 +1728,19 @@ func (e *Expression) OutputOptsSess(s *Session, opts Options) string {
 	if sessHasError(s) {
 		return ""
 	}
+	// Constant.cpp:538–545 — pointer-zero under lang_cpp emits bare "nullptr"
+	// and does NOT call Expression::output_cast, even when cast_if_needed set cast_type
+	// (ExpressionComma.cpp:48–53). Emitting "(T*) nullptr" desyncs vs golden.
+	if opts.LangCPP && e.Term == TermConstant && e.Con != nil && body == "nullptr" {
+		return body
+	}
 	if e.CastType != nil {
 		// Expression.cpp:228–231 — cast_type->Output + body; both always live
 		// sticky no invent "() body" / "(type) " empty body
+		// Only under ccomp || lang_cpp (Expression.cpp:228).
+		if !opts.CComp && !opts.LangCPP {
+			return body
+		}
 		cn := e.CastType.CNameSess(s)
 		// residual ERROR sticky — no invent cast emit past CName residual hole
 		if sessHasError(s) {
@@ -1836,8 +1846,8 @@ func (e *Expression) outputBodyOptsSess(s *Session, opts Options) string {
 		if sessHasError(s) {
 			return ""
 		}
-		if lhs == "" || rhs == "" {
-			// incomplete side IR — sticky fail closed whole comma
+		// empty sides ok under prefix_name (NDEBUG get_count_prefix → "( , )" style)
+		if (lhs == "" || rhs == "") && !opts.PrefixName {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}

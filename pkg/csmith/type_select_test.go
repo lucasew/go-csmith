@@ -387,19 +387,20 @@ func TestGetAllOKStructUnionTypesFieldTypeResidualSticky(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 }
 
-func TestChooseRandomStructFromTypeIsVolatileResidualSticky(t *testing.T) {
-	// IsVolatileStructUnion residual soft invent was invent return typ past hole.
+func TestChooseRandomStructFromTypeFieldTypeResidualSticky(t *testing.T) {
+	// Type.cpp:545–558 walks get_all_ok_struct_union_types; field Type-nil residual
+	// on IsConst/IsVolatile/HasIntField must fail closed (not invent keep typ).
 	ClearErrorSess(testAmbientSession)
 	env := &TypeEnv{Sess: testAmbientSession}
-	// Type with nil field Type → IsVolatileStructUnion residual when noVolatile
 	typ := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
 		{Name: "f0", Type: nil, BitWidth: -1},
 	}}
+	env.AllTypes = []*Type{typ}
 	if env.ChooseRandomStructFromType(NewRngSess(testAmbientSession, 1), typ, true) != nil {
-		t.Fatal("IsVolatileStructUnion residual must fail closed ChooseRandomStructFromType")
+		t.Fatal("field Type-nil residual must fail closed ChooseRandomStructFromType")
 	}
 	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("IsVolatileStructUnion residual ChooseRandomStructFromType must SetError sticky")
+		t.Fatal("field Type-nil residual ChooseRandomStructFromType must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 }

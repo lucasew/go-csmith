@@ -585,7 +585,10 @@ func TestGetAllOKStructUnionTypes(t *testing.T) {
 
 func TestChooseRandomStructFromType(t *testing.T) {
 	env := &TypeEnv{Sess: testAmbientSession}
-	st := &Type{isStruct: true, StructName: "S0"}
+	// need_int_field=true in choose_random_struct_from_type pool
+	st := &Type{isStruct: true, StructName: "S0", Fields: []StructField{
+		{Name: "f0", Type: GetIntTypeSess(testAmbientSession), BitWidth: -1},
+	}}
 	env.AllTypes = []*Type{st}
 	if env.ChooseRandomStructFromType(NewRngSess(testAmbientSession, 1), st, false) != st {
 		t.Fatal("same")

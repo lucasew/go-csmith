@@ -116,9 +116,9 @@ func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
 	// Compatible residual soft invent was soft-continue invent compatible true.
 	// Fair: sticky false. CompatibleWithVar residual via nil Var path already sticky.
 	// CompatibleCheckExprs residual soft invent was soft-continue no-reject invent false.
-	// Fair: sticky reject true.
+	// Fair: sticky reject true — requires CompatibleChecker static enabled.
 	opts := Defaults()
-	opts.CompatibleCheck = true
+	EnableCompatibleCheckSess(testAmbientSession)
 	if !CompatibleCheckExprsSess(testAmbientSession, opts, hole, live) {
 		t.Fatal("Compatible residual CompatibleCheckExprs must fail closed reject true")
 	}
@@ -126,6 +126,7 @@ func TestCompatibleWithExprNilVarFailClosed(t *testing.T) {
 		t.Fatal("Compatible residual CompatibleCheckExprs must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
+	ResetCompatibleCheckSess(testAmbientSession)
 }
 
 func TestConstantCompatibleWithVarExpandStruct(t *testing.T) {
