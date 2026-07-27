@@ -159,7 +159,8 @@ func NewProgramGenerator(s *Session) *ProgramGenerator {
 	} else if r.Sess == nil {
 		r.Sess = s
 	}
-	// C++ Probabilities is a process singleton — one session table for generator + VS
+	// C++ Probabilities is a process singleton. random_random applies after
+	// CreateInstance reseed in Initialize() (GetInstance on first extension use).
 	probs := NewProbabilities(opts)
 	s.Probs = probs
 	// Probabilities.cpp:573–578 — assignOpsTable_ + expr/param tables once
@@ -242,13 +243,36 @@ func (g *ProgramGenerator) Initialize() {
 	} else if g.Rng != nil {
 		s.Rng = g.Rng
 	}
+	// C++ first Probabilities::GetInstance()->initialize() is triggered by
+	// SIMPLE_TYPES_PROB_FILTER() inside Type::choose_random_simple (or by
+	// AbsProgramGenerator::CreateInstance when no extension). That runs
+	// random_random before any choose_random_simple rnd_upto. So when
+	// crest/klee Initialize calls choose_random_simple, the live stream is:
+	//   1) full random_random (singles + groups)
+	//   2) then per-param simple-type draws
+	// Mirror that: randomize probs first, then CreateExtension.
+	if g.Opts.RandomRandom && g.Rng != nil {
+		probs := NewProbabilitiesWithRng(g.Opts, g.Rng)
+		g.Probs = probs
+		s.Probs = probs
+		// rebuild statement table + expr tables from randomized singles/groups
+		g.StmtTab = probs.StatementThresholdTableSess(s)
+		s.StmtTab = g.StmtTab
+		InitSessionProbabilityTablesSess(s, g.Opts)
+		g.Tables = s.ExprTables
+		if g.VS != nil {
+			g.VS.Probs = probs
+		}
+	}
 	// re-init scope + assign ops from session opts (once-per-run tables)
 	InitScopeTableSess(s, g.Opts)
 	s.AssignOpsTab = NewAssignOpsTableSess(gSess(g), g.Opts)
-	// Attribute generators after Finalization cleared them
+	// Attribute generators after Finalization; post-random_random probs.
 	InitAttrGeneratorsSess(s, g.Opts, g.Probs)
 	// DefaultProgramGenerator.cpp:59 — ExtensionMgr::CreateExtension after
-	// CreateInstance so klee/crest Initialize burns the live generation RNG.
+	// CreateInstance. AbsExtension::Initialize burns choose_random_simple ×
+	// func1_max_params on the post-random_random stream (SIMPLE_TYPES filter
+	// already initialized above).
 	CreateExtensionSess(s, g.Opts)
 }
 
@@ -339,6 +363,12 @@ func (g *ProgramGenerator) GenerateFunctions() {
 			return
 		}
 	}
+	// Path A post-all-bodies (PureIVGlobals complete). Session-local — no package ambient.
+	// Restores pure FE head before residual free free-ref (seed32 func_34 g_381/g_1287).
+	FixupAllAccLatePureFEHeadsAfterAllFuncs(g.Sess, &g.Funcs, g.FactMgrs)
+	if g.hasErr() {
+		return
+	}
 	// Function.cpp:808 — FactPointTo::aggregate_all_pointto_sets
 	AggregateAllPointToSetsSess(g.Sess, g.Funcs.Funcs, g.FactMgrs)
 	// Function.cpp:809 — ExtensionMgr::GenerateValues (null extension → no-op)
@@ -419,9 +449,7 @@ func (g *ProgramGenerator) OutputHeader() string {
 		b.WriteString("#define ACCESS_ONCE(v) (*(volatile typeof(v) *)&(v))\n")
 		b.WriteString("#endif\n\n")
 	}
-	// OutputMgr.cpp:308–311 — decls when step_hash_by_stmt
-	// Go: only with ComputeHash so decls match OutputHashFuncDef / main call
-	// (no invent forward decls without live defs)
+	// OutputMgr.cpp:308–311 — decls when step_hash_by_stmt (not gated on compute_hash)
 	if g.hashHelpersEnabled() {
 		// OutputMgr::OutputHashFuncDecl / OutputStepHashFuncDecl
 		b.WriteString(OutputHashFuncDecl())
@@ -430,11 +458,10 @@ func (g *ProgramGenerator) OutputHeader() string {
 	return b.String()
 }
 
-// hashHelpersEnabled is step_hash_by_stmt && compute_hash.
-// OutputHashFuncDef / header decls / main invocation share this gate so we never
-// invent a call or forward decl without a matching definition body.
+// hashHelpersEnabled is step_hash_by_stmt alone (OutputMgr.cpp:308 / DefaultOutputMgr.cpp:187).
+// compute_hash only switches transparent_crc vs csmith_sink_ and platform_main_end form.
 func (g *ProgramGenerator) hashHelpersEnabled() bool {
-	return g != nil && g.Opts.StepHashByStmt && g.Opts.ComputeHash
+	return g != nil && g.Opts.StepHashByStmt
 }
 
 // hashFuncDefReady is true when OutputHashFuncDef can emit a live body.
@@ -684,6 +711,10 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		g.noteErr(ErrGeneric)
 		return ""
 	}
+	// Function.cpp:812–841 + DefaultOutputMgr::Output —
+	// OutputForwardDeclarations (all forwards, then all aliases) then OutputFunctions
+	// (all bodies). Do not interleave body emit with forwards: body call-site
+	// FunctionInvocationUser::Output flipcoins burn RNG and would desync attrs.
 	var forwards, aliases, bodies strings.Builder
 	for _, f := range g.Funcs.Funcs {
 		// pre-validated FunctionsComplete
@@ -703,20 +734,35 @@ func (g *ProgramGenerator) OutputFunctions() string {
 		}
 		forwards.WriteString(d)
 		forwards.WriteString("\n")
-		// Function.cpp:820–826 — alias decls when FunctionAttributes
-		if g.Opts.FunctionAttributes {
+	}
+	// Function.cpp:820–826 — alias decls when FunctionAttributes (second pass
+	// over entire FuncList including builtins; OutputForwardDeclAlias has no
+	// is_builtin skip — builtins emit empty alias_name + alias("name")).
+	if g.Opts.FunctionAttributes {
+		for _, f := range g.Funcs.Funcs {
+			// Function* always live; sticky no invent soft-skip hole
+			if f == nil {
+				g.noteErr(ErrGeneric)
+				return ""
+			}
 			a := f.OutputForwardDeclAliasOptsSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Opts)
 			// residual ERROR sticky — no invent soft-continue later funcs past alias residual
 			if g.hasErr() {
 				return ""
 			}
 			if a == "" {
-				// alias expected when FunctionAttributes; incomplete AliasName sticky
+				// FunctionAttributes always emits alias per FuncList entry
 				g.noteErr(ErrGeneric)
 				return ""
 			}
 			aliases.WriteString(a)
 			aliases.WriteString("\n")
+		}
+	}
+	// Function.cpp:834–841 — all function bodies after all forwards/aliases
+	for _, f := range g.Funcs.Funcs {
+		if f.IsBuiltin {
+			continue
 		}
 		body := f.OutputOptsWithSess(g.Sess, g.Opts.ForceGlobalsStatic, g.Opts.FunctionAttributes, g.Rng, g.Opts)
 		// residual ERROR sticky — no invent soft-continue later funcs past body residual
@@ -876,48 +922,44 @@ func (g *ProgramGenerator) OutputMain() string {
 	}
 
 	// first-function invocation builder (shared by blind_check and normal path)
-	// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation when extension active;
-	// null extension → BuildUserInvocation for random args.
+	// OutputMgr.cpp:97 — ExtensionMgr::MakeFuncInvocation(GetFirstFunction(), …)
+	// GetFirstFunction is FuncList[builtin_functions_cnt], not Funcs[0].
 	var firstInv string
 	var f0 *Function
-	if len(g.Funcs.Funcs) > 0 {
-		// Function* always live; sticky no invent main without first call shell
-		if g.Funcs.Funcs[0] == nil {
-			g.noteErr(ErrGeneric)
+	f0 = GetFirstFunctionSess(g.Sess, &g.Funcs)
+	// residual ERROR sticky — no invent main without first call shell past hole
+	if g.hasErr() {
+		return ""
+	}
+	if f0 != nil {
+		var inv *Invocation
+		if ExtensionActiveSess(g.Sess) {
+			// AbsExtension::MakeFuncInvocation — ExpressionVariable args from ExtValues
+			inv = AbsExtensionMakeFuncInvocationSess(g.Sess, f0, ExtensionValuesSess(g.Sess))
+		} else {
+			cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
+			cg.Types = &g.Types
+			inv = BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
+		}
+		// no soft invent name()+"()" or main without call when build/output fails
+		// Failed soft re-pick; nil/empty output sticky incomplete IR
+		if inv == nil {
+			if !g.hasErr() {
+				g.noteErr(ErrGeneric)
+			}
 			return ""
 		}
-		f0 = g.Funcs.Funcs[0]
-		// skip builtin first (unlikely); still need live invoke for user first
-		if !f0.IsBuiltin {
-			var inv *Invocation
-			if ExtensionActiveSess(g.Sess) {
-				// AbsExtension::MakeFuncInvocation — ExpressionVariable args from ExtValues
-				inv = AbsExtensionMakeFuncInvocationSess(g.Sess, f0, ExtensionValuesSess(g.Sess))
-			} else {
-				cg := EmptyCGContext().WithSession(g.Sess).WithFuncList(&g.Funcs)
-				cg.Types = &g.Types
-				inv = BuildUserInvocation(g.Rng, g.Opts, g.Probs, g.VS, g.Tables, &cg, &g.Funcs, f0)
-			}
-			// no soft invent name()+"()" or main without call when build/output fails
-			// Failed soft re-pick; nil/empty output sticky incomplete IR
-			if inv == nil {
-				if !g.hasErr() {
-					g.noteErr(ErrGeneric)
-				}
-				return ""
-			}
-			if inv.Failed {
-				return ""
-			}
-			firstInv = inv.OutputOptsSess(g.Sess, g.Opts)
-			// residual ERROR sticky — no invent main body past inv.Output residual hole
-			if g.hasErr() {
-				return ""
-			}
-			if firstInv == "" {
-				g.noteErr(ErrGeneric)
-				return ""
-			}
+		if inv.Failed {
+			return ""
+		}
+		firstInv = inv.OutputOptsSess(g.Sess, g.Opts)
+		// residual ERROR sticky — no invent main body past inv.Output residual hole
+		if g.hasErr() {
+			return ""
+		}
+		if firstInv == "" {
+			g.noteErr(ErrGeneric)
+			return ""
 		}
 	}
 
@@ -942,7 +984,7 @@ func (g *ProgramGenerator) OutputMain() string {
 				g.noteErr(ErrGeneric)
 				return ""
 			}
-			dump := v.OutputValueDumpSess(g.Sess, "checksum ", 1, endUnion)
+			dump := v.OutputValueDumpOptsSess(g.Sess, "checksum ", 1, endUnion, g.Opts.PrefixName)
 			if dump == "" && g.hasErr() {
 				return ""
 			}
@@ -1124,12 +1166,13 @@ func OutputPtrResetsSess(s *Session, ptrs []*Variable, opts Options) string {
 			continue
 		}
 		// OutputMgr.cpp:337 — Variable::Output always live sticky; no invent " = 0;" without name
-		out := v.OutputCOptsWithSess(s, false, opts)
+		out := v.OutputCOptsWithSess(s, opts.PrefixName, opts)
 		// residual ERROR sticky — no invent soft-continue later resets past OutputC residual
 		if sessHasError(s) {
 			return ""
 		}
-		if out == "" {
+		// empty name ok under prefix_name (NDEBUG get_count_prefix)
+		if out == "" && !opts.PrefixName {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -1559,17 +1602,10 @@ func (g *ProgramGenerator) GoGenerator() string {
 	if g.hasErr() {
 		return ""
 	}
-	// DefaultProgramGenerator.cpp:73–77 — identify_wrappers writes wrapper.h
-	// Library-first: append N_WRAP definition as a trailing section for consumers.
-	if g.Opts.IdentifyWrappers {
-		b.WriteString("\n/* --- wrapper.h (identify_wrappers) ---\n")
-		b.WriteString(OutputWrapperHSess(g.Sess))
-		// residual ERROR sticky — no invent program past OutputWrapperH residual hole
-		if g.hasErr() {
-			return ""
-		}
-		b.WriteString("--- end wrapper.h --- */\n")
-	}
+	// DefaultProgramGenerator.cpp:73–77 — identify_wrappers writes a separate
+	// wrapper.h file after Output(), not into the program stream. Soft invent
+	// embedding /* wrapper.h */ broke drop-in body parity vs golden stdout.
+	// Library consumers use WrapperHeader() / OutputWrapperHSess.
 	return b.String()
 }
 

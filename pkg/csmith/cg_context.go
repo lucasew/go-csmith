@@ -148,8 +148,13 @@ func (c CGContext) WithFuncList(list *FunctionList) CGContext {
 }
 
 // WithFactMgr attaches a FactMgr (get_fact_mgr path).
+// Also points Session.ActiveFM at fm so MergeFactInto/MergeUnionFact note
+// FactVecOrder on the same FM that owns GlobalFacts (bag-local, not package ambient).
 func (c CGContext) WithFactMgr(fm *FactMgr) CGContext {
 	c.FM = fm
+	if c.Sess != nil && fm != nil {
+		c.Sess.ActiveFM = fm
+	}
 	return c
 }
 
@@ -878,6 +883,8 @@ func (c *CGContext) ReadVar(v *Variable) {
 		return
 	}
 	if c.EffectAccum != nil {
+		// Env-gated: first EffectAccum read of named vars (n62: g_8 early vs UP late).
+		// stderr only; no package mutable state beyond the env check + already-read probe.
 		*c.EffectAccum = c.EffectAccum.ReadVarSess(sessFromCG(c), v)
 		// residual ERROR sticky — no invent soft-continue stm read past accum ReadVar residual
 		if hasErrCG(c) {

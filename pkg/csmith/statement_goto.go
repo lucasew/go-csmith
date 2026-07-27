@@ -2,7 +2,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
-import "strings"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
 
 // Session.StmLabels mirrors StatementGoto::stm_labels — dest statement → shared label.
 // StatementGoto.cpp:55, 224–229.
@@ -599,12 +603,44 @@ func MakeRandomGoto(
 	}
 	var cond *Expression
 	if len(readVars) > 0 {
+		// Optional: dump forward/back cond pool (stderr only; no package state).
+		// Diagnoses map_accum_effect[other] / EffectAccum read-set drift vs UP
+		// (n62: if (g_3199) vs if (g_2221) with identical RNG).
+		if os.Getenv("DIAG_GO_FP") != "" || (os.Getenv("CSMITH_DEBUG_POOL") != "" && os.Getenv("CSMITH_DEBUG_POOL") != "0") {
+			edge := "fwd"
+			if backEdge {
+				edge = "back"
+			}
+			nShow := len(readVars)
+			if nShow > 16 {
+				nShow = 16
+			}
+			names := make([]string, 0, nShow)
+			g8idx := -1
+			for i := 0; i < len(readVars); i++ {
+				if readVars[i] != nil && readVars[i].Name == "g_8" && g8idx < 0 {
+					g8idx = i
+				}
+				if i < nShow {
+					if readVars[i] != nil {
+						names = append(names, readVars[i].Name)
+					} else {
+						names = append(names, "?")
+					}
+				}
+			}
+			fmt.Fprintf(os.Stderr, "GO_GOTO_COND %s nRead=%d other=%d g8idx=%d first16=%v\n",
+				edge, len(readVars), other.StmID, g8idx, names)
+		}
 		if v := ChooseVisibleReadVarOptsSess(sessFromCG(cg), r, condBlk, readVars, GetIntTypeSess(sessFromCG(cg)), uf, sessOpts(sessFromCG(cg))); v != nil {
 			// StatementGoto.cpp:131–133 — ExpressionVariable(*cond_var) only.
 			// C++ does not call read_var here; visit_facts later uses check_read_var.
 			// Soft invent was NoteRead/ReadVar during make_random, which pushed the
 			// cond into effect_accum+effect_stm early and bloated map_accum_effect
 			// / later ambient (binary RHS seFree / write filters).
+			if os.Getenv("CSMITH_DEBUG_POOL") != "" && os.Getenv("CSMITH_DEBUG_POOL") != "0" {
+				fmt.Fprintf(os.Stderr, "GO_GOTO_COND_PICK %s\n", v.Name)
+			}
 			cond = &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(sessFromCG(cg))}
 		}
 	}
@@ -1034,6 +1070,11 @@ func MakeRandomGoto(
 		insertAt = ti
 	}
 	okBlk.Stmts = append(okBlk.Stmts[:insertAt+1], append([]Stmt{sg}, okBlk.Stmts[insertAt+1:]...)...)
+	// Insert restructures the block; rebuild parent index (C++ Statement::parent).
+	if okBlk.Func != nil {
+		okBlk.Func.InvalidateStmParentIdx()
+		okBlk.Func.noteStmParent(sg.StmID, okBlk)
+	}
 	// re-apply SourceLabel on dest by id after possible same-slice shift
 	if blk != nil {
 		for i := range blk.Stmts {

@@ -3,6 +3,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+)
+
 // MergeJumpFacts mirrors FactMgr::merge_jump_facts.
 // FactMgr.cpp:569–588 — for each non-rv fact, join related jump fact (or garbage).
 // Fact* always live in maps; nil subject/jump holes fail closed (*facts nil —
@@ -256,6 +261,26 @@ func AnalyzeWithEdgesIn(st *Stmt, facts *[]*FactPointTo, cg *CGContext, opts Opt
 		// back edges only if already visited
 		if fm.MapVisited != nil && fm.MapVisited[st.StmID] {
 			back := fm.FindEdgesIn(st.StmID, false, true)
+			if os.Getenv("DIAG_GO_G8") != "" && st.Kind == StmtFor && st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.Name == "g_8" {
+				nBack, nFwd := 0, 0
+				if back != nil {
+					for _, e := range back {
+						if fm.MapVisited != nil && fm.MapVisited[e.SrcID] {
+							nBack++
+						}
+					}
+				}
+				fwd0 := fm.FindEdgesIn(st.StmID, false, false)
+				if fwd0 != nil {
+					for _, e := range fwd0 {
+						if fm.MapVisited != nil && fm.MapVisited[e.SrcID] {
+							nFwd++
+						}
+					}
+				}
+				fmt.Fprintf(os.Stderr, "GO_EDGES_FOR_G8 sid=%d visBack=%d visFwd=%d nFact=%d\n",
+					st.StmID, nBack, nFwd, len(*facts))
+			}
 			// nil = incomplete CFG (hole); empty non-nil = no matching edges
 			// FindEdgesIn already SetError sticky on incomplete CFG
 			if back == nil {
@@ -436,6 +461,13 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			}
 			return
 		}
+		// Snapshot subjects present before makeup (mid-stmt first-seen detection).
+		preUnionBeforeMakeup := make(map[*Variable]struct{}, len(workPreUnion))
+		for _, uf := range workPreUnion {
+			if uf != nil && uf.Var != nil {
+				preUnionBeforeMakeup[uf.Var] = struct{}{}
+			}
+		}
 		if !makeupNewUnionFactsSess(sessFromCG(cg), &workPreUnion, fm.UnionFacts) {
 			fm.GlobalFacts = IncompleteFactSlice()
 			fm.UnionFacts = IncompleteUnionFactSlice()
@@ -443,6 +475,50 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 				noteErrCG(cg, ErrGeneric)
 			}
 			return
+		}
+		// func_1: mid-stmt first-seen eUnionWrite subjects arrive via callee renew as
+		// multi-exit BOTTOM while makeup invents field-0 INIT → false find_updated
+		// (campfail n133 sid 80). C++ does not emit that paranoid section. Only
+		// align when live is BOTTOM — gen-time field writes (n114 g_48.f3) must keep
+		// makeup INIT so map_in≠map_out (statement id + orphan indent under --quiet).
+		// Non-func_1 sites still need INIT→BOTTOM as real updates without this gate.
+		if cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" {
+			for i, uf := range workPreUnion {
+				if uf == nil || uf.Var == nil {
+					continue
+				}
+				if _, was := preUnionBeforeMakeup[uf.Var]; was {
+					continue
+				}
+				live := FindRelatedUnionSess(sessFromCG(cg), fm.UnionFacts, uf.Var)
+				if live == nil || hasErrCG(cg) {
+					if hasErrCG(cg) {
+						fm.GlobalFacts = IncompleteFactSlice()
+						fm.UnionFacts = IncompleteUnionFactSlice()
+						return
+					}
+					continue
+				}
+				isBot := live.IsBottomSess(sessFromCG(cg))
+				if hasErrCG(cg) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					return
+				}
+				if !isBot {
+					continue // keep makeup INIT; assign/out shows real field write
+				}
+				cp := live.CloneSess(sessFromCG(cg))
+				if cp == nil || hasErrCG(cg) {
+					fm.GlobalFacts = IncompleteFactSlice()
+					fm.UnionFacts = IncompleteUnionFactSlice()
+					if !hasErrCG(cg) {
+						noteErrCG(cg, ErrGeneric)
+					}
+					return
+				}
+				workPreUnion[i] = cp
+			}
 		}
 	}
 	// simple statements: save effect_stm
@@ -454,6 +530,22 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			return
 		}
 		fm.SetMapStmEffect(st.StmID, cg.EffectStm)
+		if os.Getenv("DIAG_GO_HANDOFF") != "" && cg.CurrentFunc != nil && cg.CurrentFunc.Name == "func_1" {
+			want := []string{"g_903.f3", "g_2087.f0", "g_408", "g_2486", "g_2615"}
+			var have []string
+			for _, n := range want {
+				for _, v := range cg.EffectStm.ReadVarsSess(sessFromCG(cg)) {
+					if v != nil && v.Name == n {
+						have = append(have, n)
+						break
+					}
+				}
+			}
+			if len(have) > 0 {
+				fmt.Fprintf(os.Stderr, "GO_MAPSTM_SET kind=%v sid=%d have=%v nR=%d\n",
+					st.Kind, st.StmID, have, len(cg.EffectStm.ReadVarsSess(sessFromCG(cg))))
+			}
+		}
 	}
 	specialHandled := false
 	// Statement.cpp:864–878 — func_1 outside loop + uncertain call → full validate
@@ -536,6 +628,23 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 			okV := ValidateAndUpdateFacts(st, &outputs, cg, opts, cg.CurrentBlock())
 			// NDEBUG continue: sticky from validate must not poison later soft paths.
 			sessClearError(sessFromCG(cg))
+			if os.Getenv("DIAG_GO_HANDOFF") != "" {
+				want := []string{"g_903.f3", "g_2087.f0", "g_408", "g_2486", "g_2615"}
+				me := fm.GetMapStmEffect(st.StmID)
+				var have []string
+				if EffectComplete(me) {
+					for _, n := range want {
+						for _, v := range me.ReadVarsSess(sessFromCG(cg)) {
+							if v != nil && v.Name == n {
+								have = append(have, n)
+								break
+							}
+						}
+					}
+				}
+				fmt.Fprintf(os.Stderr, "GO_SPECIAL_VAL sid=%d kind=%v okV=%v mapHave=%v nMapR=%d\n",
+					st.StmID, st.Kind, okV, have, len(me.ReadVarsSess(sessFromCG(cg))))
+			}
 			if okV {
 				if !FactsComplete(outputs) || !UnionFactsComplete(fm.UnionFacts) {
 					fm.GlobalFacts = IncompleteFactSlice()
@@ -641,7 +750,21 @@ func PostCreationAnalysis(st *Stmt, preFacts []*FactPointTo, preUnion []*FactUni
 		return
 	}
 	// FactMgr.cpp set_fact_in — full FactVec (point-to pre + eUnionWrite pre, after makeup)
+	if os.Getenv("DIAG_GO_G8") != "" && st.Kind == StmtFor {
+		ivn := "?"
+		if st.Loop != nil && st.Loop.IV != nil {
+			ivn = st.Loop.IV.Name
+		}
+		fmt.Fprintf(os.Stderr, "GO_FOR_POST sid=%d iv=%s nPrePT=%d nPreU=%d nLivePT=%d nLiveU=%d inLoop=%v mapR=%d\n",
+			st.StmID, ivn, len(preFacts), len(workPreUnion), len(fm.GlobalFacts), len(fm.UnionFacts),
+			cg.InLoop(), len(fm.GetMapStmEffect(st.StmID).ReadVarsSess(sessFromCG(cg))))
+	}
 	fm.SetMapFactsInPair(st.StmID, preFacts, workPreUnion)
+	if os.Getenv("DIAG_GO_G8") != "" && st.Kind == StmtFor && st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.Name == "g_8" {
+		got := fm.GetMapFactsIn(st.StmID)
+		gotU := fm.GetMapUnionFactsIn(st.StmID)
+		fmt.Fprintf(os.Stderr, "GO_FOR_G8_MAPIN sid=%d nIn=%d nInU=%d\n", st.StmID, len(got), len(gotU))
+	}
 	fm.SetMapFactsOutForStmt(st, fm.GlobalFacts, cg.CurrentBlock())
 	// Incomplete accum fails closed sticky (no invent MapAccumEffect incomplete as recorded success)
 	acc := cg.AccumEffect()
@@ -757,6 +880,16 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 				noteErrCG(cg, ErrGeneric)
 				return currentInputs, nil, -1, false
 			}
+			hasG8For := false
+			if os.Getenv("DIAG_GO_G8") != "" && b.Looping {
+				for i := range b.Stmts {
+					st := &b.Stmts[i]
+					if st.Kind == StmtFor && st.Loop != nil && st.Loop.IV != nil && st.Loop.IV.Name == "g_8" {
+						hasG8For = true
+						break
+					}
+				}
+			}
 			for _, e := range back {
 				// Block.cpp:535 — merge_facts(current_inputs, map_facts_out[src])
 				// Full FactVec: ePointTo + eUnionWrite (soft invent was PT-only).
@@ -767,7 +900,11 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 					return currentInputs, nil, -1, false
 				}
 				// MergeFacts clears on mid-join failure — fail closed fixed-point
-				_ = MergeFactsSess(sessFromCG(cg), &currentInputs, out)
+				ch := MergeFactsSess(sessFromCG(cg), &currentInputs, out)
+				if hasG8For && os.Getenv("DIAG_GO_G8") != "" {
+					fmt.Fprintf(os.Stderr, "GO_PARENT_MERGE blk=%d src=%d ch=%v nOut=%d nIn=%d\n",
+						b.StmID, e.SrcID, ch, len(out), len(currentInputs))
+				}
 				// residual ERROR sticky — no invent soft-fixed-point past MergeFacts residual
 				if hasErrCG(cg) {
 					return currentInputs, nil, -1, false
@@ -965,6 +1102,16 @@ func FindFixedPointBlock(b *Block, inputs []*FactPointTo, cg *CGContext, opts Op
 		// Block.cpp:552–557 — analyze each statement
 		for i := range b.Stmts {
 			if !AnalyzeWithEdgesIn(&b.Stmts[i], &outputs, cg, opts, b) {
+				// Optional: classify fail for pool/FP debug (stderr only; no package state).
+				if os.Getenv("CSMITH_DEBUG_POOL") != "" && os.Getenv("CSMITH_DEBUG_POOL") != "0" {
+					st := &b.Stmts[i]
+					errN := 0
+					if hasErrCG(cg) {
+						errN = 1
+					}
+					fmt.Fprintf(os.Stderr, "GO_FP_ANALYZE_FAIL idx=%d sid=%d kind=%d sticky=%d outs=%d\n",
+						i, st.StmID, int(st.Kind), errN, len(outputs))
+				}
 				return outputs, nil, i, false
 			}
 		}

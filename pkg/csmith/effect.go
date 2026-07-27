@@ -552,6 +552,76 @@ func (e Effect) ReadVarSess(s *Session, v *Variable) Effect {
 	return e
 }
 
+// ReadVarBeforeSess is ReadVar that inserts v immediately before before on
+// readOrder when both are distinct and before is already read. Used by pure-IV
+// Acc membership recovery to restore FE order (seed12593 g_1678 before g_3964)
+// instead of Acc-appending pure IVs after residual free of the same FE.
+// If before is nil / not already read / v already read, falls back to ReadVarSess.
+// Session-local — no package mutable state.
+func (e Effect) ReadVarBeforeSess(s *Session, v, before *Variable) Effect {
+	if v == nil {
+		sessNoteError(s, ErrGeneric)
+		return IncompleteEffect()
+	}
+	if before == nil || v == before {
+		return e.ReadVarSess(s, v)
+	}
+	if e.incomplete {
+		sessNoteError(s, ErrGeneric)
+		return IncompleteEffect()
+	}
+	already := e.IsReadSess(s, v)
+	if sessHasError(s) {
+		return IncompleteEffect()
+	}
+	if already {
+		return e.ReadVarSess(s, v) // still updates pure/SE flags
+	}
+	beforeOK := e.IsReadSess(s, before)
+	if sessHasError(s) {
+		return IncompleteEffect()
+	}
+	if !beforeOK {
+		return e.ReadVarSess(s, v)
+	}
+	// Insert v into read map + readOrder before `before`.
+	nr := make(map[*Variable]bool, len(e.read)+1)
+	for k, val := range e.read {
+		nr[k] = val
+	}
+	nr[v] = true
+	e.read = nr
+	ord := make([]*Variable, 0, len(e.readOrder)+1)
+	inserted := false
+	for _, x := range e.readOrder {
+		if x == before && !inserted {
+			ord = append(ord, v)
+			inserted = true
+		}
+		ord = append(ord, x)
+	}
+	if !inserted {
+		ord = append(ord, v)
+	}
+	e.readOrder = ord
+	// same purity/SE update as ReadVarSess
+	isConst := v.IsConstSess(s)
+	if sessHasError(s) {
+		return IncompleteEffect()
+	}
+	isVol := v.IsVolatileSess(s)
+	if sessHasError(s) {
+		return IncompleteEffect()
+	}
+	if !(isConst && !isVol && !v.IsAccessOnce) {
+		e.pure = false
+	}
+	if isVol || v.IsAccessOnce {
+		e.sideEffectFree = false
+	}
+	return e
+}
+
 // IsWritten mirrors Effect::is_written — exact or parent field_var_of.
 // Effect.cpp:333–345.
 // Incomplete effect sticky true (no invent not-written / conflict-free past holes).
@@ -1489,13 +1559,15 @@ func (e Effect) CommentOutputOptsSess(s *Session, quiet, concise bool) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
+	pref := sessOpts(s).PrefixName
 	for _, v := range reads {
 		// Effect.cpp:518 — Variable::OutputForComment → get_actual_name()
-		name := v.OutputForCommentSess(s, false)
+		name := v.OutputForCommentSess(s, pref)
 		if sessHasError(s) {
 			return ""
 		}
-		if name == "" {
+		// empty name under prefix_name still emits " " (NDEBUG get_count_prefix)
+		if name == "" && !pref {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -1513,11 +1585,11 @@ func (e Effect) CommentOutputOptsSess(s *Session, quiet, concise bool) string {
 		return ""
 	}
 	for _, v := range writes {
-		name := v.OutputForCommentSess(s, false)
+		name := v.OutputForCommentSess(s, pref)
 		if sessHasError(s) {
 			return ""
 		}
-		if name == "" {
+		if name == "" && !pref {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}

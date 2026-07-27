@@ -81,6 +81,12 @@ type Session struct {
 	// ArrayVariable static seed
 	ArrayInitSeed uint32
 
+	// PureIVGlobals records global make_iteration IVs for this run (session-local).
+	// Used by post-body pure-IV FE order fixups when residual free of one FE is
+	// pure for-IV of another function not yet on the parent's call tree (seed57
+	// g_114 of func_2/28 residual free of func_70 on func_38). Not package ambient.
+	PureIVGlobals map[*Variable]bool
+
 	// util gensym_count + analysis errlog
 	GenSym         GenSym
 	AnalysisErrLog strings.Builder
@@ -106,6 +112,11 @@ type Session struct {
 	MetaFactPointToEnabled  bool
 	MetaFactUnionEnabled    bool
 	InUserInvocationRevisit bool
+	// ActiveFM is the FactMgr currently receiving lattice merges (bag-local).
+	// MergeFactInto / MergeUnionFact note FactVecOrder on ActiveFM so paranoid
+	// output_assertions can interleave ePointTo + eUnionWrite like C++ FactVec.
+	// Not package ambient — per Session pure-run bag only.
+	ActiveFM *FactMgr
 
 	// Variable::ctrl_vars
 	CtrlVarsVectors [][]*Variable
