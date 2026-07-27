@@ -86,11 +86,41 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 		return ""
 	}
 	if fi.User != nil {
-		// FunctionInvocationUser::Output — func name + param_value[i] always live
-		// sticky no invent "()" / empty slots "f(a, , c)" or soft "0" for nil/empty args
+		// FunctionInvocationUser.cpp:415–422 — name choice BEFORE arg Output so
+		// func_attr flipcoin burns before param_value[i]->Output (variable attrs
+		// / nested calls). sticky no invent "()" / empty slots or soft "0".
 		if fi.User.Name == "" {
 			sessNoteError(s, ErrGeneric)
 			return ""
+		}
+		// FunctionInvocationUser.cpp:416–419 —
+		//   if (func_attr_flag && rnd_flipcoin(FuncAttrProb())) alias_name
+		//   else name
+		// Short-circuit: no flipcoin when FunctionAttributes off.
+		callName := fi.User.Name
+		if opts.FunctionAttributes {
+			r := sessRng(s)
+			probs := sessProbs(s)
+			if r == nil || probs == nil {
+				sessNoteError(s, ErrGeneric)
+				return ""
+			}
+			p := probs.SingleSess(s, PFuncAttrProb)
+			if sessHasError(s) {
+				return ""
+			}
+			if p < 0 {
+				sessNoteError(s, ErrGeneric)
+				return ""
+			}
+			if r.RndFlipcoinSess(s, uint32(p)) {
+				if fi.User.AliasName == "" {
+					// incomplete alias IR sticky — no invent Name+"_alias"
+					sessNoteError(s, ErrGeneric)
+					return ""
+				}
+				callName = fi.User.AliasName
+			}
 		}
 		var parts []string
 		for _, a := range fi.Args {
@@ -111,7 +141,7 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 			parts = append(parts, out)
 		}
 		var b strings.Builder
-		b.WriteString(fi.User.Name)
+		b.WriteString(callName)
 		b.WriteString("(")
 		for i, p := range parts {
 			if i > 0 {
@@ -123,7 +153,12 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 		return b.String()
 	}
 	if fi.IsStd {
-		// FunctionInvocationUnary/Binary::Output — param_value[i]->Output; sticky no soft invent "0"
+		// FunctionInvocationUnary/Binary::Output — C++ to_id(fname) before
+		// param_value[i]->Output (FunctionInvocationBinary.cpp:372–388 /
+		// Unary.cpp:206–218) so identify_wrappers registers outer before nested.
+		// Soft invent Output args first then to_id inverted registration (seed2
+		// --identify-wrappers safe_mul id 1 then safe_rshift 2 vs UP 1 then 4).
+		// Session-local WrapperNames — no package mutable state.
 		if fi.IsUnary {
 			// assert known unary op + non-empty param
 			switch fi.Unary {
@@ -136,6 +171,40 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 			if len(fi.Args) < 1 || fi.Args[0] == nil {
 				sessNoteError(s, ErrGeneric)
 				return ""
+			}
+			// Safe unary minus: to_id before arg Output (C++ order).
+			if fi.Unary == "-" && fi.Safe != nil && fi.OutSafeMath && fi.Safe.Size != SafeFloat {
+				fname := fi.Safe.UnaryMinusFuncNameSess(s)
+				if fname != "" {
+					id := SafeOpFlagsToIDSess(s, fname)
+					a0 := fi.Args[0].OutputOptsSess(s, opts)
+					if sessHasError(s) {
+						return ""
+					}
+					if a0 == "" {
+						sessNoteError(s, ErrGeneric)
+						return ""
+					}
+					if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
+						var b strings.Builder
+						b.WriteString("(")
+						b.WriteString(fname)
+						b.WriteString("(")
+						if fi.MathNoTmp && fi.Tmp1 != "" {
+							b.WriteString(fi.Tmp1)
+							b.WriteString(", ")
+						}
+						b.WriteString(a0)
+						if fi.OutIdentifyWrappers {
+							b.WriteString(", ")
+							b.WriteString(Int2Str(id))
+						}
+						b.WriteString("))")
+						return b.String()
+					}
+					// wrapper denied → cast path after arg already emitted
+					return unaryCastMinusSess(s, fi.Safe.SizeTokenSess(s), a0)
+				}
 			}
 			a0 := fi.Args[0].OutputOptsSess(s, opts)
 			// residual ERROR sticky — no invent soft-empty unary past Output residual
@@ -162,6 +231,49 @@ func (fi *Invocation) OutputOptsSess(s *Session, opts Options) string {
 			// invalid op sticky (except bare + for array mutate without flags)
 			sessNoteError(s, ErrGeneric)
 			return ""
+		}
+		// Safe binary: to_id before arg Output (FunctionInvocationBinary.cpp:372–388).
+		if fi.Safe != nil && SafeOpsBinary(fi.Binary) && fi.OutSafeMath {
+			if fname := fi.Safe.BinaryFuncNameSess(s, fi.Binary); fname != "" {
+				id := SafeOpFlagsToIDSess(s, fname)
+				a0 := fi.Args[0].OutputOptsSess(s, opts)
+				if sessHasError(s) {
+					return ""
+				}
+				a1 := fi.Args[1].OutputOptsSess(s, opts)
+				if sessHasError(s) {
+					return ""
+				}
+				if a0 == "" || a1 == "" {
+					sessNoteError(s, ErrGeneric)
+					return ""
+				}
+				if SafeMathWrapperAllowed(fi.wrapperOpts(), id) {
+					var b strings.Builder
+					b.WriteString("(")
+					b.WriteString(fname)
+					b.WriteString("(")
+					if fi.MathNoTmp && fi.Tmp1 != "" {
+						b.WriteString(fi.Tmp1)
+						b.WriteString(", ")
+					}
+					b.WriteString(a0)
+					b.WriteString(", ")
+					if fi.MathNoTmp && fi.Tmp2 != "" {
+						b.WriteString(fi.Tmp2)
+						b.WriteString(", ")
+					}
+					b.WriteString(a1)
+					if fi.OutIdentifyWrappers {
+						b.WriteString(", ")
+						b.WriteString(Int2Str(id))
+					}
+					b.WriteString("))")
+					return b.String()
+				}
+				// wrapper denied → cast both operands
+				return binaryCastOpSess(s, fi.Safe.SizeTokenSess(s), a0, fi.Binary, a1)
+			}
 		}
 		a0 := fi.Args[0].OutputOptsSess(s, opts)
 		// residual ERROR sticky — no invent soft-continue a1 past a0 Output residual
@@ -456,22 +568,42 @@ func ChooseFuncContext(r *Rng, funcs []*Function, ret *Type, exclude *Function, 
 			}
 		}
 		// Function.cpp:318–326 — has_race_with is commented out upstream; do not filter
+		// Function.cpp:324–326 — builtins always enter ok_builtin_funcs (even empty pool
+		// still burns BuiltinFunctionProb below). Not gated on opts.Builtins.
 		if f.IsBuiltin {
-			if opts.Builtins {
-				okBuiltin = append(okBuiltin, f)
-			}
+			okBuiltin = append(okBuiltin, f)
 			continue
 		}
 		ok = append(ok, f)
 	}
-	// Function.cpp:330–337 — BuiltinFunctionProb → try builtin; else user only
-	// (no soft fallback to builtins when user pool empty / not chosen)
-	// CGOptions::BuiltinFunctionProb() as-is; 0 means never (no invent default 50)
+	// Function.cpp:329–337 —
+	//   if (CGOptions::builtins() && rnd_flipcoin(BuiltinFunctionProb()))
+	//     f = get_one_function(ok_builtin_funcs);
+	//   if (f == nullptr) f = get_one_function(ok_funcs);
+	// Always flip when builtins enabled — even if okBuiltin empty or p==0
+	// (rnd_flipcoin(0) still burns genrand; empty pool → nullptr). Skipping the
+	// flip when the eligible-builtin set was empty desynced the stream at first
+	// TermFunction after --builtins (seed 6197904348660767544, n7 camp fail).
+	//
+	// Probability source: BuiltinFunctionProb() = Probabilities::get_prob
+	// (Probabilities.h:524–525), i.e. the post-random_random *table* value —
+	// NOT CGOptions::builtin_function_prob() raw CLI. With --random-random the
+	// table is rewritten (initialize_single_probs); using opts.BuiltinFunctionProb
+	// desynced F p=CLI vs F p=table (n265 first_div event 338: p=16 vs p=54).
+	// Fall back to opts only when the bag has no Probs (unit tests / no table).
+	// No soft fallback to builtins when user pool empty / not chosen.
 	var f *Function
-	if opts.Builtins && len(okBuiltin) > 0 && r != nil {
+	if opts.Builtins && r != nil {
+		s := sessFromCG(cg)
 		p := opts.BuiltinFunctionProb
-		if p > 0 && r.RndFlipcoinSess(sessFromCG(cg), uint32(p)) {
-			f = getOneFunctionSess(sessFromCG(cg), r, okBuiltin)
+		if s != nil && s.Probs != nil {
+			p = s.Probs.SingleSess(s, PBuiltinFunctionProb)
+		}
+		if p < 0 {
+			p = 0
+		}
+		if r.RndFlipcoinSess(s, uint32(p)) {
+			f = getOneFunctionSess(s, r, okBuiltin)
 		}
 	}
 	if f == nil {
@@ -516,11 +648,16 @@ func ExpressionFunctionProbability(r *Rng, list *FunctionList, opts Options) boo
 	return r.RndFlipcoinSess(rSess(r), 80)
 }
 
-// GetFirstFunction mirrors GetFirstFunction — first entry in FuncList / func_1.
-// Function.cpp / FunctionInvocationUser.cpp:274.
+// GetFirstFunction mirrors GetFirstFunction — first *user* entry in FuncList.
+// Function.cpp:242–244 — return FuncList[builtin_functions_cnt];
+// Builtins are always a prefix (initialize_builtin_functions before make_first).
+// Counting IsBuiltin prefix is equivalent to the C++ counter and matches the
+// bag-local list without a package-global builtin_functions_cnt.
+// FunctionInvocationUser.cpp:274 — target != GetFirstFunction() revisit gate.
 // Nil list / empty Funcs is complete miss (no invent first of empty; isolated
 // BuildUserInvocation may pass nil list as "no first-function identity").
-// Function* always live at [0]; nil hole sticky (no invent scan later).
+// Function* always live in the builtin prefix and at the user slot; nil hole
+// sticky (no invent scan later past a hole as soft-miss).
 // Non-Sess GetFirstFunction deleted — pass run bag or testAmbientSession explicitly.
 
 // GetFirstFunctionSess is GetFirstFunction with explicit session residual sticky.
@@ -528,12 +665,24 @@ func GetFirstFunctionSess(s *Session, list *FunctionList) *Function {
 	if list == nil || len(list.Funcs) == 0 {
 		return nil
 	}
-	// C++ first_function is funcs[0]; incomplete IR at front sticky fail closed
-	if list.Funcs[0] == nil {
-		sessNoteError(s, ErrGeneric)
+	// Function.cpp:242–244 — skip builtin prefix; first user is make_first's func.
+	i := 0
+	for i < len(list.Funcs) {
+		if list.Funcs[i] == nil {
+			// incomplete IR in prefix sticky fail closed (no invent scan later)
+			sessNoteError(s, ErrGeneric)
+			return nil
+		}
+		if !list.Funcs[i].IsBuiltin {
+			break
+		}
+		i++
+	}
+	if i >= len(list.Funcs) {
+		// only builtins — complete miss (no invent first-of-empty-user-pool)
 		return nil
 	}
-	return list.Funcs[0]
+	return list.Funcs[i]
 }
 
 // BuildUserInvocation mirrors FunctionInvocationUser::build_invocation.
@@ -710,7 +859,16 @@ func BuildUserInvocation(
 				fi.Failed = true
 				return fi
 			}
-			callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(sessFromCG(cg), effectAccum, cg.CallChain)
+			// Acc→FE handoff with outer pure for-IV strip (n94 g_2991.f0).
+			effForFE := stripCallerForIVsFromEffect(sessFromCG(cg), effectAccum, cg.CurrentFunc, cg, callee)
+			if !EffectComplete(effForFE) {
+				if !hasErrCG(cg) {
+					noteErrCG(cg, ErrGeneric)
+				}
+				fi.Failed = true
+				return fi
+			}
+			callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(sessFromCG(cg), effForFE, cg.CallChain)
 			if !EffectComplete(callee.FEffect) {
 				noteErrCG(cg, ErrGeneric)
 				fi.Failed = true
@@ -1062,7 +1220,16 @@ func BuildInvocationAndFunction(
 		fi.Failed = true
 		return fi
 	}
-	callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(sessFromCG(cg), effectAccum, cg.CallChain)
+	// Acc→FE handoff with outer pure for-IV strip (n94 g_2991.f0).
+	effForFE := stripCallerForIVsFromEffect(sessFromCG(cg), effectAccum, cg.CurrentFunc, cg, callee)
+	if !EffectComplete(effForFE) {
+		if !hasErrCG(cg) {
+			noteErrCG(cg, ErrGeneric)
+		}
+		fi.Failed = true
+		return fi
+	}
+	callee.FEffect = callee.FEffect.AddExternalEffectWithCallersSess(sessFromCG(cg), effForFE, cg.CallChain)
 	if !EffectComplete(callee.FEffect) {
 		noteErrCG(cg, ErrGeneric)
 		fi.Failed = true

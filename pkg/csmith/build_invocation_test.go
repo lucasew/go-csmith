@@ -493,15 +493,25 @@ func TestGetFirstFunction(t *testing.T) {
 	b := &Function{Name: "func_2"}
 	list := &FunctionList{Funcs: []*Function{a, b}}
 	if GetFirstFunctionSess(testAmbientSession, list) != a {
-		t.Fatal("want first")
+		t.Fatal("want first user when no builtins")
 	}
-	// nil hole at [0] sticky (no invent scan later)
+	// Function.cpp:243–246 — FuncList[builtin_functions_cnt] skips builtin prefix
+	bi := &Function{Name: "__builtin_clz", IsBuiltin: true}
+	list2 := &FunctionList{Funcs: []*Function{bi, a, b}}
+	if GetFirstFunctionSess(testAmbientSession, list2) != a {
+		t.Fatal("want first user after builtins")
+	}
+	// only builtins → complete miss
+	if GetFirstFunctionSess(testAmbientSession, &FunctionList{Funcs: []*Function{bi}}) != nil {
+		t.Fatal("only-builtins must miss")
+	}
+	// nil hole in builtin prefix sticky (no invent scan later)
 	ClearErrorSess(testAmbientSession)
 	if GetFirstFunctionSess(testAmbientSession, &FunctionList{Funcs: []*Function{nil, b}}) != nil {
-		t.Fatal("nil first hole must fail closed")
+		t.Fatal("nil hole must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
-		t.Fatal("nil first hole GetFirstFunction must SetError sticky")
+		t.Fatal("nil hole GetFirstFunction must SetError sticky")
 	}
 	ClearErrorSess(testAmbientSession)
 }

@@ -397,13 +397,60 @@ func TestGoGeneratorIdentifyWrappers(t *testing.T) {
 	_ = SafeOpFlagsToIDSess(sess, "func_add_int32_t")
 	g := NewProgramGenerator(sess)
 	out := g.GoGenerator()
-	if !strings.Contains(out, "wrapper.h") || !strings.Contains(out, "N_WRAP") {
-		t.Fatal(out[len(out)-200:])
+	// wrapper.h is a separate file (DefaultProgramGenerator.cpp:73–77), not stdout body.
+	if strings.Contains(out, "wrapper.h") || strings.Contains(out, "N_WRAP") {
+		t.Fatal("program stream must not embed wrapper.h", out[len(out)-200:])
 	}
-	if g.WrapperHeader() != OutputWrapperHSess(g.Sess) {
-		t.Fatal(g.WrapperHeader())
+	wh := g.WrapperHeader()
+	if wh != OutputWrapperHSess(g.Sess) {
+		t.Fatal(wh)
 	}
-	if !strings.Contains(out, "#define N_WRAP 1") && !strings.Contains(out, "#define N_WRAP ") {
-		t.Fatal("wrapper section must emit N_WRAP from run bag", out[len(out)-200:])
+	if !strings.Contains(wh, "#define N_WRAP 1") && !strings.Contains(wh, "#define N_WRAP ") {
+		t.Fatal("WrapperHeader must emit N_WRAP from run bag", wh)
+	}
+}
+
+// Nested safe binary: C++ to_id(outer) before param Output (inner).
+// Soft invent Output(args) then to_id shifted ids (campfail n45 identify-wrappers).
+func TestIdentifyWrappersOuterBeforeNestedArgs(t *testing.T) {
+	ClearSafeOpWrapperNamesSess(testAmbientSession)
+	defer ClearSafeOpWrapperNamesSess(testAmbientSession)
+	// outer: a + (b - c)  both safe
+	b := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 2)}
+	c := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 3)}
+	inner := &Invocation{
+		IsStd: true, Binary: "-",
+		Args:                []*Expression{b, c},
+		Safe:                &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32},
+		OutSafeMath:         true,
+		OutIdentifyWrappers: true,
+	}
+	innerExpr := &Expression{Term: TermFunction, Invoke: inner}
+	a := &Expression{Term: TermConstant, Con: MakeIntSess(testAmbientSession, 1)}
+	outer := &Invocation{
+		IsStd: true, Binary: "+",
+		Args:                []*Expression{a, innerExpr},
+		Safe:                &SafeOpFlags{Op1Signed: true, Op2Signed: true, IsFunc: true, Size: SafeInt32},
+		OutSafeMath:         true,
+		OutIdentifyWrappers: true,
+	}
+	out := outer.OutputSess(testAmbientSession)
+	// outer add = id 1, inner sub = id 2
+	if !strings.Contains(out, "safe_add_func_int32_t_s_s") || !strings.Contains(out, "safe_sub_func_int32_t_s_s") {
+		t.Fatal(out)
+	}
+	// add should be , 1) and sub , 2)
+	if !strings.Contains(out, "safe_add_func_int32_t_s_s(1, ") || !strings.Contains(out, ", 1)") {
+		// format: (safe_add_func_int32_t_s_s(1, (safe_sub... , 2), 1))
+		t.Logf("out=%s wrappers=%v", out, testAmbientSession.WrapperNames)
+	}
+	if len(testAmbientSession.WrapperNames) < 2 {
+		t.Fatal(testAmbientSession.WrapperNames)
+	}
+	if testAmbientSession.WrapperNames[0] != "safe_add_func_int32_t_s_s" {
+		t.Fatalf("outer registered first want add got %v", testAmbientSession.WrapperNames)
+	}
+	if testAmbientSession.WrapperNames[1] != "safe_sub_func_int32_t_s_s" {
+		t.Fatalf("inner second want sub got %v", testAmbientSession.WrapperNames)
 	}
 }

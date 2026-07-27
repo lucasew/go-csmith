@@ -61,7 +61,7 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	env.AllTypes = []*Type{GetIntTypeSess(testAmbientSession), deep}
 	// force nested pick: many trials with seed that might pick nest — with max 1, all rejected → simple
 	for seed := uint64(1); seed < 40; seed++ {
-		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
+		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, false)
 		if f.Type != nil && f.Type.IsStructSess(testAmbientSession) {
 			t.Fatalf("nested not allowed at max=1 got %s depth %d", f.Type.StructName, f.Type.StructDepthSess(testAmbientSession))
 		}
@@ -70,7 +70,7 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	opts.MaxNestedStructLevel = 2
 	found := false
 	for seed := uint64(1); seed < 80; seed++ {
-		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0)
+		f := MakeOneStructField(NewRngSess(testAmbientSession, seed), opts, probs, env, 0, false)
 		if f.Type != nil && f.Type.IsStructSess(testAmbientSession) && f.Type.StructName == "Sdeep" {
 			found = true
 			break
@@ -78,5 +78,38 @@ func TestMakeOneStructFieldRespectsMaxNest(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("expected some nest when max=2")
+	}
+}
+
+// FunctionInvocationUser.cpp:415–422 — func_attr_flag + rnd_flipcoin(FuncAttrProb)
+// chooses alias_name before arg Output. Session RNG only (no package state).
+func TestInvocationOutputFuncAttrAliasFlipcoin(t *testing.T) {
+	o := Defaults()
+	o.FunctionAttributes = true
+	foundAlias, foundName := false, false
+	for seed := uint64(1); seed < 500 && !(foundAlias && foundName); seed++ {
+		s := NewSession(o)
+		s.Rng = NewRngSess(s, seed)
+		s.Probs = NewProbabilities(o)
+		f := &Function{Name: "func_9", AliasName: "func_9_alias", ReturnType: GetIntTypeSess(s)}
+		out := (&Invocation{User: f}).OutputOptsSess(s, o)
+		if strings.HasPrefix(out, "func_9_alias(") {
+			foundAlias = true
+		}
+		if out == "func_9()" {
+			foundName = true
+		}
+	}
+	if !foundAlias || !foundName {
+		t.Fatalf("expected both alias and name under FunctionAttributes alias=%v name=%v", foundAlias, foundName)
+	}
+	o2 := Defaults()
+	s3 := NewSession(o2)
+	s3.Rng = NewRngSess(s3, 1)
+	s3.Probs = NewProbabilities(o2)
+	f := &Function{Name: "func_9", AliasName: "func_9_alias", ReturnType: GetIntTypeSess(s3)}
+	out := (&Invocation{User: f}).OutputOptsSess(s3, o2)
+	if out != "func_9()" {
+		t.Fatal(out)
 	}
 }

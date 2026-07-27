@@ -250,3 +250,109 @@ func TestChooseFuncBuiltinProbZeroNoInvent50(t *testing.T) {
 		}
 	}
 }
+
+func TestChooseFuncUsesProbTableNotOptsCLI(t *testing.T) {
+	// Function.cpp:329 — rnd_flipcoin(BuiltinFunctionProb()) reads
+	// Probabilities::get_prob (post-random_random table), not CGOptions raw.
+	// CLI --builtin-function-prob seeds the table; random_random may rewrite it.
+	opts := Defaults()
+	opts.Builtins = true
+	opts.BuiltinFunctionProb = 0 // CLI says never
+	// Session bag with table that says always (100) — choose must follow table.
+	s := NewSession(opts)
+	s.Probs = NewProbabilities(opts)
+	s.Probs.single[PBuiltinFunctionProb] = 100
+	bi := &Function{
+		Name: "b", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true,
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	user := &Function{
+		Name: "u", ReturnType: GetIntTypeSess(testAmbientSession),
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	cg := EmptyCGContext().WithSession(s)
+	// p=100 → always try builtin first
+	got := ChooseFuncContext(NewRngSess(s, 1), []*Function{bi, user}, GetIntTypeSess(testAmbientSession), nil, &cg, opts, nil)
+	if got != bi {
+		t.Fatalf("want table p=100 → builtin, got %v (must not use CLI opts.BuiltinFunctionProb=0)", got)
+	}
+	// table p=0 → never builtin first even if CLI says 100
+	opts.BuiltinFunctionProb = 100
+	s.Probs.single[PBuiltinFunctionProb] = 0
+	for seed := uint64(1); seed < 30; seed++ {
+		got := ChooseFuncContext(NewRngSess(s, seed), []*Function{bi, user}, GetIntTypeSess(testAmbientSession), nil, &cg, opts, nil)
+		if got != user {
+			t.Fatalf("table p=0 must yield user (not CLI 100), got %v seed=%d", got, seed)
+		}
+	}
+}
+
+func TestChooseFuncAlwaysBurnsBuiltinProbFlip(t *testing.T) {
+	// Function.cpp:329 — when builtins enabled, always rnd_flipcoin(BuiltinFunctionProb)
+	// even if no eligible builtin (wrong return type / empty ok_builtin_funcs).
+	// Skipping the flip desyncs the stream vs upstream (first_div after TermFunction).
+	opts := Defaults()
+	opts.Builtins = true
+	opts.BuiltinFunctionProb = 50
+	// Builtin return UInt; request Short so is_convertable fails → okBuiltin empty.
+	// User returns Int (convertible from Short via is_convertable? short→int yes for ret check:
+	// choose_func: type->is_convertable(return_type) means requested type convertable FROM return.
+	// short.is_convertable(int) — may fail; use exact Int return for user.
+	bi := &Function{
+		Name: "b", ReturnType: GetSimpleTypeSess(testAmbientSession, EUInt), IsBuiltin: true,
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	user := &Function{
+		Name: "u", ReturnType: GetIntTypeSess(testAmbientSession),
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	// Need a return type that excludes the builtin but keeps the user.
+	// float return requested: int not float-compatible → both empty? Use Int request:
+	// UInt is_convertable to Int? typically yes for integers. Force exclude via effect.
+	// Simpler: only a type-mismatched builtin on the list + matching user — request void-like
+	// Use a struct return type for builtin only.
+	st := &Type{isStruct: true, StructName: "S_bi"}
+	bi.ReturnType = st
+	wantRet := GetIntTypeSess(testAmbientSession)
+
+	// Same seed: path with empty okBuiltin must consume the same number of genrand draws
+	// as path with a live builtin that loses the coin — both burn exactly one flipcoin
+	// before get_one_function(user). Compare subsequent RndUpto stream position via depth.
+	rEmpty := NewRngSess(testAmbientSession, 42)
+	got := ChooseFuncContext(rEmpty, []*Function{bi, user}, wantRet, nil, nil, opts, nil)
+	if got != user {
+		t.Fatalf("empty-okBuiltin path: want user, got %v", got)
+	}
+	depthEmpty := rEmpty.RandDepthSess(testAmbientSession)
+
+	// Eligible builtin + user: always burns flip, then may pick user or builtin.
+	// Use same seed; only care that depth is at least as large as empty path's flip+pick.
+	// With p=50, either pick: if builtin, get_one_function(n=1) no upto; if user, n=1 no upto.
+	// Empty path: flip + get_one_function(user n=1). Eligible: flip + get_one_function(n=1).
+	// Depth must match.
+	biOK := &Function{
+		Name: "b2", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true,
+		BuildState: BuildBuilt, IsBuilt: true, FEffect: EmptyEffect(),
+	}
+	rOK := NewRngSess(testAmbientSession, 42)
+	_ = ChooseFuncContext(rOK, []*Function{biOK, user}, wantRet, nil, nil, opts, nil)
+	depthOK := rOK.RandDepthSess(testAmbientSession)
+	if depthEmpty != depthOK {
+		t.Fatalf("BuiltinFunctionProb flip must always burn: empty-okBuiltin depth=%d eligible depth=%d",
+			depthEmpty, depthOK)
+	}
+
+	// Without the flip (regression guard): Builtins=false must NOT burn the coin —
+	// depth must be lower than Builtins=true empty-okBuiltin path (only get_one_function).
+	optsOff := Defaults()
+	optsOff.Builtins = false
+	rOff := NewRngSess(testAmbientSession, 42)
+	gotOff := ChooseFuncContext(rOff, []*Function{bi, user}, wantRet, nil, nil, optsOff, nil)
+	if gotOff != user {
+		t.Fatalf("builtins off: want user, got %v", gotOff)
+	}
+	depthOff := rOff.RandDepthSess(testAmbientSession)
+	if depthOff >= depthEmpty {
+		t.Fatalf("builtins off must not burn BuiltinFunctionProb: off=%d on=%d", depthOff, depthEmpty)
+	}
+}
