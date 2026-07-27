@@ -106,9 +106,23 @@ func TestKleeCrestCoverageEmit(t *testing.T) {
 	if CrestTypeToStringSess(testAmbientSession, GetIntTypeSess(testAmbientSession)) != "int" {
 		t.Fatal(CrestTypeToStringSess(testAmbientSession, GetIntTypeSess(testAmbientSession)))
 	}
+	// CrestExtension.cpp:69–73 NDEBUG default → empty suffix (CREST_(x) for int128).
+	ClearErrorSess(testAmbientSession)
+	if CrestTypeToStringSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EUInt128)) != "" {
+		t.Fatal("UInt128 Crest type token must be empty")
+	}
+	if HasErrorSess(testAmbientSession) {
+		t.Fatal("UInt128 empty Crest token is complete NDEBUG path, not sticky")
+	}
 	cinit := CrestOutputInitSess(testAmbientSession, vals)
 	if !strings.Contains(cinit, "CREST_") {
 		t.Fatal(cinit)
+	}
+	// int128 param → CREST_(xN)
+	u128 := NewExtensionValueSess(testAmbientSession, GetSimpleTypeSess(testAmbientSession, EUInt128), "x4")
+	c128 := CrestOutputSymbolicsSess(testAmbientSession, []*ExtensionValue{u128})
+	if !strings.Contains(c128, "CREST_(x4);") {
+		t.Fatal(c128)
 	}
 	// Coverage
 	tests := CoverageGenerateValuesSess(testAmbientSession, vals, 2, r, Defaults(), probs)

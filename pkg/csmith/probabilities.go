@@ -130,18 +130,35 @@ func (f *ProbabilityFilter) FilterSess(s *Session, v uint32) bool {
 
 // NewProbabilities builds tables from opts like Probabilities::initialize
 // after CGOptions::set_default_settings (and option flags).
+// Without an RNG, random_random is not applied (unit tests / defaults).
 func NewProbabilities(opts Options) *Probabilities {
+	return NewProbabilitiesWithRng(opts, nil)
+}
+
+// NewProbabilitiesWithRng is NewProbabilities; when opts.RandomRandom and r
+// are set, applies Probabilities.cpp get_random_single_prob / GroupProbElem
+// randomize using the live generation stream (after RandomNumber::CreateInstance).
+func NewProbabilitiesWithRng(opts Options, r *Rng) *Probabilities {
 	p := &Probabilities{
 		single:       make(map[ProbName]int),
 		probFilters:  make(map[ProbName]*ProbabilityFilter),
 		extraFilters: make(map[ProbName]Filter),
 	}
 	p.initSingle(opts)
+	// Probabilities.cpp:555–556 — randomize singles before group tables.
+	if opts.RandomRandom && r != nil {
+		p.randomizeSingleProbs(r)
+	}
 	p.initSimpleTypes(opts)
 	p.initBinaryOps(opts)
 	p.initUnaryOps(opts)
 	p.initSafeOpsSize(opts)
 	p.initStatementProbs(opts)
+	// GroupProbElem::initialize — C++ order: statement (unequal) then equal groups.
+	if opts.RandomRandom && r != nil {
+		p.randomizeStatementGroup(r, opts)
+		p.randomizeEqualGroupWeights(r)
+	}
 	// set_prob_filter for each equal group after set_default_*
 	// Construction has no residual bag yet; install filters on this Probabilities owner.
 	p.probFilters[PSimpleTypesProb] = newProbabilityFilterOwned(p, PSimpleTypesProb)
@@ -149,6 +166,247 @@ func NewProbabilities(opts Options) *Probabilities {
 	p.probFilters[PUnaryOpsProb] = newProbabilityFilterOwned(p, PUnaryOpsProb)
 	p.probFilters[PSafeOpsSizeProb] = newProbabilityFilterOwned(p, PSafeOpsSizeProb)
 	return p
+}
+
+// singleProbInitOrder is C++ ProbName enum order for keys in
+// initialize_single_probs (std::map iteration). Must match Probabilities.h.
+var singleProbInitOrder = []ProbName{
+	PMoreStructUnionProb,
+	PBitFieldsCreationProb,
+	PBitFieldsSignedProb,
+	PBitFieldInNormalStructProb,
+	PScalarFieldInFullBitFieldsProb,
+	PExhaustiveBitFieldsProb,
+	PSafeOpsSignedProb,
+	PSelectDerefPointerProb,
+	PRegularVolatileProb,
+	PRegularConstProb,
+	PStricterConstProb,
+	PLooserConstProb,
+	PFieldVolatileProb,
+	PFieldConstProb,
+	PStdUnaryFuncProb,
+	PShiftByNonConstantProb,
+	PPointerAsLTypeProb,
+	PStructAsLTypeProb,
+	PUnionAsLTypeProb,
+	PFloatAsLTypeProb,
+	PNewArrayVariableProb,
+	PAccessOnceVariableProb,
+	PInlineFunctionProb,
+	PBuiltinFunctionProb,
+	PArrayOOBProb,
+	// GCC extension singles appear after group names in the C++ enum
+	PFuncAttrProb,
+	PTypeAttrProb,
+	PLabelAttrProb,
+	PVarAttrProb,
+	PBinaryConstProb,
+}
+
+// randomizeSingleProbs mirrors initialize_single_probs random_random loop.
+// Probabilities.cpp:550–561 — val==0 stays 0 (no draw); else rnd_upto(101).
+func (p *Probabilities) randomizeSingleProbs(r *Rng) {
+	if p == nil || r == nil {
+		return
+	}
+	s := r.Sess
+	if s == nil {
+		s = NewSession(Defaults())
+	}
+	for _, name := range singleProbInitOrder {
+		v, ok := p.single[name]
+		if !ok || v == 0 {
+			continue
+		}
+		p.single[name] = int(r.RndUptoSess(s, 101))
+	}
+}
+
+// simpleTypeProbNameOrder is ProbName enum / std::map iteration order for
+// set_default_simple_types_prob (Probabilities.h pVoidProb…pUInt128Prob).
+// eSimpleType places eFloat before eULongLong; ProbName places pULongLong
+// before pFloat — random_random equal-group flipcoins must follow ProbName.
+var simpleTypeProbNameOrder = []ESimpleType{
+	EVoid, EChar, EInt, EShort, ELong, ELongLong,
+	EUChar, EUInt, EUShort, EULong, EULongLong, EFloat, EInt128, EUInt128,
+}
+
+// randomizeEqualGroupWeights mirrors GroupProbElem::initialize for is_equal groups.
+// Probabilities.cpp:188–193 — non-zero defaults: flipcoin(50) → 0 or 1;
+// if all zero for equal group, restore defaults.
+func (p *Probabilities) randomizeEqualGroupWeights(r *Rng) {
+	if p == nil || r == nil {
+		return
+	}
+	s := r.Sess
+	if s == nil {
+		s = NewSession(Defaults())
+	}
+	// Order: unary, binary, simple types, safe ops (initialize_group_probs).
+	// unary first in C++ after statement (statement is unequal, handled separately).
+	// C++ order: statement (unequal), unary, binary, simple, safe_ops.
+	// This runs after statement randomize in NewProbabilitiesWithRng.
+	randomizeWeightSlice := func(w []int) {
+		if len(w) == 0 {
+			return
+		}
+		def := append([]int(nil), w...)
+		any := false
+		for i, v := range w {
+			if v == 0 {
+				continue
+			}
+			if r.RndFlipcoinSess(s, 50) {
+				w[i] = 1
+				any = true
+			} else {
+				w[i] = 0
+			}
+		}
+		if !any {
+			copy(w, def)
+		}
+	}
+	// Simple types: flip in ProbName map order, not eSimpleType index order.
+	// Without float the non-zero sets match either order; with --float, eFloat
+	// sits before eULongLong while pFloat is after pULongLong → wrong weights.
+	randomizeSimpleTypeWeights := func(w []int) {
+		if len(w) == 0 {
+			return
+		}
+		def := append([]int(nil), w...)
+		any := false
+		for _, st := range simpleTypeProbNameOrder {
+			i := int(st)
+			if i < 0 || i >= len(w) || w[i] == 0 {
+				continue
+			}
+			if r.RndFlipcoinSess(s, 50) {
+				w[i] = 1
+				any = true
+			} else {
+				w[i] = 0
+			}
+		}
+		if !any {
+			copy(w, def)
+		}
+	}
+	// Note: statement unequal runs before equal groups in C++.
+	// Call order from NewProbabilitiesWithRng: equal after statement.
+	randomizeWeightSlice(p.unaryOpWeight)
+	randomizeWeightSlice(p.binaryOpWeight)
+	randomizeSimpleTypeWeights(p.simpleTypeWeight)
+	randomizeWeightSlice(p.safeOpsSizeWeight)
+}
+
+// randomizeStatementGroup mirrors set_default_statement_prob + unequal
+// GroupProbElem::initialize. Probabilities.cpp:159–220, 748–774.
+// Rebuilds p.statementTable from randomized cutoffs.
+func (p *Probabilities) randomizeStatementGroup(r *Rng, opts Options) {
+	if p == nil || r == nil {
+		return
+	}
+	s := r.Sess
+	if s == nil {
+		s = NewSession(opts)
+	}
+	p.statementTable = buildStatementThresholdTableRandomized(s, opts, r)
+}
+
+// buildStatementThresholdTableRandomized applies unequal GroupProbElem randomize
+// then builds a ThresholdTable. Mirrors set_default_statement_prob + initialize.
+func buildStatementThresholdTableRandomized(s *Session, opts Options, r *Rng) *ThresholdTable {
+	type kv struct {
+		def int
+		st  StatementType
+	}
+	// C++ std::map order by ProbName among inserted keys:
+	// Assign, Block, For, IfElse, Return, Continue, Break, Goto, ArrayOp
+	ordered := []kv{
+		{100, StmtAssign},
+		{0, StmtBlock},
+		{30, StmtFor},
+		{15, StmtIfElse},
+		{35, StmtReturn},
+		{40, StmtContinue},
+		{45, StmtBreak},
+	}
+	gotoDef, arrayOpDef := 0, 0
+	if opts.Jumps && opts.Arrays {
+		gotoDef, arrayOpDef = 50, 60
+	} else if opts.Jumps && !opts.Arrays {
+		gotoDef = 50
+	} else if !opts.Jumps && opts.Arrays {
+		arrayOpDef = 55
+	}
+	ordered = append(ordered, kv{gotoDef, StmtGoto}, kv{arrayOpDef, StmtArrayOp})
+
+	invalid := map[int]bool{0: true, 100: true}
+	type validE struct {
+		st  StatementType
+		val int
+	}
+	var valid []validE
+	vals := make(map[StatementType]int)
+	for _, e := range ordered {
+		if e.def == 0 {
+			vals[e.st] = 0
+			continue
+		}
+		v := int(r.RndUptoFilterSess(s, 101, filterFunc(func(u uint32) bool {
+			return invalid[int(u)]
+		})))
+		vals[e.st] = v
+		if v != 0 {
+			invalid[v] = true
+			valid = append(valid, validE{e.st, v})
+		}
+	}
+	// Force one valid entry to 100
+	if len(valid) > 0 {
+		idx := int(r.RndUptoSess(s, uint32(len(valid))))
+		vals[valid[idx].st] = 100
+	}
+	// Build threshold table: C++ ProbabilityTable from group probs —
+	// Statement uses cumulative style cutoffs. After randomize, C++ stores
+	// absolute weights in SingleProbElem and builds table via set_prob_table.
+	// Default path uses cumulative cutoffs 15,30,35,...100.
+	// After random_random, values are independent 1..99 (or 100 for one).
+	// Statement::InitProbabilityTable uses ProbabilityTable from group.
+	// For ThresholdTable compatibility: sort by val and use as cumulative? 
+	// Safer: rebuild with randomized absolute weights as cutoffs sorted.
+	// C++ number_to_type uses ProbabilityTable lookup by cumulative max.
+	// Mirror: collect non-zero (st,val), sort by val, use as threshold entries.
+	type pe struct {
+		st  StatementType
+		val int
+	}
+	var parts []pe
+	for st, v := range vals {
+		if v > 0 {
+			parts = append(parts, pe{st, v})
+		}
+	}
+	// Stable sort by val ascending for cumulative table
+	for i := 0; i < len(parts); i++ {
+		for j := i + 1; j < len(parts); j++ {
+			if parts[j].val < parts[i].val {
+				parts[i], parts[j] = parts[j], parts[i]
+			}
+		}
+	}
+	t := &ThresholdTable{}
+	for _, e := range parts {
+		t.AddSess(s, e.val, int(e.st))
+	}
+	// Ensure 100 terminal if missing
+	if len(parts) == 0 || parts[len(parts)-1].val < 100 {
+		// Assign default terminal
+		t.AddSess(s, 100, int(StmtAssign))
+	}
+	return t
 }
 
 // equalGroupWeight returns weight for equal-group root pname at index v.
