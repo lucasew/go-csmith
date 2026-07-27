@@ -306,15 +306,17 @@ func (op AssignOp) CompoundToBinaryOps() (BinaryOp, bool) {
 }
 
 // AssignOpC formats an assignment for a variable name and optional RHS.
-// StatementAssign.cpp:515–537 — lhs always live; rhs live when op needs it.
-// sticky no invent " = x" / "++" / "g = " empty-side shells
+// StatementAssign.cpp:515–537 — streams lhs/rhs even when prefix_name empties
+// globals (NDEBUG get_count_prefix → " = rhs" / "++" bare).
 // AssignOpCSess is AssignOpC with explicit session residual sticky.
 func (op AssignOp) AssignOpCSess(s *Session, name, rhs string) string {
-	if name == "" {
+	// empty name/rhs ok under prefix_name (Default get_count_prefix NDEBUG)
+	pref := sessOpts(s).PrefixName
+	if name == "" && !pref {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	if !op.NeedNoRHS() && rhs == "" {
+	if !op.NeedNoRHS() && rhs == "" && !pref {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}

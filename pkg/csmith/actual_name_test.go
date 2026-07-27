@@ -11,9 +11,18 @@ func TestGetActualNameAndPrefix(t *testing.T) {
 	if g.GetActualNameSess(testAmbientSession, false) != "g_1" {
 		t.Fatal(g.GetActualNameSess(testAmbientSession, false))
 	}
-	// default generator: prefix returns name unchanged
-	if GetPrefixedName("g_1", true) != "g_1" {
-		t.Fatal("prefix")
+	// bag-less prefix on → Default get_count_prefix empty (random.cpp !sequence_name_prefix)
+	if GetPrefixedName("g_1", true) != "" {
+		t.Fatal("prefix bag-less should empty")
+	}
+	// session bag Default ProgramGen: same empty emit name
+	s := NewSession(Defaults())
+	s.ProgramGen = NewProgramGenerator(s)
+	if GetPrefixedNameSess(s, "g_1", true) != "" {
+		t.Fatal("prefix sess Default count-prefix should empty")
+	}
+	if GetPrefixedNameSess(s, "g_1", false) != "g_1" {
+		t.Fatal("prefix off sess")
 	}
 	l := CreateVariableScalarsSess(testAmbientSession, "l_1", GetIntTypeSess(testAmbientSession), false, false)
 	if l.GetActualNameSess(testAmbientSession, true) != "l_1" {

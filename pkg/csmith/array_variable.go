@@ -305,12 +305,13 @@ func (av *ArrayVariable) CDeclTypeOptsSess(s *Session, opts Options) string {
 		return ""
 	}
 	// ArrayVariable.cpp:518 — get_actual_name(); no invent space (type already spaced)
-	name := av.GetActualNameSess(s, false)
+	name := av.GetActualNameSess(s, opts.PrefixName)
 	// residual ERROR sticky — no invent soft-continue decl past GetActualName residual
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
+	// empty name ok under prefix_name + Default get_count_prefix (NDEBUG)
+	if name == "" && !opts.PrefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -1041,17 +1042,14 @@ func (av *ArrayVariable) OutputLowerBoundSess(s *Session) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	// ArrayVariable.cpp: lower bound uses name + [0]…; name always live sticky
-	name := av.GetActualNameSess(s, false)
-	// residual ERROR sticky — no invent soft-empty lower past GetActualName residual
-	if sessHasError(s) {
-		return ""
-	}
-	if name == "" {
+	// ArrayVariable.cpp:585–590 — bare name (not get_actual_name) + [0]…
+	// Under --prefix-name, subject Output empties globals but bounds keep g_N
+	// (campfail n12: &g_10[0] vs &[0]).
+	if av.Name == "" {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	str := name
+	str := av.Name
 	for range av.Sizes {
 		str += "[0]"
 	}
@@ -1068,12 +1066,13 @@ func (av *ArrayVariable) OutputWithIndicesSess(s *Session, ctrl []string) string
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := av.GetActualNameSess(s, false)
+	prefix := sessOpts(s).PrefixName
+	name := av.GetActualNameSess(s, prefix)
 	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
+	if name == "" && !prefix {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -1301,12 +1300,13 @@ func (av *ArrayVariable) OutputAccessSess(s *Session) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := av.GetActualNameSess(s, false)
+	prefix := sessOpts(s).PrefixName
+	name := av.GetActualNameSess(s, prefix)
 	// residual ERROR sticky — no invent soft-empty access past GetActualName residual
 	if sessHasError(s) {
 		return ""
 	}
-	if name == "" {
+	if name == "" && !prefix {
 		// name always live; sticky no invent bare indices without identifier
 		sessNoteError(s, ErrGeneric)
 		return ""
@@ -1337,7 +1337,8 @@ func (av *ArrayVariable) OutputAccessSess(s *Session) string {
 			if sessHasError(s) {
 				return ""
 			}
-			if idx == "" {
+			// empty index ok under prefix_name (NDEBUG get_count_prefix → "a[]")
+			if idx == "" && !prefix {
 				sessNoteError(s, ErrGeneric)
 				return ""
 			}
@@ -1348,8 +1349,8 @@ func (av *ArrayVariable) OutputAccessSess(s *Session) string {
 		return b.String()
 	}
 	for _, idxStr := range av.Indices {
-		// const-itemize string indices always non-empty in C++
-		if idxStr == "" {
+		// Indices string cache may be empty under prefix_name
+		if idxStr == "" && !prefix {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -1369,13 +1370,9 @@ func (av *ArrayVariable) OutputUpperBoundArraySess(s *Session) string {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
-	name := av.GetActualNameSess(s, false)
-	// residual ERROR sticky — no invent soft-empty upper past GetActualName residual
-	if sessHasError(s) {
-		return ""
-	}
-	if name == "" {
-		// name always live; sticky no invent bare "[n]" bounds
+	// ArrayVariable.cpp:573–578 — bare name (not get_actual_name) + [sizes[i]-1]
+	// Match OutputLowerBoundSess: prefix_name does not rewrite array bound tokens.
+	if av.Name == "" {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -1385,7 +1382,7 @@ func (av *ArrayVariable) OutputUpperBoundArraySess(s *Session) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(name)
+	b.WriteString(av.Name)
 	for _, sz := range av.Sizes {
 		// ArrayVariable.cpp:575 — out << "[" << (sizes[i] - 1) << "]"
 		b.WriteString("[" + itoa(sz-1) + "]")

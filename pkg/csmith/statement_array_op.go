@@ -198,9 +198,12 @@ func MakeRandomArrayLoop(
 		MustReadVars:  allMustReads,
 		MustWriteVars: allMustWrites,
 	}
-	// CGContext(loop, &rwd, nullptr, 0) — no outer IV
-	loopCG := cg.CloneSubcontext()
-	loopCG.RW = rwd
+	// StatementFor.cpp:344–346 — CGContext(cg, &rwd, nullptr, 0):
+	// CGContext.cpp:95–105 sets flags|IN_LOOP, expr_depth=0, curr_rhs=null,
+	// empty effect_stm, then make_random under that context (body gets another
+	// WithLoopBody). Soft invent CloneSubcontext without IN_LOOP left Continue
+	// filtered out in loop body (flagcamp first_div ~440 U n=100 v=35).
+	loopCG := cg.WithLoopBody(rwd, nil, 0)
 	loopCG.MustUseArrays = avs
 	// StatementFor.cpp:344–346 — make_random → StatementFor* (not StatementArrayOp)
 	st := MakeRandomFor(r, opts, probs, vs, tables, stmtTab, &loopCG)
@@ -450,11 +453,30 @@ func MakeRandomArrayInit(
 
 	// access with ctrl vars: a[i0][i1]… —
 	// ArrayVariable.cpp:708–709 + StatementArrayOp.cpp:245–250 —
-	// output_with_indices uses cvs[i]->Output (virtual). Soft invent used
-	// IV.Name (bare get_actual_name) so itemized array IVs lost indices in the
+	// output_with_indices uses get_actual_name for the base + cvs[i]->Output.
+	// Soft invent used av.Name (internal) so --prefix-name NDEBUG empty base was
+	// still g_N (flagcamp n151: UP `[p_64] = …` vs GO `g_2[p_64] = …`).
+	// Soft invent also used IV.Name so itemized array IVs lost indices in the
 	// body assign (seed-48: UP l_91[…][g_106[4]] vs GO …[g_106]; for-header was
 	// already OutputC and matched g_106[4]).
-	access := av.Name
+	access := av.GetActualNameSess(sessFromCG(cg), opts.PrefixName)
+	if hasErrCG(cg) {
+		for _, x := range dims {
+			if x != nil && x.IV != nil {
+				cg.RemoveIVBound(x.IV)
+			}
+		}
+		return Stmt{}
+	}
+	if access == "" && !opts.PrefixName {
+		for _, x := range dims {
+			if x != nil && x.IV != nil {
+				cg.RemoveIVBound(x.IV)
+			}
+		}
+		noteErrCG(cg, ErrGeneric)
+		return Stmt{}
+	}
 	for _, d := range dims {
 		// sticky no invent "a[]" / "[0]" for missing IV
 		if d == nil || d.IV == nil {
@@ -466,7 +488,10 @@ func MakeRandomArrayInit(
 			noteErrCG(cg, ErrGeneric)
 			return Stmt{}
 		}
-		ivOut := d.IV.OutputCSess(sessFromCG(cg), false)
+		// StatementArrayOp.cpp / ArrayVariable::output_with_indices — Output at emit
+		// uses get_actual_name (prefix_name). Cache access with same rules so mid-gen
+		// ArrayAccess text matches final emit (empty under NDEBUG get_count_prefix).
+		ivOut := d.IV.OutputCSess(sessFromCG(cg), opts.PrefixName)
 		// residual ERROR sticky — no invent soft-continue access past OutputC residual
 		if hasErrCG(cg) {
 			for _, x := range dims {
@@ -476,7 +501,7 @@ func MakeRandomArrayInit(
 			}
 			return Stmt{}
 		}
-		if ivOut == "" {
+		if ivOut == "" && !opts.PrefixName {
 			for _, x := range dims {
 				if x != nil && x.IV != nil {
 					cg.RemoveIVBound(x.IV)

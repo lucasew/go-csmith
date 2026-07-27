@@ -406,7 +406,8 @@ func (l *Lhs) OutputSess(s *Session, wrapVolatiles bool) string {
 		if sessHasError(s) {
 			return ""
 		}
-		if ty == "" || ev == "" {
+		// empty ev ok under prefix_name (NDEBUG get_count_prefix)
+		if ty == "" || (ev == "" && !sessOpts(s).PrefixName) {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}
@@ -452,13 +453,14 @@ func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts 
 		}
 		ind = vi - wi
 	}
-	base := v.OutputCOptsWithSess(s, false, opts)
+	// ExpressionVariable.cpp:202–219 — Variable::Output uses get_actual_name (prefix_name)
+	base := v.OutputCOptsWithSess(s, opts.PrefixName, opts)
 	// residual ERROR sticky — no invent soft-empty base past OutputC residual hole
 	if sessHasError(s) {
 		return ""
 	}
-	// ExpressionVariable always has live var Output; sticky no invent "(***)" / "&" without base
-	if base == "" {
+	// empty base ok under prefix_name (Default get_count_prefix NDEBUG → bare "&")
+	if base == "" && !opts.PrefixName {
 		sessNoteError(s, ErrGeneric)
 		return ""
 	}
@@ -466,14 +468,9 @@ func outputExpressionVariableOptsSess(s *Session, v *Variable, want *Type, opts 
 		return "(" + strings.Repeat("*", ind) + base + ")"
 	}
 	if ind < 0 {
-		// ExpressionVariable.cpp:210–216 — assert(indirect_level == -1); out << "&"; var.OutputSess(s, out)
+		// ExpressionVariable.cpp:210–216 — assert(indirect_level == -1); out << "&"; var.Output
 		// var.Output is ArrayVariable::Output for itemized members (name[index]…), not bare get_actual_name.
 		if ind != -1 {
-			sessNoteError(s, ErrGeneric)
-			return ""
-		}
-		// base already from v.OutputCSess(cgSess(cg, false)) above (includes itemized indices)
-		if base == "" {
 			sessNoteError(s, ErrGeneric)
 			return ""
 		}

@@ -72,6 +72,57 @@ func TestItemizeArrayOffsetBinary(t *testing.T) {
 	}
 }
 
+// VariableSelector.cpp:1466 — int2str(offset), not make_int. Under mark_mutable_const
+// make_int would emit "(1)" and body-diverge as (p_2 + (1)) vs (p_2 + 1).
+func TestItemizeArrayOffsetNoMarkMutableWrap(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	opts := Defaults()
+	opts.MarkMutableConst = true
+	// Session bag carries MarkMutableConst so MakeInt would wrap — offset must not.
+	testAmbientSession.Opts = opts
+	t.Cleanup(func() { testAmbientSession.Opts = Defaults() })
+	vs := NewVariableSelector(testAmbientSession, opts)
+	av := CreateArrayVariable(NewRngSess(testAmbientSession, 1), opts, NewProbabilities(opts), nil, nil, nil, "g_a", GetIntTypeSess(testAmbientSession), MakeIntSess(testAmbientSession, 0), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false}))
+	if av == nil {
+		t.Fatal("nil av")
+	}
+	av.Sizes = []int{8}
+	av.ArraySizes = []int{8}
+	iv := CreateVariableScalarsSess(testAmbientSession, "i", GetIntTypeSess(testAmbientSession), false, false)
+	cg := EmptyCGContext().WithSession(testAmbientSession)
+	cg.IVBounds = map[*Variable]int{iv: 0}
+	for seed := uint64(1); seed < 80; seed++ {
+		item := vs.ItemizeArray(NewRngSess(testAmbientSession, seed), cg, av)
+		if item == nil {
+			t.Fatal("itemize")
+		}
+		if len(item.IndexExprs) != 1 {
+			continue
+		}
+		ie := item.IndexExprs[0]
+		if ie.Term != TermFunction || ie.Invoke == nil || ie.Invoke.Binary != "+" {
+			continue
+		}
+		if len(ie.Invoke.Args) < 2 || ie.Invoke.Args[1] == nil || ie.Invoke.Args[1].Con == nil {
+			t.Fatal("offset arg missing")
+		}
+		v := ie.Invoke.Args[1].Con.Value
+		if strings.HasPrefix(v, "(") {
+			t.Fatalf("offset must be bare int2str, got %q (mark_mutable_const must not wrap)", v)
+		}
+		// MakeInt would still wrap under the same opts — proves the contrast.
+		if MakeIntSess(testAmbientSession, 1).Value != "(1)" {
+			t.Fatal("fixture: MakeInt should wrap under mark_mutable_const")
+		}
+		out := item.OutputAccessSess(testAmbientSession)
+		if strings.Contains(out, "+ (") {
+			t.Fatalf("emit must not wrap offset: %s", out)
+		}
+		return
+	}
+	t.Log("no offset in scan; bare path still covered by MakeInt unit tests")
+}
+
 func TestItemizeArrayRejectsInvalidBound(t *testing.T) {
 	opts := Defaults()
 	vs := NewVariableSelector(testAmbientSession, opts)

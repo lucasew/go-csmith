@@ -57,10 +57,12 @@ func TestItemizeArrayIndicesStringUsesItemizedOutput(t *testing.T) {
 	}
 	out1 := got1.OutputAccessSess(testAmbientSession)
 	if !strings.Contains(out1, "g_106[4]") {
-		t.Fatalf("got %q must contain g_106[4] (not bare g_106); Indices=%v", out1, got1.Indices)
+		t.Fatalf("got %q must contain g_106[4] (not bare g_106); Indices=%v IndexExprs=%d",
+			out1, got1.Indices, len(got1.IndexExprs))
 	}
-	// Indices string form must also carry itemization (not v.Name only)
-	if len(got1.Indices) != 1 || !strings.Contains(got1.Indices[0], "g_106[4]") {
-		t.Fatalf("Indices string must use Output not Name: %v", got1.Indices)
+	// C++ itemize_array stores Expression* only (VariableSelector.cpp:1463–1470).
+	// Emit uses IndexExprs→Output; Indices is a non-emit cache (may be Name-based).
+	if len(got1.IndexExprs) != 1 || got1.IndexExprs[0] == nil {
+		t.Fatalf("IndexExprs must hold live Expression*: %v", got1.IndexExprs)
 	}
 }

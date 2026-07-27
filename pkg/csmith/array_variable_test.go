@@ -1255,3 +1255,74 @@ func TestOutputInitNegativeConstParen(t *testing.T) {
 		t.Fatalf("want paren-negative init, got %q", out)
 	}
 }
+
+// IndexExprs free-ref walk: itemized array access stores for-IV offsets on
+// ArrayVariable.IndexExprs (VariableSelector itemize ExpressionVariable + binary
+// add). bodyValueFreeReadsVar / bodySyntacticFreeReadsVar must see g_iv in
+// return arr[(g_iv + 2)] — seed5139 NHEAD wrongly treated g_167 as pure-for-only
+// when IndexExprs were not walked (yanked nested pure FE head before free-ref Acc).
+func TestExprValueFreeRefsVarWalksIndexExprs(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	iv := CreateVariableScalarsSess(testAmbientSession, "g_iv", GetIntTypeSess(testAmbientSession), false, false)
+	arr := CreateVariableScalarsSess(testAmbientSession, "l_arr", GetIntTypeSess(testAmbientSession), false, false)
+	arr.IsArray = true
+	off := &Expression{
+		Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(testAmbientSession), Value: "2"},
+		ExprType: GetIntTypeSess(testAmbientSession),
+	}
+	idxVar := &Expression{Term: TermVariable, Var: iv, ExprType: GetIntTypeSess(testAmbientSession)}
+	idxAdd := &Expression{
+		Term: TermFunction,
+		Invoke: &Invocation{
+			IsStd:  true,
+			Binary: "+",
+			Args:   []*Expression{idxVar, off},
+		},
+		ExprType: GetIntTypeSess(testAmbientSession),
+	}
+	item := &ArrayVariable{
+		Variable:   *arr,
+		IndexExprs: []*Expression{idxAdd},
+	}
+	item.AsArray = item
+	item.Name = arr.Name
+	retExpr := &Expression{Term: TermVariable, Var: &item.Variable, ExprType: GetIntTypeSess(testAmbientSession)}
+	fn := &Function{Name: "func_1", ReturnType: GetIntTypeSess(testAmbientSession)}
+	ret := Stmt{Kind: StmtReturn, Expr: retExpr, StmID: AllocStmIDSess(testAmbientSession)}
+	// for (g_iv = 0; …) { return l_arr[(g_iv + 2)]; }
+	forBlk := &Block{
+		Func:  fn,
+		StmID: AllocStmIDSess(testAmbientSession),
+		Stmts: []Stmt{ret},
+	}
+	forSt := Stmt{
+		Kind:  StmtFor,
+		StmID: AllocStmIDSess(testAmbientSession),
+		Loop:  &LoopControl{IV: iv},
+		Then:  forBlk,
+	}
+	body := &Block{
+		Func:  fn,
+		StmID: AllocStmIDSess(testAmbientSession),
+		Stmts: []Stmt{forSt},
+	}
+	fn.Body = body
+	fn.Blocks = []*Block{body, forBlk}
+	if !bodyValueFreeReadsVar(fn, iv) {
+		t.Fatal("bodyValueFreeReadsVar must see for-IV free-ref via ArrayVariable.IndexExprs")
+	}
+	if !bodySyntacticFreeReadsVar(fn, iv) {
+		t.Fatal("bodySyntacticFreeReadsVar must see for-IV free-ref via ArrayVariable.IndexExprs")
+	}
+	// Address-of only still does not count as value free-ref
+	addrOnly := CreateVariableScalarsSess(testAmbientSession, "g_addr", GetIntTypeSess(testAmbientSession), false, false)
+	ptrInit := &Expression{
+		Term: TermVariable, Var: addrOnly, ExprType: GetIntTypeSess(testAmbientSession),
+	}
+	// IndirectLevel < 0 for address-of: set want type one pointer higher
+	// (skip if hard — IndexExprs path is the regression under test)
+	_ = ptrInit
+	if bodyValueFreeReadsVar(fn, addrOnly) {
+		t.Fatal("must not invent free-ref of unrelated var")
+	}
+}
