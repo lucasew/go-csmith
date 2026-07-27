@@ -163,7 +163,7 @@ func GenerateParameterListFromStringSess(s *Session, f *Function, params string)
 	if len(vs) == 1 && strings.TrimSpace(vs[0]) == "Void" {
 		return true
 	}
-	for i, ts := range vs {
+	for _, ts := range vs {
 		ts = strings.TrimSpace(ts)
 		// Function.cpp:355 — assert(vs[i] != "Void"); no soft invent skip
 		if ts == "Void" {
@@ -177,9 +177,19 @@ func GenerateParameterListFromStringSess(s *Session, f *Function, params string)
 			return false
 		}
 		q := NewCVQualifiersSess(s, []bool{false}, []bool{false})
-		name := "p_" + itoa(i+1)
-		// Function.cpp:359–360 — GenerateParameterVariable; assert(v)
-		v := CreateVariableQferSess(s, name, ty, q)
+		// Function.cpp:359–360 — VariableSelector::GenerateParameterVariable(ty, &qfer)
+		// → new_variable(RandomParamName(), type, 0, qfer) — gensym("p_") + AllVars.
+		var v *Variable
+		if s != nil && s.ProgramGen != nil && s.ProgramGen.VS != nil {
+			v = s.ProgramGen.VS.GenerateParameterVariableTyped(ty, q)
+		} else {
+			name := GensymSess(s, "p_")
+			if name == "" {
+				fail()
+				return false
+			}
+			v = CreateVariableQferSess(s, name, ty, q)
+		}
 		if v == nil {
 			fail()
 			return false
@@ -231,13 +241,16 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 		sessNoteError(s, ErrGeneric)
 		return nil
 	}
+	// Function.cpp:748 — Function(name, ty, is_builtin); BuildState starts Unbuilt
+	// so GenerateBody (Function.cpp:762) can enter make_dummy_block + post_creation.
 	f := &Function{
 		Name:       name,
 		ReturnType: ty,
 		IsBuiltin:  true,
-		BuildState: BuildBuilding,
+		BuildState: BuildUnbuilt,
 	}
 	// return dummy variable — Probabilities singleton always live; nil probs → 0% quals
+	// Function.cpp:752 — CVQualifiers::random_qualifiers(ty) always burns stream.
 	retQ := RandomQualifiersNoContextNoVolatileSess(s, ty, opts, probs, r)
 	f.RV = CreateVariableQferSess(s, name+"_rv", ty, retQ)
 	if f.RV == nil {
@@ -258,13 +271,46 @@ func MakeBuiltinFunctionSess(s *Session, opts Options, probs *Probabilities, r *
 	if fmMap != nil {
 		_ = fmMap.ForFuncSess(s, f)
 	}
-	_ = fm
-	// dummy body (no random generation for builtins)
-	// Block.cpp:97 assert(curr_func) — f is live
-	f.Body = MakeDummyBlockSess(s, f)
-	f.ComputeSummarySess(s, EmptyEffect())
-	f.BuildState = BuildBuilt
-	f.IsBuilt = true
+	// Function.cpp:762 — GenerateBody(empty context): make_dummy_block +
+	// post_creation_analysis → append_return_stmt for non-void returns (burns RNG + gensyms).
+	// Soft invent MakeDummyBlockSess skipped post_creation → first_div after types (seed2 --builtins).
+	vs := (*VariableSelector)(nil)
+	tables := (*ExprTables)(nil)
+	stmtTab := (*ThresholdTable)(nil)
+	if s != nil && s.ProgramGen != nil {
+		vs = s.ProgramGen.VS
+		tables = s.ProgramGen.Tables
+		stmtTab = s.ProgramGen.StmtTab
+	}
+	if vs == nil {
+		vs = NewVariableSelector(s, opts)
+	}
+	if tables == nil {
+		tables = NewExprTablesSess(s, opts)
+	}
+	if stmtTab == nil {
+		stmtTab = NewStatementThresholdTableSess(s, opts)
+	}
+	cg := EmptyCGContext().WithSession(s).WithFactMgr(fm)
+	cg.CurrentFunc = f
+	if list != nil {
+		cg = cg.WithFuncList(list)
+	}
+	if s != nil && s.ProgramGen != nil {
+		cg.Types = &s.ProgramGen.Types
+	}
+	f.GenerateBody(r, opts, probs, vs, tables, stmtTab, cg)
+	// Function.cpp:762–769 — body must be Built; map_out / add_back / dangling already in GenerateBody
+	if sessHasError(s) || f.Body == nil || f.BuildState != BuildBuilt {
+		if !sessHasError(s) {
+			sessNoteError(s, ErrGeneric)
+		}
+		return nil
+	}
+	// Function.cpp:773 — find_dangling always (option default true; GenerateBody already if enabled)
+	if opts.DanglingGlobalPointers && fm != nil {
+		fm.FindDanglingGlobalPtrs(f)
+	}
 	if list != nil {
 		list.Funcs = append(list.Funcs, f)
 	}

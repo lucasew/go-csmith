@@ -77,8 +77,18 @@ func TestGenerateParameterListFromStringAsserts(t *testing.T) {
 		t.Fatal("sole Void ok")
 	}
 	f4 := &Function{Name: "b4"}
+	ResetDefaultGensymSess(testAmbientSession)
 	if !GenerateParameterListFromStringSess(testAmbientSession, f4, "UInt, UChar") || len(f4.Param) != 2 {
 		t.Fatal("two params", f4.Param)
+	}
+	// Function.cpp:359 — GenerateParameterVariable → RandomParamName → gensym("p_"),
+	// not fixed p_1/p_2 (shared process counter with func_/l_/t_).
+	if f4.Param[0].Name != "p_1" || f4.Param[1].Name != "p_2" {
+		t.Fatalf("want gensym p_1 p_2, got %q %q", f4.Param[0].Name, f4.Param[1].Name)
+	}
+	// Next gensym continues the same counter (not a per-function reset).
+	if g := GensymSess(testAmbientSession, "func_"); g != "func_3" {
+		t.Fatalf("shared gensym after two params want func_3 got %q", g)
 	}
 }
 

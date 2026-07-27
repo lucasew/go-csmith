@@ -2,6 +2,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+)
+
 // MustBreakOrReturnFull mirrors Block::must_break_or_return.
 // Block.cpp:342–357 — last must_return unless continue-like back edge from outside.
 // Note: unlike must_return, does not require break_stms empty.
@@ -314,6 +319,18 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 				nb = append(nb, blk)
 			}
 			if BlocksComplete(f.Blocks) {
+				if os.Getenv("CSMITH_DEBUG_POOL") != "" && os.Getenv("CSMITH_DEBUG_POOL") != "0" {
+					before := len(f.Blocks)
+					after := len(nb)
+					if after != before {
+						fn := "?"
+						if f.Name != "" {
+							fn = f.Name
+						}
+						fmt.Fprintf(os.Stderr, "GO_SCRUB func=%s blocks %d->%d stm=%d kind=%d\n",
+							fn, before, after, removed.StmID, int(removed.Kind))
+					}
+				}
 				f.Blocks = nb
 			}
 		}
@@ -332,6 +349,10 @@ func (b *Block) RemoveStmt(stmID int, fm *FactMgr) int {
 
 	// Block.cpp:664–671 — erase s itself
 	b.Stmts = append(b.Stmts[:idx], b.Stmts[idx+1:]...)
+	// Drop Function-local parent index: tree restructure (remove + nested ids).
+	if b.Func != nil {
+		b.Func.InvalidateStmParentIdx()
+	}
 	cnt := 1
 
 	// cascade-remove goto sources (may live in this or other blocks)
@@ -740,6 +761,9 @@ func (b *Block) AppendNestedLoop(
 		st.StmID = AllocStmIDSess(sessFromCG(cg))
 	}
 	b.Stmts = append(b.Stmts, *st)
+	if b.Func != nil {
+		b.Func.noteStmParent(st.StmID, b)
+	}
 	if cg.FM != nil {
 		// Block::stm_id always live when FM bound (no invent fold into key 0)
 		if StmIDUnset(b.StmID) {
@@ -854,6 +878,9 @@ func (b *Block) AppendReturnStmt(r *Rng, opts Options, vs *VariableSelector, cg 
 		ret.StmID = AllocStmIDSess(sessFromCG(cg))
 	}
 	b.Stmts = append(b.Stmts, ret)
+	if b.Func != nil {
+		b.Func.noteStmParent(ret.StmID, b)
+	}
 	st := &b.Stmts[len(b.Stmts)-1]
 	if fm != nil {
 		// Block::stm_id always live when FM bound (no invent fold into key 0)
@@ -988,9 +1015,11 @@ func blockHasStmtIDSess(s *Session, b *Block, id int) bool {
 
 // MakeDummyBlockCG mirrors Block::make_dummy_block with CGContext.
 // Block.cpp:95–110 — empty block, fact_in, post_creation_analysis, stack pop.
+// r/vs are required for post_creation append_return_stmt on non-void funcs
+// (Function.cpp:762 make_builtin GenerateBody; soft invent nil r skipped return RNG).
 // Incomplete EffectAccum / GlobalFacts / post-creation fails closed nil
 // (no invent dummy block success past hole shells).
-func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
+func MakeDummyBlockCG(cg *CGContext, opts Options, r *Rng, vs *VariableSelector) *Block {
 	// Block.cpp:96–97 — assert(curr_func) sticky
 	if cg == nil || cg.CurrentFunc == nil {
 		noteErrCG(cg, ErrGeneric)
@@ -1049,8 +1078,8 @@ func MakeDummyBlockCG(cg *CGContext, opts Options) *Block {
 		}
 		cg.FM.SetMapFactsIn(b.StmID, cg.FM.GlobalFacts)
 	}
-	// Block.cpp:107 — post_creation_analysis
-	b.PostCreationAnalysis(cg, opts, preEffect, nil, nil)
+	// Block.cpp:107 — post_creation_analysis (needs r/vs for append_return_stmt)
+	b.PostCreationAnalysis(cg, opts, preEffect, r, vs)
 	// Block.cpp:108 — stack pop only (b stays on func->blocks)
 	popStack()
 	// incomplete post-creation must not invent dummy block success
@@ -1110,7 +1139,14 @@ func ShortcutAnalysisBlock(b *Block, facts *[]*FactPointTo, cg *CGContext) int {
 	if !UnionFactsComplete(inU) {
 		return ShortcutNone
 	}
-	if !SameFactVecSess(sessFromCG(cg), *facts, fm.UnionFacts, in, inU) {
+	sameBlk := SameFactVecSess(sessFromCG(cg), *facts, fm.UnionFacts, in, inU)
+	// Env-gated: n62 parent-block SC vs for(g_8) re-entry (UP block SC avoids early for SC_OK).
+	if os.Getenv("DIAG_GO_G8") != "" && b.Looping {
+		unf := ContainsUnfixedGotoBlockSess(sessFromCG(cg), b, fm)
+		fmt.Fprintf(os.Stderr, "GO_SC_BLK sid=%d same=%v unfixed=%v looping=1 nFact=%d nIn=%d nU=%d nInU=%d nStmts=%d\n",
+			b.StmID, sameBlk, unf, len(*facts), len(in), len(fm.UnionFacts), len(inU), len(b.Stmts))
+	}
+	if !sameBlk {
 		// residual ERROR sticky — no invent soft-continue ShortcutOK past same_facts residual
 		if hasErrCG(cg) {
 			return ShortcutNone

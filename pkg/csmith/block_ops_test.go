@@ -370,7 +370,7 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	eff := EmptyEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &eff
-	b := MakeDummyBlockCG(&cg, opts)
+	b := MakeDummyBlockCG(&cg, opts, NewRngSess(testAmbientSession, 1), NewVariableSelector(testAmbientSession, opts))
 	if b == nil || b.Func != f {
 		t.Fatal(b)
 	}
@@ -385,13 +385,13 @@ func TestMakeDummyBlockCG(t *testing.T) {
 	}
 	ClearErrorSess(testAmbientSession)
 	// Block.cpp:96–97 assert(curr_func) sticky
-	if MakeDummyBlockCG(nil, opts) != nil {
+	if MakeDummyBlockCG(nil, opts, nil, nil) != nil {
 		t.Fatal("nil cg must fail closed")
 	}
 	// nil cg must SetError sticky — nil-owner residual: no bag → fail-closed without ambient sticky
 	ClearErrorSess(testAmbientSession)
 	empty := EmptyCGContext().WithSession(testAmbientSession)
-	if MakeDummyBlockCG(&empty, opts) != nil {
+	if MakeDummyBlockCG(&empty, opts, nil, nil) != nil {
 		t.Fatal("nil CurrentFunc must fail closed")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -417,7 +417,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	inc := IncompleteEffect()
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
 	cg.EffectAccum = &inc
-	if MakeDummyBlockCG(&cg, opts) != nil {
+	if MakeDummyBlockCG(&cg, opts, NewRngSess(testAmbientSession, 1), NewVariableSelector(testAmbientSession, opts)) != nil {
 		t.Fatal("incomplete EffectAccum must fail closed MakeDummyBlockCG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -431,7 +431,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	fm2 := NewFactMgrSess(testAmbientSession, f2)
 	fm2.GlobalFacts = IncompleteFactSlice()
 	cg2 := WithFunc(f2, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm2)
-	if MakeDummyBlockCG(&cg2, opts) != nil {
+	if MakeDummyBlockCG(&cg2, opts, NewRngSess(testAmbientSession, 1), NewVariableSelector(testAmbientSession, opts)) != nil {
 		t.Fatal("incomplete GlobalFacts must fail closed MakeDummyBlockCG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -442,7 +442,7 @@ func TestMakeDummyBlockCGIncompleteFailClosed(t *testing.T) {
 	cg3 := WithFunc(f3, IncompleteEffect()).WithSession(testAmbientSession).WithFactMgr(NewFactMgrSess(testAmbientSession, f3))
 	eff := EmptyEffect()
 	cg3.EffectAccum = &eff
-	if MakeDummyBlockCG(&cg3, opts) != nil {
+	if MakeDummyBlockCG(&cg3, opts, NewRngSess(testAmbientSession, 1), NewVariableSelector(testAmbientSession, opts)) != nil {
 		t.Fatal("incomplete EffectContext must fail closed MakeDummyBlockCG")
 	}
 	if !HasErrorSess(testAmbientSession) {
@@ -1022,6 +1022,10 @@ func TestFindStmtByID(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 	f.Blocks = []*Block{outer}
 	outer.Stmts[0].Else = nil
+	// Drop parent index so walk re-validates get_blocks completeness (C++ keeps
+	// Statement::parent; Go index is rebuild-on-demand and must not soft-hit
+	// a pre-mutation parent past an incomplete arm).
+	f.InvalidateStmParentIdx()
 	if FindStmtByIDSess(testAmbientSession, f, 3) != nil {
 		t.Fatal("nil Else must fail closed when only reachable via incomplete if")
 	}
@@ -1502,17 +1506,30 @@ func TestMakeDummyBlockCGFactIn(t *testing.T) {
 	// Block.cpp:95–110 — fact_in + post_creation, not empty shell only
 	ClearErrorSess(testAmbientSession)
 	opts := Defaults()
-	f := &Function{Name: "builtin_x", ReturnType: GetIntTypeSess(testAmbientSession), IsBuiltin: true}
+	f := &Function{
+		Name:       "builtin_x",
+		ReturnType: GetIntTypeSess(testAmbientSession),
+		IsBuiltin:  true,
+		// StatementReturn.cpp:61 — rv->qfer required for append_return make_random
+		RV: CreateVariableQferSess(testAmbientSession, "rv", GetIntTypeSess(testAmbientSession), NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})),
+	}
 	fm := NewFactMgrSess(testAmbientSession, f)
 	p := CreateVariableScalarsSess(testAmbientSession, "g_p", PointerToSess(testAmbientSession, GetIntTypeSess(testAmbientSession)), false, false)
 	fm.GlobalFacts = []*FactPointTo{MakeFactPointToSess(testAmbientSession, p, NullPtr)}
 	cg := WithFunc(f, EmptyEffect()).WithSession(testAmbientSession).WithFactMgr(fm)
-	b := MakeDummyBlockCG(&cg, opts)
+	// Int return: post_creation append_return_stmt needs r/vs (Block.cpp:747–748)
+	r := NewRngSess(testAmbientSession, 1)
+	vs := NewVariableSelector(testAmbientSession, opts)
+	b := MakeDummyBlockCG(&cg, opts, r, vs)
 	if b == nil || b.StmID == 0 {
 		t.Fatal("nil dummy")
 	}
 	if in, ok := fm.MapFactsIn[b.StmID]; !ok || FindRelatedPointToSess(testAmbientSession, in, p) == nil {
 		t.Fatal("fact_in missing")
+	}
+	// non-void empty dummy → append_return_stmt
+	if len(b.Stmts) == 0 || b.Stmts[0].Kind != StmtReturn {
+		t.Fatal("expected append_return for non-void builtin dummy", b.OutputSess(testAmbientSession, 0))
 	}
 	// stack popped after make
 	if len(f.Stack) != 0 {
