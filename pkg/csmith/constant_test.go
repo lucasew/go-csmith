@@ -299,6 +299,35 @@ func TestGenerateSmallRandomFloatHexConstant(t *testing.T) {
 	ClearErrorSess(testAmbientSession)
 }
 
+// TestFormatSmallConstantUInt128DefaultSigned mirrors Constant.cpp:329–361 —
+// eUInt128 is not in the unsigned cast switch; default `oss << num` then "U"/"UL".
+func TestFormatSmallConstantUInt128DefaultSigned(t *testing.T) {
+	opts := Defaults()
+	// longlong on → UL suffix
+	got := formatSmallConstantSess(testAmbientSession, EUInt128, -4, opts)
+	if got != "-4UL" {
+		t.Fatalf("longlong: got %q want -4UL", got)
+	}
+	// ccomp or !longlong → U suffix (Constant.cpp:357–359)
+	opts.CComp = true
+	got = formatSmallConstantSess(testAmbientSession, EUInt128, -4, opts)
+	if got != "-4U" {
+		t.Fatalf("ccomp: got %q want -4U", got)
+	}
+	opts = Defaults()
+	opts.LongLong = false
+	got = formatSmallConstantSess(testAmbientSession, EUInt128, -4, opts)
+	if got != "-4U" {
+		t.Fatalf("!longlong: got %q want -4U", got)
+	}
+	// Output wraps leading '-' (Constant.cpp:535–539)
+	c := &Constant{Type: GetSimpleTypeSess(testAmbientSession, EUInt128), Value: "-4U"}
+	out := c.OutputOptsSess(testAmbientSession, Defaults())
+	if out != "(-4U)" {
+		t.Fatalf("Output: got %q want (-4U)", out)
+	}
+}
+
 func TestRandomHexDigitsNilRNGSticky(t *testing.T) {
 	// AbsRndNumGenerator always has live RNG sticky
 	ClearErrorSess(testAmbientSession)

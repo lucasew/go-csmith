@@ -555,10 +555,25 @@ func formatSmallConstantSess(s *Session, st ESimpleType, num int, opts Options) 
 	case EUInt:
 		body = strconv.FormatUint(uint64(uint32(int32(num))), 10)
 	case EULong:
-		// (unsigned long)num — use uint64 cast of int64(num) for two's-complement wrap
-		body = strconv.FormatUint(uint64(int64(num)), 10)
-	case EULongLong, EUInt128:
-		body = strconv.FormatUint(uint64(int64(num)), 10)
+		// Constant.cpp:348–355 — (unsigned long)num when longlong; else (unsigned int)
+		if !opts.LongLong {
+			body = strconv.FormatUint(uint64(uint32(int32(num))), 10)
+		} else {
+			// (unsigned long)num — uint64 cast of int64(num) for two's-complement wrap
+			body = strconv.FormatUint(uint64(int64(num)), 10)
+		}
+	case EULongLong:
+		// Constant.cpp:348–355 — (unsigned INT64)num when longlong; else (unsigned int)
+		if !opts.LongLong {
+			body = strconv.FormatUint(uint64(uint32(int32(num))), 10)
+		} else {
+			body = strconv.FormatUint(uint64(int64(num)), 10)
+		}
+	case EUInt128:
+		// Constant.cpp:329–361 small-path switch has no eUInt128 case — default
+		// `oss << num` (signed decimal). Soft invent was FormatUint wrap which
+		// emitted 18446744073709551612U instead of -4U (flagcamp seed 111663…).
+		body = strconv.Itoa(num)
 	default:
 		body = strconv.Itoa(num)
 	}
