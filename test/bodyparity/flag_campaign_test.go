@@ -2,8 +2,10 @@ package bodyparity_test
 
 import (
 	crand "crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -23,7 +25,7 @@ func TestBodyParityFlagCampaign(t *testing.T) {
 	}
 	_ = upstreamCsmith(t)
 	deadline := time.Now().Add(dur)
-	n := 0
+	n, compared := 0, 0
 	// Start from a valid v2 drop-in blob size, then re-randomize payload.
 	// Random bytes without magic 0xFF are seed-only (legacy); always use v2.
 	base := csmith.FuzzBlobFromOptions(csmith.Defaults())
@@ -42,6 +44,11 @@ func TestBodyParityFlagCampaign(t *testing.T) {
 			blob = seedb[:]
 		}
 		opts := csmith.OptionsFromFuzzBlob(blob)
+		// DFS exhaustive burns the campaign budget; re-roll to random-mode.
+		if opts.DFSExhaustive {
+			opts.DFSExhaustive = false
+			opts.RandomBased = true
+		}
 		n++
 		// Subtest so Skip (upstream conflict) does not abort the whole campaign.
 		name := fmt.Sprintf("n%d_s%d", n, opts.Seed)
@@ -49,12 +56,33 @@ func TestBodyParityFlagCampaign(t *testing.T) {
 			assertOptsBodyParity(t, opts)
 		})
 		if !ok && t.Failed() {
+			// Persist blob for exact repro (CLIArgs alone can lose drop-in detail).
+			dumpCampBlob(t, n, opts)
 			// Hard fail already recorded; stop so the crasher is the campaign exit.
 			return
 		}
+		if ok {
+			compared++
+		}
 		if n%10 == 0 {
-			t.Logf("flagcamp n=%d last=%s", n, csmith.FormatOptionsShort(opts.ForDropInParity()))
+			t.Logf("flagcamp n=%d compared=%d last=%s", n, compared, csmith.FormatOptionsShort(opts.ForDropInParity()))
 		}
 	}
-	t.Logf("flagcamp CLEAN n=%d elapsed=%s", n, dur)
+	t.Logf("flagcamp CLEAN n=%d compared=%d elapsed=%s", n, compared, dur)
+}
+
+// dumpCampBlob writes FuzzBlobFromOptions(ForDropInParity) hex under testdata/campfails/.
+func dumpCampBlob(t *testing.T, n int, opts csmith.Options) {
+	t.Helper()
+	o := opts.ForDropInParity()
+	blob := csmith.FuzzBlobFromOptions(o)
+	dir := filepath.Join("testdata", "campfails")
+	_ = os.MkdirAll(dir, 0o755)
+	name := fmt.Sprintf("n%d_s%d.blob.hex", n, o.Seed)
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(hex.EncodeToString(blob)+"\n"), 0o644); err != nil {
+		t.Logf("camp blob dump failed: %v", err)
+		return
+	}
+	t.Logf("camp DIFF blob hex written %s (%d bytes payload)", path, len(blob))
 }

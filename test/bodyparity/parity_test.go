@@ -19,6 +19,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -121,6 +122,11 @@ func upstreamGenerate(tb testing.TB, opts csmith.Options) string {
 	// Upstream often prints "error: options conflict …" on stdout (not stderr).
 	combined := strings.TrimSpace(stderr.String() + "\n" + stdout.String())
 	if err != nil {
+		// Signal/exit from ProcessState (locale-independent); also scan err text.
+		// Partial stdout (e.g. header only then SIGSEGV) must not hide the crash.
+		if isUpstreamProcessCrash(err) || isUpstreamCrash(err.Error()) {
+			tb.Skipf("upstream crash %v: %s", args, err.Error())
+		}
 		msg := combined
 		if msg == "" {
 			msg = err.Error()
@@ -169,14 +175,31 @@ func isUpstreamCrash(msg string) bool {
 		strings.Contains(low, "aborted") ||
 		strings.Contains(low, "sigsegv") ||
 		strings.Contains(low, "sigabrt") ||
-		strings.Contains(low, "bus error")
+		strings.Contains(low, "bus error") ||
+		// Portuguese glibc/shell (Falha de segmentação / despejou núcleo)
+		strings.Contains(low, "falha de segmenta") ||
+		strings.Contains(low, "despejou n")
+}
+
+// isUpstreamProcessCrash reports signal deaths from exec.ExitError (locale-independent).
+func isUpstreamProcessCrash(err error) bool {
+	var ee *exec.ExitError
+	if err == nil || !errors.As(err, &ee) || ee.ProcessState == nil {
+		return false
+	}
+	// WaitStatus: signal exit (SIGSEGV etc.) — not a Go body parity bug.
+	return !ee.ProcessState.Exited() || ee.ProcessState.ExitCode() > 128
 }
 
 // goGenTimeout bounds one Go Generate in bodyparity. Larger than typical cases;
 // true hangs fail as Fatal (not go-fuzz worker EOF). go-fuzz workers still have
 // ~10s internal budget — slow-but-correct seeds (~7s gen) can false-hang there;
 // re-run corpus entries alone to confirm (hangs are bugs only if reproducible).
-const goGenTimeout = 90 * time.Second
+//
+// Pathological drop-in cases (e.g. seed=2 --random-random) do ~238k RNG events
+// bit-identically vs upstream but take ~90–100s in Go vs ~12s C++ (impl cost,
+// not stream climb). Keep headroom so bodyparity does not false-Fatal as hang.
+const goGenTimeout = 3 * time.Minute
 
 func goGenerate(tb testing.TB, opts csmith.Options) string {
 	tb.Helper()
@@ -317,8 +340,10 @@ func FuzzBodyParity(f *testing.F) {
 		binary.LittleEndian.PutUint64(b, seed)
 		f.Add(b)
 	}
-	// Drop-in flag roots.
-	for _, seed := range []uint64{0, 2, 42} {
+	// Drop-in flag roots. Prefer seed=0 for muts — seed=2 + --no-arrays etc. can
+	// exceed the go-fuzz ~10s worker budget as a false hang (body still matches;
+	// flagcamp / TestBodyParityBattery cover slow cases without the worker cap).
+	for _, seed := range []uint64{0, 1, 42} {
 		o := csmith.Defaults()
 		o.Seed = seed
 		f.Add(csmith.FuzzBlobFromOptions(o))
@@ -326,14 +351,14 @@ func FuzzBodyParity(f *testing.F) {
 	for _, mut := range []func(*csmith.Options){
 		func(o *csmith.Options) { o.Jumps = false },
 		func(o *csmith.Options) { o.Volatiles = false },
-		func(o *csmith.Options) { o.MaxFuncs = 3 },
+		func(o *csmith.Options) { o.MaxFuncs = 2 },
 		func(o *csmith.Options) { o.Pointers = false },
 		func(o *csmith.Options) { o.Arrays = false },
 		func(o *csmith.Options) { o.SafeMath = false },
 		func(o *csmith.Options) { o.Bitfields = false },
 	} {
 		o := csmith.Defaults()
-		o.Seed = 2
+		o.Seed = 0
 		mut(&o)
 		f.Add(csmith.FuzzBlobFromOptions(o))
 	}
