@@ -3031,7 +3031,49 @@ func (f *Function) generateBodyCore(
 															}
 														}
 														if !accSuccOwnerResFree {
-															accOrderFH = true
+															// Acc-order Acc-early with gap. Keep map when gap has
+															// another free residual pure free-ref free of the same
+															// free-head owner (seed9838263505978394624 func_12
+															// g_445 Acc before l_34 with gap sibling pure residual
+															// pure free-ref free g_276 of free-head func_28; Acc-
+															// order before l_34 yanks past g_276 → UP g_445
+															// g_276). Session-local — no package mutable state.
+															gapSibPureFR := false
+															for j := ppFH + 1; j < rpFH; j++ {
+																w := ordFH[j]
+																if w == nil {
+																	continue
+																}
+																for _, invG := range calls {
+																	if invG == nil || invG.User == nil || !EffectComplete(invG.User.FEffect) {
+																		continue
+																	}
+																	if !isForIVOfFunc(invG.User, v) || !bodySyntacticFreeReadsVar(invG.User, v) {
+																		continue
+																	}
+																	if !isForIVOfFunc(invG.User, w) || !bodySyntacticFreeReadsVar(invG.User, w) {
+																		continue
+																	}
+																	frG := invG.User.FEffect.ReadVarsSess(s)
+																	if hasErrVS(vs) || !VariablesComplete(frG) {
+																		break
+																	}
+																	if len(frG) > 0 && frG[0] != nil && !isForIVOfFunc(invG.User, frG[0]) {
+																		gapSibPureFR = true
+																		break
+																	}
+																}
+																if gapSibPureFR {
+																	break
+																}
+															}
+															if hasErrVS(vs) {
+																abortUnbuilt()
+																return
+															}
+															if !gapSibPureFR {
+																accOrderFH = true
+															}
 														}
 													}
 													if hasErrVS(vs) {
