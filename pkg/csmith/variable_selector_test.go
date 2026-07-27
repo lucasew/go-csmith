@@ -104,6 +104,30 @@ func TestGenerateNewGlobalNamesAndList(t *testing.T) {
 	}
 }
 
+// Golden Release builds strip RandomGlobalName's assert(global_variables); forced
+// globals (InitPointerValue under --no-addr-taken-of-locals) still create.
+func TestGenerateNewGlobalDespiteNoGlobalVariablesOption(t *testing.T) {
+	ClearErrorSess(testAmbientSession)
+	ResetDefaultGensymSess(testAmbientSession)
+	opts := Defaults()
+	opts.Arrays = false
+	opts.GlobalVariables = false
+	opts.AddrTakenOfLocals = false
+	vs := NewVariableSelector(testAmbientSession, opts)
+	q := NewCVQualifiersSess(testAmbientSession, []bool{false}, []bool{false})
+	v := vs.GenerateNewGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 2))
+	if v == nil || HasErrorSess(testAmbientSession) {
+		t.Fatalf("forced global under !GlobalVariables: v=%v sticky=%v", v, HasErrorSess(testAmbientSession))
+	}
+	if len(vs.GlobalList) != 1 || vs.GlobalList[0] != v {
+		t.Fatal("GlobalList")
+	}
+	v2 := vs.GenerateNewNonArrayGlobal(AccessRead, EmptyCGContext().WithSession(testAmbientSession), GetIntTypeSess(testAmbientSession), &q, NewRngSess(testAmbientSession, 3))
+	if v2 == nil || HasErrorSess(testAmbientSession) {
+		t.Fatalf("NonArray forced global: v=%v sticky=%v", v2, HasErrorSess(testAmbientSession))
+	}
+}
+
 func TestGenerateNewGlobalIncompleteAmbientSticky(t *testing.T) {
 	// incomplete ambient / GlobalFacts fail closed sticky before create
 	ClearErrorSess(testAmbientSession)

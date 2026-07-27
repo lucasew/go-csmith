@@ -3,6 +3,11 @@
 // Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
 package csmith
 
+import (
+	"fmt"
+	"os"
+)
+
 // VariableSelector holds AllVars / GlobalList inventories (static vectors in C++).
 type VariableSelector struct {
 	// Sess is the pure-run bag when set (generation); nil in minimal unit tests.
@@ -203,6 +208,79 @@ func ChooseVisibleReadVarOptsSess(s *Session,
 		}
 		ok = append(ok, v)
 	}
+	// Env-gated pool dump for bodyparity debugging (stderr only; no package mutable state).
+	// DIAG_GO_CVRV=1 → dump when nOk∈{4,5,17,20,35} or pool has key names (seed17/42/n62).
+	if os.Getenv("DIAG_GO_CVRV") != "" {
+		interesting := len(ok) == 4 || len(ok) == 5 || len(ok) == 17 || len(ok) == 20 || len(ok) == 35
+		// seed17: if (l_16) vs if (l_21) goto — nOk 5 vs 4 first_div
+		if len(readVars) == 12 {
+			interesting = true
+		}
+		has128, has1054 := false, false
+		for _, v := range ok {
+			if v == nil {
+				continue
+			}
+			switch v.Name {
+			case "g_3199", "g_2221", "g_2498.f0", "g_322", "l_16", "l_21":
+				interesting = true
+			case "g_128":
+				has128 = true
+			case "g_1054":
+				has1054 = true
+			}
+		}
+		// seed-42: if (g_128) goto — pool order among EffectAccum reads
+		if has128 && has1054 {
+			interesting = true
+		}
+		if interesting {
+			fmt.Fprintf(os.Stderr, "GO_CVRV nOk=%d nRead=%d nExp=%d pool=", len(ok), len(readVars), len(expanded))
+			for i, v := range ok {
+				if i > 0 {
+					fmt.Fprint(os.Stderr, ",")
+				}
+				if v != nil {
+					fmt.Fprint(os.Stderr, v.Name)
+				}
+			}
+			fmt.Fprint(os.Stderr, " reads=")
+			limit := len(readVars)
+			if limit > 40 {
+				limit = 40
+			}
+			for i := 0; i < limit; i++ {
+				if i > 0 {
+					fmt.Fprint(os.Stderr, ",")
+				}
+				if readVars[i] != nil {
+					fmt.Fprint(os.Stderr, readVars[i].Name)
+				}
+			}
+			if len(readVars) > 40 {
+				fmt.Fprintf(os.Stderr, "...(+%d)", len(readVars)-40)
+			}
+			for _, name := range []string{"g_8", "l_3", "g_4", "g_5", "g_322", "g_2498.f0", "g_2221", "g_3199", "g_128", "g_1054", "g_804"} {
+				ri, pi := -1, -1
+				for i, v := range readVars {
+					if v != nil && v.Name == name {
+						ri = i
+						break
+					}
+				}
+				for i, v := range ok {
+					if v != nil && v.Name == name {
+						pi = i
+						break
+					}
+				}
+				if ri >= 0 || pi >= 0 {
+					fmt.Fprintf(os.Stderr, " %s:r%d/p%d", name, ri, pi)
+				}
+			}
+			fmt.Fprintln(os.Stderr)
+		}
+	}
 	// VariableSelector.cpp always has RNG for multi-pick; ChooseOKVar handles n==0/1/nil r
 	return ChooseOKVarSess(s, r, ok)
 }
@@ -383,27 +461,30 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 		if v == nil {
 			return nil
 		}
-		// ExpressionVariable(*v) then optional (v + offset)
-		// VariableSelector.cpp:1492–1497 — FunctionInvocationBinary(eAdd, …, flags=0)
-		// null op_flags → Output emits plain "a + b" (FunctionInvocationBinary.cpp:357–361)
-		// Indices string form must match Expression.Output (virtual Variable::Output),
-		// not v.Name — itemized array IVs print as name[i]… (seed-48 g_106[4]).
-		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(sessFromCG(&cg))}
-		idx := idxExpr.OutputSess(sessFromVS(vs))
-		// residual ERROR sticky — no invent soft-continue later dims past index Output residual
-		if hasErrVS(vs) {
-			return nil
-		}
-		if idx == "" {
+		// VariableSelector.cpp:1463–1470 — ExpressionVariable(*v) + optional
+		// FunctionInvocationBinary(eAdd, …, flags=0). C++ stores Expression* only;
+		// no Output during itemize (emit uses IndexExprs → Expression::Output).
+		// Indices is a non-emit cache for equals/tests; use internal Name, not
+		// get_prefixed_name (prefix_name would empty globals mid-gen and diverge
+		// from C++ which never Outputs here).
+		if v.Name == "" {
 			noteErrVS(vs, ErrGeneric)
 			return nil
 		}
+		idxExpr := &Expression{Term: TermVariable, Var: v, ExprType: GetIntTypeSess(sessFromCG(&cg))}
+		idx := v.Name
 		remain := dimenLen - boundOf[v]
 		if remain > 1 {
 			off := int(r.RndUptoSess(sessFromVS(vs), uint32(remain)))
 			if off > 0 {
+				// VariableSelector.cpp:1466 — new Constant(get_int_type(),
+				// StringUtils::int2str(offset)), not Constant::make_int.
+				// mark_mutable_const must not wrap index-offset literals as "(n)".
+				bag := sessFromVS(vs)
+				offStr := Int2Str(off)
 				offExpr := &Expression{
-					Term: TermConstant, Con: MakeIntSess(sessFromVS(vs), off), ExprType: GetIntTypeSess(sessFromCG(&cg)),
+					Term: TermConstant, Con: &Constant{Type: GetIntTypeSess(bag), Value: offStr},
+					ExprType: GetIntTypeSess(sessFromCG(&cg)),
 				}
 				fi := &Invocation{
 					IsStd:  true,
@@ -412,16 +493,8 @@ func (vs *VariableSelector) ItemizeArray(r *Rng, cg CGContext, av *ArrayVariable
 					// Safe nil: ArrayVariable index add must not use safe_* wrappers
 				}
 				idxExpr = &Expression{Term: TermFunction, Invoke: fi, ExprType: GetIntTypeSess(sessFromCG(&cg))}
-				idx = idxExpr.OutputSess(sessFromVS(vs))
-				// residual ERROR sticky — no invent soft-continue later dims past index Output residual
-				if hasErrVS(vs) {
-					return nil
-				}
-				// incomplete index Output sticky — no invent empty index string then partial item
-				if idx == "" {
-					noteErrVS(vs, ErrGeneric)
-					return nil
-				}
+				// string cache only; emit re-Outputs IndexExprs (plain "a + b")
+				idx = v.Name + " + " + offStr
 			}
 		}
 		indices = append(indices, idx)
@@ -2258,10 +2331,11 @@ func (vs *VariableSelector) GenerateNewNonArrayGlobal(
 		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	// VariableSelector.cpp:129 assert global_variables; library → nil
-	if !vs.Opts.GlobalVariables {
-		return nil
-	}
+	// VariableSelector.cpp:129 RandomGlobalName assert(global_variables) is NDEBUG-no-op
+	// in golden Release builds. Forced globals still create when !GlobalVariables —
+	// e.g. InitPointerValue with --no-addr-taken-of-locals && use_local falls through
+	// to GenerateNewGlobal/NonArrayGlobal (VariableSelector.cpp:891–900). Soft-nil
+	// on !GlobalVariables emptied GlobalList and broke --no-global-variables+--no-addr-taken-of-locals.
 	if vs.atMaxGlobals() {
 		return nil
 	}
@@ -2371,9 +2445,8 @@ func (vs *VariableSelector) GenerateNewGlobal(
 		noteErrVS(vs, ErrGeneric)
 		return nil
 	}
-	if !vs.Opts.GlobalVariables {
-		return nil
-	}
+	// Do not soft-nil on !GlobalVariables — see GenerateNewNonArrayGlobal (NDEBUG assert;
+	// forced-global path under --no-addr-taken-of-locals).
 	if vs.atMaxGlobals() {
 		return nil
 	}
@@ -2555,15 +2628,25 @@ func (vs *VariableSelector) SelectGlobalMT(
 }
 
 // chooseRandomStructFromType mirrors Type::choose_random_struct_from_type.
-// Type.cpp:570–586 — if ok structs exist pick one; else return original type.
-// Incomplete ok pool fails closed nil (no invent keep original typ past hole
-// via len(nil)==0 empty-complete success).
+// Type.cpp:545–558 — get_all_ok_struct_union_types(ok, no_volatile, false, true, true)
+// i.e. no_const=noVolatile, no_volatile=false, need_int_field=true, bStruct=true only;
+// if any ok structs, DEPTH_GUARD then choose_random_struct_union_type (marks used);
+// else keep original type. Soft invent was okStructUnionLTypes(structs+unions, no
+// need_int) → n=2 vs n=1 (flagcamp seed 947777… first_div @127).
 func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng) *Type {
-	if typ == nil || r == nil {
-		return typ
+	// Type.cpp:547–548 — if (!type) return nullptr
+	if typ == nil {
+		return nil
 	}
-	cands := okStructUnionLTypes(env, noVolatile, true, true)
-	// incomplete ok pool fails closed sticky (no invent keep original typ past hole)
+	if env == nil || r == nil {
+		noteErrEnv(env, ErrGeneric)
+		return nil
+	}
+	// Type.cpp:551–553 — arg order is (no_const, no_volatile, need_int, bStruct)
+	cands := env.GetAllOKStructUnionTypes(noVolatile, false, true, true)
+	if hasErrEnv(env) {
+		return nil
+	}
 	if !typesComplete(cands) {
 		noteErrEnv(env, ErrGeneric)
 		return nil
@@ -2571,12 +2654,13 @@ func chooseRandomStructFromType(env *TypeEnv, typ *Type, noVolatile bool, r *Rng
 	if len(cands) == 0 {
 		return typ
 	}
-	st := cands[r.RndUptoSess(sessFromEnv(env), uint32(len(cands)))]
-	if st == nil {
-		noteErrEnv(env, ErrGeneric)
+	// Type.cpp:554–555 — DEPTH_GUARD_BY_DEPTH_RETURN(1, nullptr) when candidates exist
+	opts := sessOpts(sessFromEnv(env))
+	if DepthGuardByDepthSess(sessFromEnv(env), opts, 1) == BadDepth {
 		return nil
 	}
-	return st
+	// Type.cpp:557–558 — choose_random_struct_union_type (marks used)
+	return ChooseRandomStructUnionTypeSess(sessFromEnv(env), r, cands)
 }
 
 // EagerCreateGlobalStruct mirrors VariableSelector::eager_create_global_struct.
