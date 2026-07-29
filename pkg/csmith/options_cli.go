@@ -71,21 +71,27 @@ const (
 var optionsRegistry = buildOptionsRegistry()
 
 func buildOptionsRegistry() []optionsField {
-	// Helper constructors keep the table readable.
+	// Helper constructors keep the table readable (one body each; style/kind differ).
+	boolField := func(name, cli string, kind FieldKind, style cliStyle, get func(Options) bool, set func(*Options, bool)) optionsField {
+		return optionsField{Name: name, Kind: kind, CLI: cli, CLIStyle: style, getBool: get, setBool: set}
+	}
 	bp := func(name, cli string, kind FieldKind, get func(Options) bool, set func(*Options, bool)) optionsField {
-		return optionsField{Name: name, Kind: kind, CLI: cli, CLIStyle: cliBoolPair, getBool: get, setBool: set}
+		return boolField(name, cli, kind, cliBoolPair, get, set)
 	}
 	bon := func(name, cli string, kind FieldKind, get func(Options) bool, set func(*Options, bool)) optionsField {
-		return optionsField{Name: name, Kind: kind, CLI: cli, CLIStyle: cliBoolOn, getBool: get, setBool: set}
+		return boolField(name, cli, kind, cliBoolOn, get, set)
 	}
 	boff := func(name, cli string, kind FieldKind, get func(Options) bool, set func(*Options, bool)) optionsField {
-		return optionsField{Name: name, Kind: kind, CLI: cli, CLIStyle: cliBoolOff, getBool: get, setBool: set}
+		return boolField(name, cli, kind, cliBoolOff, get, set)
+	}
+	kindB := func(name string, kind FieldKind, get func(Options) bool, set func(*Options, bool)) optionsField {
+		return boolField(name, "", kind, cliNone, get, set)
 	}
 	libB := func(name string, get func(Options) bool, set func(*Options, bool)) optionsField {
-		return optionsField{Name: name, Kind: FieldLibrary, CLIStyle: cliNone, getBool: get, setBool: set}
+		return kindB(name, FieldLibrary, get, set)
 	}
 	goB := func(name string, get func(Options) bool, set func(*Options, bool)) optionsField {
-		return optionsField{Name: name, Kind: FieldGoOnly, CLIStyle: cliNone, getBool: get, setBool: set}
+		return kindB(name, FieldGoOnly, get, set)
 	}
 	ii := func(name, cli string, kind FieldKind, lo, span int, get func(Options) int, set func(*Options, int)) optionsField {
 		st := cliNone
@@ -597,24 +603,11 @@ func FuzzBlobFromOptions(o Options) []byte {
 	return b
 }
 
-func registryPlanes() (bools, ints, strs []optionsField) {
+// fieldPlanes splits the registry into bool/int/str planes.
+// cliOnly keeps FieldCLI only (drop-in / bodyparity fuzz surface).
+func fieldPlanes(cliOnly bool) (bools, ints, strs []optionsField) {
 	for _, f := range optionsRegistry {
-		switch {
-		case f.getBool != nil && f.setBool != nil:
-			bools = append(bools, f)
-		case f.getInt != nil && f.setInt != nil:
-			ints = append(ints, f)
-		case f.getStr != nil && f.setStr != nil:
-			strs = append(strs, f)
-		}
-	}
-	return
-}
-
-// dropInPlanes is the bodyparity / drop-in fuzz surface (golden CLI only).
-func dropInPlanes() (bools, ints, strs []optionsField) {
-	for _, f := range optionsRegistry {
-		if f.Kind != FieldCLI {
+		if cliOnly && f.Kind != FieldCLI {
 			continue
 		}
 		switch {
@@ -628,6 +621,11 @@ func dropInPlanes() (bools, ints, strs []optionsField) {
 	}
 	return
 }
+
+func registryPlanes() (bools, ints, strs []optionsField) { return fieldPlanes(false) }
+
+// dropInPlanes is the bodyparity / drop-in fuzz surface (golden CLI only).
+func dropInPlanes() (bools, ints, strs []optionsField) { return fieldPlanes(true) }
 
 // SanitizeForBodyParityFuzz clears modes that cannot produce a single-stdout
 // program body for comparison (dump-and-exit, delta tools, multi-file split).
@@ -726,17 +724,16 @@ func OptionsRegistryNames() []string {
 	return out
 }
 
-// OptionsFieldCount returns full registry plane sizes (all kinds).
-func OptionsFieldCount() (nBool, nInt, nStr int) {
-	b, i, s := registryPlanes()
+func planeLens(cliOnly bool) (nBool, nInt, nStr int) {
+	b, i, s := fieldPlanes(cliOnly)
 	return len(b), len(i), len(s)
 }
 
+// OptionsFieldCount returns full registry plane sizes (all kinds).
+func OptionsFieldCount() (nBool, nInt, nStr int) { return planeLens(false) }
+
 // DropInFieldCount returns drop-in (FieldCLI) plane sizes for bodyparity fuzz.
-func DropInFieldCount() (nBool, nInt, nStr int) {
-	b, i, s := dropInPlanes()
-	return len(b), len(i), len(s)
-}
+func DropInFieldCount() (nBool, nInt, nStr int) { return planeLens(true) }
 
 // FormatOptionsShort is a compact log of non-default fields.
 func FormatOptionsShort(o Options) string {
