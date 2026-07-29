@@ -1,3 +1,10 @@
+// Upstream: CGOptions.h / CGOptions.cpp (set_default_settings and option fields).
+// Pin: pkgs.csmith git 0cdc710315cfee9035e22ef4363ca479270d1934.
+// MaxGlobals is a Go-only library cap (not CGOptions). 0 = unlimited.
+//
+// Scaffold for bodyparity: Options + Defaults + Validate + CLI/fuzz surface
+// (options_cli.go). Generate is intentionally stubbed so the harness can drive
+// model convergence toward bit-identical program bodies vs golden csmith.
 package csmith
 
 import (
@@ -11,8 +18,18 @@ import (
 
 const defaultPlatformInfoPath = "platform.info"
 
-// Options is the canonical API-level configuration contract for generation.
-// Defaults are aligned with Csmith's CGOptions::set_default_settings where possible.
+// Options is the full generation configuration (CGOptions-shaped + Go library extras).
+//
+// Two product contracts share this type:
+//
+//   - Drop-in vs golden csmith(1): Defaults() plus fields that CLIArgs() can
+//     express (FieldCLI in options_cli.go). Body parity and FuzzBodyParity use
+//     ForDropInParity / OptionsFromFuzzBlob — library-only knobs stay default.
+//   - Go library: any field may be set for in-process Generate; CGOptions
+//     fields without a golden flag are still honored by the generator but are
+//     not drop-in-comparable to the stock binary.
+//
+// Defaults align with CGOptions::set_default_settings where possible.
 type Options struct {
 	Seed uint64
 
@@ -48,8 +65,6 @@ type Options struct {
 	InlineFunctionProb   int
 	BuiltinFunctionProb  int
 	ArrayOOBProb         int
-	NullPtrDerefProb     int
-	DanglingPtrDerefProb int
 	StopByStmt           int
 	CoverageTestSize     int
 
@@ -62,48 +77,51 @@ type Options struct {
 	DepthProtect  bool
 
 	// Core generation features
-	ComputeHash              bool
-	AcceptArgc               bool
-	Arrays                   bool
-	Bitfields                bool
-	CompoundAssignment       bool
-	Consts                   bool
-	Divs                     bool
-	Muls                     bool
-	EmbeddedAssigns          bool
-	CommaOperators           bool
-	PreIncrOperator          bool
-	PreDecrOperator          bool
-	PostIncrOperator         bool
-	PostDecrOperator         bool
-	UnaryPlusOperator        bool
-	Jumps                    bool
-	LongLong                 bool
-	Int8                     bool
-	UInt8                    bool
-	EnableFloat              bool
-	Math64                   bool
-	InlineFunction           bool
-	Pointers                 bool
-	Structs                  bool
-	ReturnStructs            bool
-	ArgStructs               bool
-	Unions                   bool
-	ReturnUnions             bool
-	ArgUnions                bool
-	TakeUnionFieldAddr       bool
-	VolStructUnionFields     bool
-	ConstStructUnionFields   bool
-	Volatiles                bool
-	VolatilePointers         bool
-	ConstPointers            bool
-	GlobalVariables          bool
-	StrictConstArrays        bool
-	AccessOnce               bool
-	StrictVolatileRule       bool
-	AddrTakenOfLocals        bool
-	DanglingGlobalPointers   bool
-	NoReturnDeadPointer      bool
+	ComputeHash            bool
+	AcceptArgc             bool
+	Arrays                 bool
+	Bitfields              bool
+	CompoundAssignment     bool
+	Consts                 bool
+	Divs                   bool
+	Muls                   bool
+	EmbeddedAssigns        bool
+	CommaOperators         bool
+	PreIncrOperator        bool
+	PreDecrOperator        bool
+	PostIncrOperator       bool
+	PostDecrOperator       bool
+	UnaryPlusOperator      bool
+	Jumps                  bool
+	LongLong               bool
+	Int8                   bool
+	UInt8                  bool
+	EnableFloat            bool
+	Math64                 bool
+	InlineFunction         bool
+	Pointers               bool
+	Structs                bool
+	ReturnStructs          bool
+	ArgStructs             bool
+	Unions                 bool
+	ReturnUnions           bool
+	ArgUnions              bool
+	TakeUnionFieldAddr     bool
+	VolStructUnionFields   bool
+	ConstStructUnionFields bool
+	Volatiles              bool
+	VolatilePointers       bool
+	ConstPointers          bool
+	GlobalVariables        bool
+	StrictConstArrays      bool
+	AccessOnce             bool
+	StrictVolatileRule     bool
+	AddrTakenOfLocals      bool
+	DanglingGlobalPointers bool
+	NoReturnDeadPointer    bool
+	// InterestedFacts is FactMgr meta_facts bitmask (ePointTo|eUnionWrite).
+	// 0 means use DefaultInterestedFacts at generation time.
+	InterestedFacts          int
 	HashValuePrintf          bool
 	SignedCharIndex          bool
 	ForceGlobalsStatic       bool
@@ -135,14 +153,18 @@ type Options struct {
 	PrefixName               bool
 	SequenceNamePrefix       bool
 	CompatibleCheck          bool
-	MathNoTmp                bool
-	StrictFloat              bool
-	WrapVolatiles            bool
-	AllowConstVolatile       bool
-	FunctionAttributes       bool
-	TypeAttributes           bool
-	LabelAttributes          bool
-	VariableAttributes       bool
+	// NullPointerDerefProb mirrors null_pointer_dereference_prob [0,100]; default 0.
+	NullPointerDerefProb int
+	// DeadPointerDerefProb mirrors dead_pointer_dereference_prob [0,100]; default 0.
+	DeadPointerDerefProb int
+	MathNoTmp            bool
+	StrictFloat          bool
+	WrapVolatiles        bool
+	AllowConstVolatile   bool
+	FunctionAttributes   bool
+	TypeAttributes       bool
+	LabelAttributes      bool
+	VariableAttributes   bool
 
 	StructOutput             string
 	DFSDebugSequence         string
@@ -156,11 +178,17 @@ type Options struct {
 	DumpRandomProbabilities  string
 	SafeMathWrappers         string
 	MonitorFuncs             string
-	EnableBuiltinKinds       string
-	DisableBuiltinKinds      string
-	NoDeltaReduction         bool
+	// Argv is CLI args for the Options: header line (excluding argv[0]).
+	Argv                []string
+	EnableBuiltinKinds  string
+	DisableBuiltinKinds string
+	NoDeltaReduction    bool
+	// VolTestsMach mirrors CGOptions::vol_tests_mach_ (machine string for vol tests).
+	VolTestsMach string
 
-	// Keep an escape hatch for the current simplified generator shape.
+	// MaxGlobals is a Go-only optional cap on GlobalList length during create.
+	// 0 = unlimited (fair default; upstream VariableSelector has no cap).
+	// Positive N fail-closes GenerateNewGlobal / CreateRandomArray global at N.
 	MaxGlobals int
 }
 
@@ -171,8 +199,10 @@ func Defaults() Options {
 		SplitFilesDir:    "",
 		NoMain:           false,
 		PlatformInfoPath: defaultPlatformInfoPath,
-		IntSize:          int(unsafe.Sizeof(int(0))),
-		PointerSize:      int(unsafe.Sizeof(uintptr(0))),
+		// C ABI sizeof(int) is 4 on LP64/ILP32 Csmith targets — not Go's int (8 on amd64).
+		// platform.info / --int-size may override; Type::Output uses intN_t from SizeInBytes.
+		IntSize:     4,
+		PointerSize: int(unsafe.Sizeof(uintptr(0))),
 
 		MaxFuncs:             10,
 		MaxParams:            5,
@@ -183,19 +213,19 @@ func Defaults() Options {
 		MaxStructFields:      10,
 		MaxUnionFields:       5,
 		MaxNestedStructLevel: 3,
-		MaxPointerDepth:      2,
-		MaxArrayDim:          3,
-		MaxArrayLenPerDim:    10,
-		MaxArrayLength:       256,
-		MaxArrayNumInLoop:    4,
-		MaxExhaustiveDepth:   -1,
-		InlineFunctionProb:   50,
-		BuiltinFunctionProb:  50,
-		ArrayOOBProb:         0,
-		NullPtrDerefProb:     0,
-		DanglingPtrDerefProb: 0,
-		StopByStmt:           -1,
-		CoverageTestSize:     500,
+		// CGOptions::max_indirect_level = CGOPTIONS_DEFAULT_MAX_INDIRECT_LEVEL (5).
+		// Older residual-era default of 2 was wrong vs upstream.
+		MaxPointerDepth:     5,
+		MaxArrayDim:         3,
+		MaxArrayLenPerDim:   10,
+		MaxArrayLength:      256,
+		MaxArrayNumInLoop:   4,
+		MaxExhaustiveDepth:  -1,
+		InlineFunctionProb:  50,
+		BuiltinFunctionProb: 50,
+		ArrayOOBProb:        0,
+		StopByStmt:          -1,
+		CoverageTestSize:    500,
 
 		RandomBased:   true,
 		DFSExhaustive: false,
@@ -277,6 +307,8 @@ func Defaults() Options {
 		PrefixName:               false,
 		SequenceNamePrefix:       false,
 		CompatibleCheck:          false,
+		NullPointerDerefProb:     0,
+		DeadPointerDerefProb:     0,
 		MathNoTmp:                false,
 		StrictFloat:              false,
 		WrapVolatiles:            false,
@@ -300,9 +332,33 @@ func Defaults() Options {
 		EnableBuiltinKinds:       "",
 		DisableBuiltinKinds:      "",
 		NoDeltaReduction:         false,
+		VolTestsMach:             "",
 
-		MaxGlobals: 80,
+		// Unlimited — VariableSelector.cpp GenerateNewGlobal has no GlobalList cap.
+		// Positive MaxGlobals remains a library/CLI escape hatch only.
+		MaxGlobals: 0,
 	}
+}
+
+// IsRandom mirrors CGOptions::is_random.
+// CGOptions.cpp:380 — return random_based_.
+func (o Options) IsRandom() bool { return o.RandomBased }
+
+// FuncAttrFlag mirrors CGOptions::func_attr_flag — FunctionAttributes option.
+// CGOptions.cpp DEFINE_GETTER_SETTER_BOOL(func_attr_flag).
+func (o Options) FuncAttrFlag() bool { return o.FunctionAttributes }
+
+// VolTestsMachValue mirrors CGOptions::vol_tests_mach.
+// CGOptions.cpp:589–591.
+func (o Options) VolTestsMachValue() string { return o.VolTestsMach }
+
+// AllowInt64 mirrors CGOptions::allow_int64.
+// CGOptions.cpp: !has_extension_support() && math64() && longlong().
+func (o Options) AllowInt64() bool {
+	if o.Klee || o.Crest || o.CoverageTest {
+		return false
+	}
+	return o.Math64 && o.LongLong
 }
 
 func (o Options) resolvePlatformInfo() (Options, error) {
@@ -386,8 +442,9 @@ func (o Options) Validate() error {
 	if o.MaxBlockDepth < 1 {
 		return fmt.Errorf("max-stmt-depth must be at least 1")
 	}
-	if o.MaxGlobals < 1 {
-		return fmt.Errorf("max-globals must be at least 1")
+	// 0 = unlimited (fair Defaults); negative is invalid.
+	if o.MaxGlobals < 0 {
+		return fmt.Errorf("max-globals must be non-negative (0 = unlimited)")
 	}
 	if o.Func1MaxParams > o.MaxParams {
 		return fmt.Errorf("func1_max_params() cannot be larger than max_params()")
@@ -401,11 +458,12 @@ func (o Options) Validate() error {
 	if o.ArrayOOBProb < 0 || o.ArrayOOBProb > 100 {
 		return fmt.Errorf("array-oob-prob value must between [0,100]")
 	}
-	if o.NullPtrDerefProb < 0 || o.NullPtrDerefProb > 100 {
-		return fmt.Errorf("null-ptr-deref-prob value must between [0,100]")
+	// CGOptions.cpp — single knobs only (null_pointer / dead_pointer_dereference_prob)
+	if o.NullPointerDerefProb < 0 || o.NullPointerDerefProb > 100 {
+		return fmt.Errorf("null-pointer-dereference-prob value must between [0,100]")
 	}
-	if o.DanglingPtrDerefProb < 0 || o.DanglingPtrDerefProb > 100 {
-		return fmt.Errorf("dangling-ptr-deref-prob value must between [0,100]")
+	if o.DeadPointerDerefProb < 0 || o.DeadPointerDerefProb > 100 {
+		return fmt.Errorf("dead-pointer-dereference-prob value must between [0,100]")
 	}
 	if !o.LangCPP && o.CPP11 {
 		return fmt.Errorf("--cpp11 option makes sense only with --lang-cpp option enabled")
@@ -440,8 +498,11 @@ func (o Options) Validate() error {
 	if o.DeltaMonitor != "" && o.GoDelta != "" {
 		return fmt.Errorf("you cannot specify --delta-monitor and --go-delta monitor at the same time")
 	}
-	if o.MaxSplitFiles > 0 && o.SplitFilesDir == "" {
+	// CGOptions.cpp:525–532 — empty split_files_dir → "./output"; create only if max_split_files>0
+	if o.SplitFilesDir == "" {
 		o.SplitFilesDir = "./output"
+	}
+	if o.MaxSplitFiles > 0 {
 		if err := os.MkdirAll(o.SplitFilesDir, 0o755); err != nil {
 			return fmt.Errorf("cannot create dir for split files: %w", err)
 		}
@@ -463,11 +524,18 @@ func (o Options) Validate() error {
 }
 
 func (o Options) normalizeUpstreamFlow() Options {
-	// Upstream fast-execution turns on C++ mode and tightens options.
+	// Upstream --fast-execution (RandomProgramGenerator.cpp:1854–1861) sets
+	// lang_cpp, jumps(false), max_array_length_per_dimension(5) at parse time.
+	// CLIArgs emits --fast-execution before int flags, so a non-default
+	// MaxArrayLenPerDim is the post-flag override (e.g. 13 after fast sets 5).
+	// When still at Defaults (10), apply the side effect so Generate matches
+	// golden which only saw --fast-execution.
 	if o.FastExecution {
 		o.LangCPP = true
 		o.Jumps = false
-		o.MaxArrayLenPerDim = min(o.MaxArrayLenPerDim, 5)
+		if o.MaxArrayLenPerDim == Defaults().MaxArrayLenPerDim {
+			o.MaxArrayLenPerDim = 5
+		}
 	}
 	// Upstream C++ normalization.
 	if o.LangCPP {
@@ -476,7 +544,9 @@ func (o Options) normalizeUpstreamFlow() Options {
 		o.ConstStructUnionFields = false
 	}
 	// Upstream DFS mode forces fixed struct fields.
-	if o.DFSExhaustive {
+	// CGOptions.cpp:410–417 resolve_exhaustive_options side effects.
+	// CompatibleChecker static is enabled only under dfs_exhaustive (same block);
+		if o.DFSExhaustive {
 		o.FixedStructFields = true
 	}
 	return o
